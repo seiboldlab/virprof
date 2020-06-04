@@ -1,0 +1,27 @@
+
+with Stage("classify"):
+    rule blast_classify:
+        input:
+            coverage = "{:prev:}/{:target:}.coverage",
+            blast7 = "{:prev:}/{:target:}.blast7",
+            ncbi_nodes = "{:prev:}/{:target:}.NCBI.nodes.dmp",
+            ncbi_names = "{:prev:}/{:target:}.NCBI.names.dmp"
+        output:
+            result = "{:this:}/{target}.virus.csv"
+        log:
+                     "{:this:}/{target}.log"
+        params:
+            ncbi_dir = lambda wc, input: os.path.dirname(input.ncbi_nodes)
+        shell:
+            "./rules/classify.py"
+            " --out {output.result}"
+            " {input.blast7}"
+            " {input.coverage}"
+            " --ncbi-taxonomy {params.ncbi_dir}"
+            " >{log} 2>&1"
+
+    rule collect_all:
+        input:
+            "{:this:}/{:targets:}.virus.csv"
+        output:
+            touch("{:this:}/all_targets.stamp")

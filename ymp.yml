@@ -1,0 +1,218 @@
+projects:
+  gala:
+    data: gala_test.csv
+  gala_full:
+    data:
+      - gala.csv
+      - gala_test.csv
+  gala_cov:
+    data: gala_cov.csv
+  daps:
+    data: daps.csv
+  inspire:
+    data: inspire.csv
+
+pipelines:
+  gala_nonhuman_reads:
+    - gala_full
+    - trim_bbmapAQ10
+    - ref_hg38
+    - map_hisat2
+    - extract_readsf12
+    - map_bowtie2
+    - extract_readsf12
+  gala_cleaned:
+    - gala_nonhuman_reads
+    - ref_SilvaSSU
+    - map_bbmap
+    - extract_readsF2
+    - ref_SilvaLSU
+    - map_bbmap
+    - extract_readsF2
+  gala_assembly:
+    - gala_nonhuman_reads
+    - dust_bbmapE60
+    - assemble_metaspades
+    - format_bbmapL200
+    - index_bowtie2
+    - map_bowtie2VS
+    - sort_bam
+    - coverage_samtools
+  gala_annotation:
+    - gala_assembly
+    - ref_hg38
+    - annotate_blastE2MegaBest
+    - extract_seqsNomatch
+    - ref_RespVir_G
+    - annotate_blastE10Best
+    - extract_seqs
+    - ref_NT
+    - annotate_blastE10Best
+  daps_nonhuman_reads:
+    - daps
+    - trim_bbmapAQ10
+    - ref_hg38
+    - map_hisat2
+    - extract_readsf12
+    - map_bowtie2
+    - extract_readsf12
+  daps_assembly:
+    - daps_nonhuman_reads
+    - dust_bbmapE60
+    - assemble_metaspades
+    - format_bbmapL200
+    - index_bowtie2
+    - map_bowtie2VS
+    - sort_bam
+    - coverage_samtools
+  daps_annotation:
+    - daps_assembly
+    - ref_hg38
+    - annotate_blastE2MegaBest
+    - extract_seqsNomatch
+    - ref_RespVir_G
+    - annotate_blastE10Best
+    - extract_seqs
+    - ref_NT
+    - annotate_blastE10Best
+  inspire_nonhuman_reads:
+    - inspire
+    - trim_bbmapAQ10
+    - ref_hg38
+    - map_hisat2
+    - extract_readsf12
+    - map_bowtie2
+    - extract_readsf12
+  inspire_assembly:
+    - inspire_nonhuman_reads
+    - dust_bbmapE60
+    - group_sample
+    - assemble_metaspades
+    - format_bbmapL200
+    - index_bowtie2
+    - map_bowtie2VS
+    - sort_bam
+    - coverage_samtools
+  inspire_annotation:
+    - inspire_assembly
+    - ref_hg38
+    - annotate_blastE2MegaBest
+    - extract_seqsNomatch
+    - ref_RespVir_G
+    - annotate_blastE10Best
+    - extract_seqs
+    - ref_NT
+    - annotate_blastE10Best
+
+
+cluster:
+  profile: lsf
+  profiles:
+    lsf:
+      args:
+        queue: "-q foo24"
+        #queue: "-q normal"
+    default:
+      max_jobs_per_second: 5
+      latency_wait: 120
+      cluster_cores: 100
+#      cluster_cores: 35
+
+limits:
+  min_mem: 2G
+  max_mem: 47G
+
+references:
+  hg38:
+    - url:
+        /data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
+      type: dirx
+      files:
+        ALL.1.bt2: genome.1.bt2
+        ALL.2.bt2: genome.2.bt2
+        ALL.3.bt2: genome.3.bt2
+        ALL.4.bt2: genome.4.bt2
+        ALL.rev.1.bt2: genome.rev.1.bt2
+        ALL.rev.2.bt2: genome.rev.2.bt2
+        ALL.fasta: genome.fa
+    - url: /data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
+      type: dirx
+      files:
+        ALL.nin: genome_blastn.nin
+        ALL.nhr: genome_blastn.nhr
+        ALL.nsq: genome_blastn.nsq
+        ALL.nsi: genome_blastn.nsi
+        ALL.nsd: genome_blastn.nsd
+        ALL.nog: genome_blastn.nog
+    - url: /Seibold/data/Reference/HISAT/grch38_snp_tran/
+      type: dirx
+      files:
+        ALL.1.ht2: genome_snp_tran.1.ht2
+        ALL.2.ht2: genome_snp_tran.2.ht2
+        ALL.3.ht2: genome_snp_tran.3.ht2
+        ALL.4.ht2: genome_snp_tran.4.ht2
+        ALL.5.ht2: genome_snp_tran.5.ht2
+        ALL.6.ht2: genome_snp_tran.6.ht2
+        ALL.7.ht2: genome_snp_tran.7.ht2
+        ALL.8.ht2: genome_snp_tran.8.ht2
+  RespVir:
+    - url: /data/reference/NCBI_nt/NCBI_NT_21Aug2018/RespVir/
+      type: dirx
+      files:
+        ALL.nin: RespVir.fa.nin
+        ALL.nhr: RespVir.fa.nhr
+        ALL.nsq: RespVir.fa.nsq
+  RespVir_F:
+    - url: /data/reference/NCBI_nt/NCBI_NT_21Aug2018/RespVir/
+      type: dirx
+      files:
+        ALL.nin: RespVirF.fa.nin
+        ALL.nhr: RespVirF.fa.nhr
+        ALL.nsq: RespVirF.fa.nsq
+  RespVir_G:
+    - url: /data/reference/NCBI_nt/NCBI_NT_21Aug2018/RespVir/
+      type: dirx
+      files:
+        ALL.nin: RespVirG2.nin
+        ALL.nhr: RespVirG2.nhr
+        ALL.nsq: RespVirG2.nsq
+        ALL.nsi: RespVirG2.nsi
+        ALL.nsd: RespVirG2.nsd
+        ALL.nog: RespVirG2.nog
+
+  RespVir_NG:
+    - url: RespVir_NG/
+      type: dirx
+      files:
+        ALL.nin: respvir.fasta.nin
+        ALL.nhr: respvir.fasta.nhr
+        ALL.nsq: respvir.fasta.nsq
+        ALL.nsi: respvir.fasta.nsi
+        ALL.nsd: respvir.fasta.nsd
+        ALL.nog: respvir.fasta.nog
+
+  vf2:
+    - url: VF2_detections.fasta
+
+  NT:
+    - url: /data/reference/NCBI_nt/NCBI_NT_2020-05-01/
+      type: path
+      group:
+        - nt
+      match:
+        - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
+        #- taxdb.{bti,btd}
+
+  NcbiTaxonomy:
+    - url: /data/reference/NCBI/taxonomy/
+      type: dirx
+      files:
+        ALL.NCBI.nodes.dmp: nodes.dmp
+        ALL.NCBI.names.dmp: names.dmp
+
+  SilvaSSU:
+    - url: https://www.arb-silva.de/fileadmin/silva_databases/release_138/Exports/SILVA_138_SSURef_NR99_tax_silva_trunc.fasta.gz
+  SilvaLSU:
+    - url: https://www.arb-silva.de/fileadmin/silva_databases/release_132/Exports/SILVA_132_LSURef_tax_silva_trunc.fasta.gz
+
+
