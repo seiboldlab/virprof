@@ -229,7 +229,7 @@ class HitChain:
         for ohit in self.hits:
             if hit.qacc == ohit.qacc:
                 ostart, oend = sorted((ohit.qstart, ohit.qend))
-                if not oend < start + 80 and not end - 80 < ostart:
+                if not oend < start and not end < ostart:
                     yield ohit
 
     def append(self, hit: BlastHit) -> None:
