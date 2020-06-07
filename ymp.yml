@@ -11,6 +11,8 @@ projects:
     data: daps.csv
   inspire:
     data: inspire.csv
+  sarp:
+    data: sarp.csv
 
 pipelines:
   gala_nonhuman_reads:
@@ -101,6 +103,30 @@ pipelines:
     - ref_RespVir_G
     - annotate_blastE10Best
     - extract_seqs
+    - ref_NT
+    - annotate_blastE10Best
+  sarp_nonhuman_reads:
+    - sarp
+    - trim_bbmapAQ10
+    - ref_hg38
+    - map_hisat2
+    - extract_readsf12
+    - map_bowtie2
+    - extract_readsf12
+  sarp_assembly:
+    - sarp_nonhuman_reads
+    - dust_bbmapE60
+    - assemble_metaspades
+    - format_bbmapL200
+    - index_bowtie2
+    - map_bowtie2VS
+    - sort_bam
+    - coverage_samtools
+  sarp_annotation:
+    - sarp_assembly
+    - ref_hg38
+    - annotate_blastE2MegaBest
+    - extract_seqsNomatch
     - ref_NT
     - annotate_blastE10Best
 
