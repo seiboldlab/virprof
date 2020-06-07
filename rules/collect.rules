@@ -1,6 +1,7 @@
 
 with Stage("classify"):
     rule blast_classify:
+        message: "Classifying {input.blast7}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
             blast7 = "{:prev:}/{:target:}.blast7",
@@ -12,6 +13,8 @@ with Stage("classify"):
                      "{:this:}/{target}.log"
         params:
             ncbi_dir = lambda wc, input: os.path.dirname(input.ncbi_nodes)
+        threads:
+            1
         shell:
             "./rules/classify.py"
             " --out {output.result}"
