@@ -957,8 +957,14 @@ class WordScorer:
                 break
         return " ".join(result_words[:self.keepwords])
 
-    def score_taxids(self, chains):
-        """Selects best scoring taxid from chains"""
+    def score_taxids(self, chains: List[HitChain]) -> int:
+        """Selects best scoring taxid from chains
+
+        Each input HitChain may have multiple NCBI taxonomy IDs
+        assigned (NCBI taxonomy may assign multiple to a single
+        reference sequence). For each found ID, the respective
+        log-evalues are summed and the best score selected.
+        """
         taxid_scores = defaultdict(float)
         for chain in chains:
             for taxid in chain.staxids:
@@ -971,6 +977,7 @@ class WordScorer:
 
 
 def setup_logging():
+    """Sets up python logging facility"""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(levelname)s %(message)s',
@@ -979,6 +986,27 @@ def setup_logging():
 
 
 def parse_file_args(files):
+    """Composes sample dictionary from list of files passed on cmdline
+
+    - If we have only files ending in ``.blast7``, each is a sample of
+      its own.
+    - If we have an equal number of ``.blast7`` and ``.coverage``
+      files, each pair is a sample and the basenames must match.
+    - If we have one file ending in ``.blast7`` and a number of
+      ``.coverage`` files, we have one sample with multiple coverage
+      files (e.g. from a co-assembly over technical replicates or time
+      series).
+
+    Returns:
+      A dictionary with sample names (file base names) as key and
+      pairs of file-descriptor and coverage-file dictionary as
+      value. The coverage-file dictionary itself has the coverage file
+      basename as keys and the respective file-descriptor as values. E.g.
+
+        ```
+           {'sample1': (sample_1_blast7_file, {'coverage1': coverage1_fd})}
+        ```
+    """
     # Sort file arguments by extension
     cov_files = {}
     blast7_files = {}
@@ -996,6 +1024,7 @@ def parse_file_args(files):
             f"Unknown file type in arguments: {other_files}"
         )
 
+    # Build result dictionary
     samples = {}
     if cov_files:
         chain_class = CoverageHitChain
@@ -1028,6 +1057,7 @@ def parse_file_args(files):
 
 
 def group_hits_by_qacc(hits):
+    """Groups input hits into lists with same query accession"""
     qacc = None
     group = []
     for hit in hits:
