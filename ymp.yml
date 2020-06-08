@@ -13,6 +13,8 @@ projects:
     data: inspire.csv
   sarp:
     data: sarp.csv
+  covid:
+    data: covid.csv
 
 pipelines:
   gala_nonhuman_reads:
@@ -130,6 +132,32 @@ pipelines:
     - ref_NT
     - annotate_blastE10Best
 
+  covid_nonhuman_reads:
+    - covid
+    - trim_bbmapAQ10
+    - ref_hg38
+    - map_hisat2
+    - extract_readsf12
+    - map_bowtie2
+    - extract_readsf12
+  covid_assembly:
+    - covid_nonhuman_reads
+    - dust_bbmapE60
+    - assemble_metaspades
+    - format_bbmapL200
+    - index_bowtie2
+    - map_bowtie2VS
+    - sort_bam
+    - coverage_samtools
+  covid_annotation:
+    - covid_assembly
+    - ref_hg38
+    - annotate_blastE2MegaBest
+    - extract_seqsNomatch
+    - ref_NT
+    - annotate_blastE10Best
+    - ref_NcbiTaxonomy
+    - classify
 
 cluster:
   profile: lsf
