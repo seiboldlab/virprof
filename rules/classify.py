@@ -849,7 +849,7 @@ class WordScorer:
         self.stopwords = stopwords
         self.maxwordlen = maxwordlen
         self.orderweight = orderweight
-        self.keepwords = keepwords(words)
+        self.keepwords = keepwords
 
     @staticmethod
     def split_words(chain: HitChain) -> Iterable[str]:
