@@ -146,7 +146,7 @@ cluster:
 
 limits:
   min_mem: 2G
-  max_mem: 47G
+  max_mem: 45G
 
 references:
   hg38:
