@@ -47,11 +47,10 @@ pipelines:
     - ref_hg38
     - annotate_blastE2MegaBest
     - extract_seqsNomatch
-    - ref_RespVir_G
-    - annotate_blastE10Best
-    - extract_seqs
     - ref_NT
     - annotate_blastE10Best
+    - ref_NcbiTaxonomy
+    - classify
   daps_nonhuman_reads:
     - daps
     - trim_bbmapAQ10
@@ -74,11 +73,10 @@ pipelines:
     - ref_hg38
     - annotate_blastE2MegaBest
     - extract_seqsNomatch
-    - ref_RespVir_G
-    - annotate_blastE10Best
-    - extract_seqs
     - ref_NT
     - annotate_blastE10Best
+    - ref_NcbiTaxonomy
+    - classify
   inspire_nonhuman_reads:
     - inspire
     - trim_bbmapAQ10
@@ -102,11 +100,10 @@ pipelines:
     - ref_hg38
     - annotate_blastE2MegaBest
     - extract_seqsNomatch
-    - ref_RespVir_G
-    - annotate_blastE10Best
-    - extract_seqs
     - ref_NT
     - annotate_blastE10Best
+    - ref_NcbiTaxonomy
+    - classify
   sarp_nonhuman_reads:
     - sarp
     - trim_bbmapAQ10
@@ -131,7 +128,8 @@ pipelines:
     - extract_seqsNomatch
     - ref_NT
     - annotate_blastE10Best
-
+    - ref_NcbiTaxonomy
+    - classify
   covid_nonhuman_reads:
     - covid
     - trim_bbmapAQ10
