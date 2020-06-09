@@ -176,7 +176,8 @@ class HitChain:
         return self._hash
 
     def __eq__(self, other) -> bool:
-        return all(hit == ohit for hit, ohit in zip(self.hits, other.hits))
+        #return all(hit == ohit for hit, ohit in zip(self.hits, other.hits))
+        return hash(self) == hash(other)
 
     def overlaps(self, hit: BlastHit) -> bool:
         """Checks for overlap with ``hit``
