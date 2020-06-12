@@ -426,7 +426,7 @@ class HitChain:
                 chains.append(chain)
         return chains
 
-    def make_chains(self, hits: Iterable[BlastHit]) -> Iterator["HitChain"]:
+    def make_chains(self, hits: Iterable[BlastHit]) -> List["HitChain"]:
         """Generates hit chains for set of hits
 
         Uses the current HitChain as start point
@@ -434,17 +434,18 @@ class HitChain:
         hitsets = defaultdict(list)
         for hit in hits:
             hitsets[hit.sacc].append(hit)
-        logging.error("Got %i hitsets", len(hitsets))
-        return itertools.chain.from_iterable(
-            self._make_chains(hits)
-            for hits in hitsets.values()
-        )
+        logging.info("Making chains from %i hitsets", len(hitsets))
+        return [chain
+                for hitset in tqdm.tqdm(hitsets.values(),
+                                        desc="Making chains",
+                                        disable=None)
+                for chain in self._make_chains(hitset)]
 
     @classmethod
-    def greedy_select_chains(cls, it: Iterable["HitChain"], alt: float=0.9
-    ) -> Iterator["HitChain"]:
+    def greedy_select_chains(cls, chains: List["HitChain"],
+                             alt: float=0.9) -> Iterator["HitChain"]:
         """Greedily selects hit chains with best e-value score"""
-        chains = list(it)
+        total = len(chains)
         while chains:
             best_chain_id = min(range(len(chains)),
                                 key=lambda i: chains[i].log10_evalue)
