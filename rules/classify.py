@@ -879,7 +879,7 @@ class WordScorer:
           Generator over words
         """
         for word in words:
-            if word[1:].isLower():
+            if word[1:].islower():
                 yield word.lower()
             else:
                 yield word
@@ -893,7 +893,7 @@ class WordScorer:
         Returns:
           Generator over words
         """
-        stack = []
+        stack = [next(iter(words))]
         for word in words:
             if len(word) <= 2:
                 stack += [' '.join((stack[-1], word))]
@@ -902,8 +902,7 @@ class WordScorer:
                 stack  = [word]
         yield from reversed(stack)
 
-    @staticmethod
-    def filter_stopwords(words: Iterable[str]) -> Iterable[str]:
+    def filter_stopwords(self, words: Iterable[str]) -> Iterable[str]:
         """Filter out words occurring in our stopword list
 
         Args:
@@ -934,8 +933,9 @@ class WordScorer:
         result. Words composed from multiple words are split for this
         accounting, and no (sub)word may occur twice.
         """
+        word_scores = defaultdict(float)
         for chain in chains:
-            words = self.split_words(words)
+            words = self.split_words(chain)
             words = self.strip_punctuation(words)
             words = self.uncapitalize(words)
             words = self.combine_shortwords(words)
