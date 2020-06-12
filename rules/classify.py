@@ -418,9 +418,9 @@ class HitChain:
                 try:
                     chain.append(hit)
                 except self.OverlapException:
-                    chain = copy(chain)
-                    chain.prune([hit])
-                    newchains.add(chain)
+                    newchain = copy(chain)
+                    newchain.prune([hit])
+                    newchains.add(newchain)
             for chain in newchains:
                 chain.append(hit)
                 chains.append(chain)
