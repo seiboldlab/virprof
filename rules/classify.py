@@ -172,12 +172,11 @@ class HitChain:
 
     def __hash__(self) -> int:
         if self._hash is None:
-            self._hash = hash(hit for hit in self.hits)
+            self._hash = hash(tuple(self.hits))
         return self._hash
 
     def __eq__(self, other) -> bool:
-        #return all(hit == ohit for hit, ohit in zip(self.hits, other.hits))
-        return hash(self) == hash(other)
+        return self.hits == other.hits
 
     def overlaps(self, hit: BlastHit) -> bool:
         """Checks for overlap with ``hit``
