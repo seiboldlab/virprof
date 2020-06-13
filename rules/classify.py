@@ -450,12 +450,14 @@ class HitChain:
             best_chain_id = min(range(len(chains)),
                                 key=lambda i: chains[i].log10_evalue)
             result = chains.pop(best_chain_id)
+            qaccs = set(result.qaccs)
             altresult = sorted((
                 chain for chain in chains
                 if chain != result
                 and chain.log10_evalue < alt * result.log10_evalue
                 and chain.alen > alt * result.alen
                 and chain.qlen > alt * result.qlen
+                and len(qaccs.intersection(set(chain.qaccs))) > len(qaccs) * alt
             ), key=lambda res: res.log10_evalue)
 
             yield result, altresult
