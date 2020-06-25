@@ -240,7 +240,7 @@ class HitChain:
         Args:
           hit: A BLAST hit
         """
-        if self.overlaps_query(hit):
+        if self.overlaps(hit):
             raise self.OverlapException()
         self.hits.append(hit)
         self._reset()
@@ -426,6 +426,7 @@ class HitChain:
                     chain.append(hit)
                 except self.OverlapException:
                     newchain = copy(chain)
+                    newchain.trunc(sstart)
                     newchain.prune([hit])
                     newchains.add(newchain)
             for chain in newchains:
