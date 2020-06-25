@@ -453,6 +453,7 @@ class HitChain:
                              alt: float=0.9) -> Iterator["HitChain"]:
         """Greedily selects hit chains with best e-value score"""
         total = len(chains)
+        bar = tqdm.tqdm(total=total, desc="Pruning chains")
         while chains:
             best_chain_id = min(range(len(chains)),
                                 key=lambda i: chains[i].log10_evalue)
@@ -472,6 +473,8 @@ class HitChain:
             for chain in chains:
                 chain.prune(result.hits, full_sequence=True)
             chains = [chain for chain in chains if len(chain) > 0]
+            bar.update(total - len(chains))
+            total = len(chains)
 
     def to_dict(self):
         """Convert class to dict for writing to CSV"""
