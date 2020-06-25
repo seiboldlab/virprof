@@ -1159,7 +1159,12 @@ def main(files, out, ncbi_taxonomy=None, include=None,
     writer.writeheader()
     log.info("Writing to: %s", out.name)
 
-    for sample, (fd, cov_files) in tqdm.tqdm(samples.items()):
+    if len(samples) > 1:
+        sample_iter = tqdm.tqdm(samples.items())
+    else:
+        sample_iter = samples.items()
+
+    for sample, (fd, cov_files) in sample_iter:
         log.info("Processing %s", sample)
 
         # Do prefiltering
