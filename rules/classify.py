@@ -143,7 +143,7 @@ class HitChain:
     def __init__(self,
                  hits: List[BlastHit] = None,
                  chain_penalty: int = 20) -> None:
-        self.hits = copy(hits) if hits else list()
+        self.hits = hits.copy() if hits else list()
         self.chain_penalty = chain_penalty
 
         self._score: Optional[float] = None
