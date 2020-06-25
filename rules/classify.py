@@ -56,6 +56,8 @@ import graph_tool.topology
 import graph_tool.search
 import graph_tool.util
 
+log = logging.getLogger(__name__)
+
 class BlastHit(NamedTuple):
     """Base type for a BLAST hit
 
@@ -434,7 +436,7 @@ class HitChain:
         hitsets = defaultdict(list)
         for hit in hits:
             hitsets[hit.sacc].append(hit)
-        logging.info("Making chains from %i hitsets", len(hitsets))
+        log.info("Making chains from %i hitsets", len(hitsets))
         return [chain
                 for hitset in tqdm.tqdm(hitsets.values(),
                                         desc="Making chains",
@@ -688,14 +690,14 @@ class Taxonomy(ABC):
             else:
                 def excludeFilter(taxid: int) -> bool:
                     return taxid not in exclude_ids
-                logging.info("Made filter excluding %i tax_ids",
+                log.info("Made filter excluding %i tax_ids",
                              len(exclude_ids))
                 return excludeFilter
         else:
             include_ids = include_ids.intersection(exclude_ids)
             def includeFilter(taxid: int) -> bool:
                 return taxid in include_ids
-            logging.info("Made filter including %i tax_ids",
+            log.info("Made filter including %i tax_ids",
                          len(include_ids))
 
             return includeFilter
@@ -1045,17 +1047,17 @@ def parse_file_args(files):
                 )
             for name in basenames:
                 samples[name] = (blast7_files[name], {name: cov_files[name]})
-            logging.info("Processing %i samples with coverage", len(samples))
+            log.info("Processing %i samples with coverage", len(samples))
         else:
             name = next(iter(blast7_files.keys()))
             samples[name] = (blast7_files[name], cov_files)
-            logging.info("Processing single sample with %i coverage files",
+            log.info("Processing single sample with %i coverage files",
                          len(cov_files))
     else:
         chain_class = HitChain
         for name in blast7_files:
             samples[name] = (blast7_files[name], {})
-        logging.info("Processing %i samples without coverage", len(samples))
+        log.info("Processing %i samples without coverage", len(samples))
     return chain_class, samples
 
 
@@ -1102,7 +1104,7 @@ def main(files, out, ncbi_taxonomy=None, include=None,
     setup_logging()
 
     if not files:
-        logging.info("No files to process")
+        log.info("No files to process")
         return
     chain_class, samples = parse_file_args(files)
     chain_tpl = chain_class(chain_penalty=chain_penalty)
@@ -1133,14 +1135,14 @@ def main(files, out, ncbi_taxonomy=None, include=None,
     field_list += ['taxid']
     if not taxonomy.isNull():
         field_list += ['lineage']
-    logging.info("Output fields: %s", ' '.join(field_list))
+    log.info("Output fields: %s", ' '.join(field_list))
 
     writer = csv.DictWriter(out, field_list)
     writer.writeheader()
-    logging.info("Writing to: %s", out.name)
+    log.info("Writing to: %s", out.name)
 
     for sample, (fd, cov_files) in tqdm.tqdm(samples.items()):
-        logging.info("Processing %s", sample)
+        log.info("Processing %s", sample)
 
         # Do prefiltering
         reader = group_hits_by_qacc(ymp.blast.reader(fd))
@@ -1159,18 +1161,17 @@ def main(files, out, ncbi_taxonomy=None, include=None,
                 hits += hitgroup
             else:
                 n_filtered += 1
-        logging.info("  %i query sequences (contigs) had hits",
+        log.info("  %i query sequences (contigs) had hits",
                      n_queries)
-        logging.info("  %i matched excludes", n_filtered)
-        logging.info("  %i HSPs to process", len(hits))
+        log.info("  %i matched excludes", n_filtered)
+        log.info("  %i HSPs to process", len(hits))
 
         # Load Coverage
         cov = {}
         for cov_sample, cov_fd in cov_files.items():
-            logging.error("Loading coverage for %s %s", sample, cov_sample)
+            log.info("Loading coverage for %s %s", sample, cov_sample)
             cov_reader = csv.DictReader(cov_fd, delimiter="\t")
             cov_data = {row['#rname']:row for row in cov_reader}
-            logging.error("Got %i rows", len(cov_data))
             cov[cov_sample] = cov_data
             cov_fd.close()
         if cov:
@@ -1180,6 +1181,7 @@ def main(files, out, ncbi_taxonomy=None, include=None,
         chains = chain_tpl.make_chains(hits)
         fd.close()  # not needed any more, keep open fd's low
 
+        log.info("Selecting chains")
         # Choose "best" chains
         for chain, altchains in chain_tpl.greedy_select_chains(chains):
             allchains = [chain] + (altchains or [])
