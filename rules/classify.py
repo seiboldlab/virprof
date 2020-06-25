@@ -286,11 +286,13 @@ class HitChain:
             this HitChain that does not extend beyond the parameter
             ``start``.
         """
-        oldlen = len(self.hits)
+        hits = self.hits
+        oldlen = len(hits)
         while hits and max(hits[-1].sstart, hits[-1].send) >= sstart:
             hits.pop()
-        if oldlen != len(self.hits):
+        if oldlen != len(hits):
             self._reset()
+            self.hits = hits
 
     @property
     def qlen(self) -> int:
