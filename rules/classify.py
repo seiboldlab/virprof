@@ -228,11 +228,11 @@ class HitChain:
           ``hit`` and overlapping query side of ``hit``.
         """
         start, end = sorted((hit.qstart, hit.qend))
-        for ohit in self.hits:
-            if hit.qacc == ohit.qacc:
-                ostart, oend = sorted((ohit.qstart, ohit.qend))
-                if not oend < start and not end < ostart:
-                    yield ohit
+        qacc = hit.qacc
+        for ohit in filter(lambda h: h.qacc == qacc, self.hits):
+            ostart, oend = sorted((ohit.qstart, ohit.qend))
+            if not oend < start and not end < ostart:
+                yield ohit
 
     def append(self, hit: BlastHit) -> None:
         """Append a BLAST hit to the chain
