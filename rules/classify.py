@@ -410,9 +410,12 @@ class HitChain:
         """
         # start with empty chain
         chains = [copy(self)]
+        hitset.sort(key=lambda h: min(h.sstart, h.send))
+        if len(hitset) > 10:
+            hitset = tqdm.tqdm(hitset, desc=hitset[0].sacc)
 
         # iterate over hits in order of range on target
-        for hit in sorted(hitset, key=lambda h: min(h.sstart, h.send)):
+        for hit in hitset:
             newchains = set()
             sstart = min(hit.sstart, hit.send)
             # iterate over open chains
