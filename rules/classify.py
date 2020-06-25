@@ -984,12 +984,27 @@ class WordScorer:
         return staxids[0]
 
 
+class TqdmHandler(logging.Handler):
+    def __init__(self):
+        logging.Handler.__init__(self)
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            tqdm.tqdm.write(msg)
+        except (KeyboardInterrupt, SystemExit, RecursionError):
+            raise
+        except Exception:
+            self.handleError(record)
+
+
 def setup_logging():
     """Sets up python logging facility"""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(levelname)s %(message)s',
-        datefmt='%m/%d/%Y %I:%M:%S'
+        datefmt='%m/%d/%Y %I:%M:%S',
+        handlers=[TqdmHandler()]
     )
 
 
