@@ -15,6 +15,8 @@ projects:
     data: sarp.csv
   covid:
     data: covid.csv
+  sunbeam:
+    data: sunbeam.csv
 
 pipelines:
   gala_nonhuman_reads:
@@ -118,7 +120,7 @@ pipelines:
     - assemble_metaspades
     - format_bbmapL200
     - index_bowtie2
-    - map_bowtie2VS
+    - map_bowtie2
     - sort_bam
     - coverage_samtools
   sarp_annotation:
@@ -156,6 +158,32 @@ pipelines:
     - annotate_blastE10Best
     - ref_NcbiTaxonomy
     - classify
+  sunbeam_nonhuman_reads:
+    - sunbeam
+    - trim_bbmapAQ10
+    - ref_hg38
+    - map_hisat2
+    - extract_readsf12
+    - map_bowtie2
+    - extract_readsf12
+  sunbeam_assembly:
+    - sunbeam_nonhuman_reads
+    - dust_bbmapE60
+    - assemble_metaspades
+    - format_bbmapL200
+    - index_bowtie2
+    - map_bowtie2VS
+    - sort_bam
+    - coverage_samtools
+  sunbeam_annotation:
+    - sunbeam_assembly
+    - ref_hg38
+    - annotate_blastE2MegaBest
+    - extract_seqsNomatch
+    - ref_NT
+    - annotate_blastE10Best
+    - ref_NcbiTaxonomy
+    - classify
 
 cluster:
   profile: lsf
@@ -167,7 +195,8 @@ cluster:
     default:
       max_jobs_per_second: 5
       latency_wait: 120
-      cluster_cores: 100
+      cluster_cores: 50
+#      cluster_cores: 100
 #      cluster_cores: 35
 
 limits:
