@@ -21,6 +21,7 @@ with Stage("classify"):
             " {input.blast7}"
             " {input.coverage}"
             " --ncbi-taxonomy {params.ncbi_dir}"
+            " --exclude 'cellular organisms'"
             " >{log} 2>&1"
 
     rule collect_all:
