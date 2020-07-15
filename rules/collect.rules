@@ -1,3 +1,17 @@
+Env(name="virprof_r", base="bioconda",
+    packages=[
+        "r-magrittr",
+        "r-dplyr",
+        "r-readr",
+        "r-purrr",
+        "r-tidyr",
+        "r-stringr",
+        "r-fuzzyjoin",
+        "r-tibble",
+        "r-openxlsx",
+        "r-optparse",
+    ])
+
 
 with Stage("classify"):
     rule blast_classify:
@@ -24,8 +38,36 @@ with Stage("classify"):
             " --exclude 'cellular organisms'"
             " >{log} 2>&1"
 
+    rule aggregate_virus:
+        message: "Creating virus summary"
+        input:
+            #virushostdb="{:prev:}/virushostdb.csv",
+            calls="{:this:}/{:targets:}.virus.csv"
+        output:
+            excel="{:this:}/virus_summary.xlsx"
+        log:
+            "{:this:}/aggregate.log"
+        params:
+            filter="^Viruses;",
+            filter_host="Homo sapiens",
+            min_alen=200,
+            min_reads=3
+        threads:
+            1
+        conda:
+            "virprof_r"
+        shell:
+            "./scripts/aggregate_classifications.R"
+            "  --filter '{params.filter}'"
+            "  --filter-host '{params.filter_host}'"
+            "  --min-alen '{params.min_alen}'"
+            "  --min-reads '{params.min_reads}'"
+            "  --excel-out '{output.excel}'"
+            "  {input.calls}"
+            "  >{log} 2>&1"
+
     rule collect_all:
         input:
-            "{:this:}/{:targets:}.virus.csv"
+            "{:this:}/virus_summary.xlsx"
         output:
             touch("{:this:}/all_targets.stamp")
