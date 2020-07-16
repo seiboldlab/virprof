@@ -30,7 +30,7 @@ with Stage("classify"):
         threads:
             1
         shell:
-            "./rules/classify.py"
+            "./scripts/blast_classify.py"
             " --out {output.result}"
             " {input.blast7}"
             " {input.coverage}"
