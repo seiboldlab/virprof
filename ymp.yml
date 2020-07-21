@@ -17,6 +17,8 @@ projects:
     data: covid.csv
   sunbeam:
     data: sunbeam.csv
+  enigma:
+    data: enigma.csv
 
 pipelines:
   gala_nonhuman_reads:
@@ -177,6 +179,32 @@ pipelines:
     - coverage_samtools
   sunbeam_annotation:
     - sunbeam_assembly
+    - ref_hg38
+    - annotate_blastE2MegaBest
+    - extract_seqsNomatch
+    - ref_NT
+    - annotate_blastE10Best
+    - ref_NcbiTaxonomy
+    - classify
+  enigma_nonhuman_reads:
+    - enigma
+    - trim_bbmapAQ10
+    - ref_hg38
+    - map_hisat2
+    - extract_readsf12
+    - map_bowtie2
+    - extract_readsf12
+  enigma_assembly:
+    - enigma_nonhuman_reads
+    - dust_bbmapE60
+    - assemble_metaspades
+    - format_bbmapL200
+    - index_bowtie2
+    - map_bowtie2
+    - sort_bam
+    - coverage_samtools
+  enigma_annotation:
+    - enigma_assembly
     - ref_hg38
     - annotate_blastE2MegaBest
     - extract_seqsNomatch
