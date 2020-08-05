@@ -44,10 +44,12 @@ with Stage("classify"):
             #virushostdb="{:prev:}/virushostdb.csv",
             calls="{:this:}/{:targets:}.virus.csv"
         output:
-            excel="{:this:}/virus_summary.xlsx"
+            excel="{:this:}/virus_summary.xlsx",
+            csv="{:this:}/result_by_sample.csv"
         log:
             "{:this:}/aggregate.log"
         params:
+            this="{:this:}",
             filter="^Viruses;",
             filter_host="Homo sapiens",
             min_alen=200,
@@ -63,6 +65,7 @@ with Stage("classify"):
             "  --min-alen '{params.min_alen}'"
             "  --min-reads '{params.min_reads}'"
             "  --excel-out '{output.excel}'"
+            "  --out '{params.this}/result_%s.csv'"
             "  {input.calls}"
             "  >{log} 2>&1"
 
