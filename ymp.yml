@@ -40,7 +40,7 @@ pipelines:
     - assemble_metaspades
     - format_bbmapL200
     - index_bowtie2
-    - map_bowtie2VS
+    - map_bowtie2
     - sort_bam
     - coverage_samtools
   gala_annotation:
@@ -66,7 +66,7 @@ pipelines:
     - assemble_metaspades
     - format_bbmapL200
     - index_bowtie2
-    - map_bowtie2VS
+    - map_bowtie2
     - sort_bam
     - coverage_samtools
   daps_annotation:
@@ -93,7 +93,7 @@ pipelines:
     - assemble_metaspades
     - format_bbmapL200
     - index_bowtie2
-    - map_bowtie2VS
+    - map_bowtie2
     - sort_bam
     - coverage_samtools
   inspire_annotation:
@@ -145,7 +145,7 @@ pipelines:
     - assemble_metaspades
     - format_bbmapL200
     - index_bowtie2
-    - map_bowtie2VS
+    - map_bowtie2
     - sort_bam
     - coverage_samtools
   covid_annotation:
@@ -171,7 +171,7 @@ pipelines:
     - assemble_metaspades
     - format_bbmapL200
     - index_bowtie2
-    - map_bowtie2VS
+    - map_bowtie2
     - sort_bam
     - coverage_samtools
   sunbeam_annotation:
