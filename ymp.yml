@@ -1,10 +1,7 @@
 projects:
   gala:
-    data: gala_test.csv
-  gala_full:
     data:
       - gala.csv
-      - gala_test.csv
   gala_cov:
     data: gala_cov.csv
   daps:
@@ -22,7 +19,7 @@ projects:
 
 pipelines:
   gala_nonhuman_reads:
-    - gala_full
+    - gala
     - trim_bbmapAQ10
     - ref_hg38
     - map_hisat2
