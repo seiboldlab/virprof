@@ -3,20 +3,22 @@
 # IMPORTANT: Files MUST have a column named "sample" for
 # grouping by the pipeline later.
 projects:
-  gala:
-    data: gala.csv
-  daps:
-    data: daps.csv
-  inspire:
-    data: inspire.csv
-  sarp:
-    data: sarp.csv
   covid:
-    data: covid.csv
-  sunbeam:
-    data: sunbeam.csv
+    data: projects/covid.csv
+  daps:
+    data: projects/daps.csv
   enigma:
-    data: enigma.csv
+    data: projects/enigma.csv
+  gala:
+    data: projects/gala.csv
+  hrvc15:
+    data: projects/hrvc15.csv
+  inspire:
+    data: projects/inspire.csv
+  sarp:
+    data: projects/sarp.csv
+  sunbeam:
+    data: projects/sunbeam.csv
 
 # Here the pipeline is defined in three parts:
 # 1. Selection of non-human reads
