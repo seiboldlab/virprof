@@ -1,0 +1,339 @@
+"""This module contains classes for handling operations on the NCBI taxonomy"""
+
+import os
+import csv
+import logging
+from abc import ABC, abstractmethod
+from typing import Set, List
+
+import graph_tool as gt
+import graph_tool.topology as gt_topology
+import graph_tool.search as gt_search
+import graph_tool.util as gt_util
+import networkx as nx
+
+LOG = logging.getLogger(__name__)
+
+
+class Taxonomy(ABC):
+    """Base class holding NCBI taxonomy
+
+    The tree is implemented in subclasses TaxonomyGT and
+    TaxonomyNX, using graph-tool and networkx libraries,
+    respectively.
+
+    Args:
+      path: Path to the place where names.dmp and nodes.dmp
+            can be found.
+    """
+    def __init__(self, path: str) -> None:
+        self.path = path
+        if path is None:
+            self.names_fn: str = None
+            self.nodes_fn: str = None
+        else:
+            self.names_fn = os.path.join(self.path, "names.dmp")
+            self.nodes_fn = os.path.join(self.path, "nodes.dmp")
+
+        try:
+            self.tree = self.load_tree_binary()
+        except FileNotFoundError:
+            self.tree = self.load_tree()
+            self.save_tree_binary()
+
+    @abstractmethod
+    def load_tree_binary(self):
+        """Load the tree from implementation specific binary"""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def save_tree_binary(self):
+        """Save the tree to implementation specific binary"""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def load_tree(self):
+        """Load the tree from NCBI dmp files"""
+        raise NotImplementedError()
+
+    @property
+    def root(self) -> int:
+        """The ``tax_id`` of the root node
+
+        Returns:
+          Always 1
+        """
+        return 1
+
+    def node_reader(self):
+        """Reader for NCBI names.dmp listing nodes and properties
+
+        Returns:
+           Generator of tax_id and property dictionary. The
+           latter has ``name`` set to the scientific name from
+           the NCBI file.
+        """
+        with open(self.names_fn, "r") as names_fd:
+            reader = csv.DictReader(
+                names_fd, delimiter='|',
+                fieldnames=[
+                    'tax_id', 'name', 'unique_name', 'name_class'
+                ])
+            for row in reader:
+                if row['name_class'].strip() == 'scientific name':
+                    tax_id = int(row['tax_id'])
+                    data = dict((('name', row['name'].strip()),))
+                    yield tax_id, data
+
+    def edge_reader(self):
+        """Reader for NCBI nodes.dmp, listing node and parent ids
+
+        Returns:
+           Generator over taxids ``(source, target)``
+        """
+        with open(self.nodes_fn, "r") as nodes_fd:
+            reader = csv.DictReader(
+                nodes_fd, delimiter='|',
+                fieldnames=[
+                    'tax_id', 'parent_id', 'rank'
+                ]
+            )
+            for row in reader:
+                source_node = int(row['parent_id'])
+                target_node = int(row['tax_id'])
+                yield source_node, target_node
+
+    @abstractmethod
+    def get_name(self, tax_id: int) -> str:
+        """Get the scientific name of a node
+
+        Args:
+          tax_id: ID of taxonomy node
+        Returns:
+          The NCBI taxonomy scientific name, or "Unknown"
+          for ``tax_id``s not found or named in the tree
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_lineage(self, tax_id: int) -> str:
+        """Get the lineage for a node
+
+        Args:
+          tax_id: ID of taxonomy node
+
+        Returns:
+          The names of all nodes from (excluding) the root node until
+          (including) node given in ``tax_id``. Names are separated by
+          semicolons. If the node ``tax_id`` is not found in the tree,
+          "Unknown" is returned. Nodes not described are not mentioned
+          in the linage string.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_subtree_ids(self, name: str) -> Set:
+        """Get the ``tax_id``s for node ``name`` and all subnodes
+
+        Args:
+          name: Scientific name of node
+
+        Returns:
+          Set of ``tax_id``s of the named node and all subnodes.
+        """
+        raise NotImplementedError()
+
+    def make_filter(self, include: List[str] = None,
+                    exclude: List[str] = None):
+        """Create a filtering function
+
+        Args:
+          include: List of strings matching NCBI taxonomy scientific
+            names of nodes. Only tax_ids of nodes below any of the
+            listed "clades" will be accepted by the generated filter
+            function.
+
+          exclude: List of strings matching NCBI taxonomy scientific
+            names of nodes. IDs of nodes below any of the listed
+            "clades" will be rejected by the generated filter
+            function.
+
+        Returns:
+          A function that takes an integer ``tax_id`` and returns
+          a boolean indicating whether the tax_id should be included.
+        """
+        if include is None:
+            include_ids = set()
+        else:
+            include_ids = set(
+                tid
+                for name in include
+                for tid in self.get_subtree_ids(name)
+            )
+        if exclude is None:
+            exclude_ids = set()
+        else:
+            exclude_ids = set(
+                tid
+                for name in exclude
+                for tid in self.get_subtree_ids(name)
+            )
+        if not include_ids:
+            if not exclude_ids:
+                def null_filter(_tax_id: int) -> bool:
+                    """Always true"""
+                    return True
+                return null_filter
+
+            def exclude_filter(taxid: int) -> bool:
+                """True if taxid not excluded"""
+                return taxid not in exclude_ids
+            LOG.info("Made filter excluding %i tax_ids",
+                     len(exclude_ids))
+            return exclude_filter
+
+        include_ids = include_ids.intersection(exclude_ids)
+
+        def include_filter(taxid: int) -> bool:
+            """True if ``taxid`` included"""
+            return taxid in include_ids
+        LOG.info("Made filter including %i tax_ids",
+                 len(include_ids))
+        return include_filter
+
+    @staticmethod
+    def is_null() -> bool:
+        """Tests if this is an instance of TaxonmyNull (no taxonomy)"""
+        return False
+
+
+class TaxonomyGT(Taxonomy):
+    """NCBI Taxonomy class using ``graph-tool`` to manage tree"""
+    def load_tree(self) -> gt.Graph:
+        tree = gt.load_graph_from_csv(
+            self.nodes_fn,
+            directed=True, eprop_types=[], string_vals=False,
+            ecols=(1, 0),
+            csv_options={'delimiter': '|'})
+        tree.vp.name = tree.new_vertex_property("string")
+        for tax_id, data in self.node_reader():
+            tree.vp.name[tree.vertex(tax_id)] = data['name']
+        return tree
+
+    def load_tree_binary(self) -> gt.Graph:
+        return gt.load_graph('taxtree.gt')
+
+    def save_tree_binary(self) -> None:
+        self.tree.save('taxtree.gt')
+
+    def get_name(self, tax_id: int) -> str:
+        try:
+            return self.tree.vp.name[self.tree.vertex(tax_id)] or 'Unknown'
+        except ValueError:
+            return 'Unknown'
+
+    def get_lineage(self, tax_id: int) -> str:
+        try:
+            target = self.tree.vertex(tax_id)
+        except ValueError:
+            return 'Unknown'
+        nodes, _ = gt_topology.shortest_path(self.tree, self.root, target)
+        return '; '.join(self.tree.vp.name[node]
+                         for node in nodes[1:])
+
+    def get_subtree_ids(self, name):
+        vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
+        if len(vertices) != 1:
+            return set()
+        ids = set(
+            int(tgt) for _, tgt in
+            gt_search.dfs_iterator(self.tree, vertices[0])
+        )
+        ids.add(int(vertices[0]))
+        return ids
+
+
+class TaxonomyNX(Taxonomy):
+    """Implementation of Taxonomy class using NetworkX
+
+    No longer actually used.
+    """
+    def load_tree_binary(self):
+        return nx.read_gpickle('taxtree.pkl')
+
+    def save_tree_binary(self):
+        nx.write_gpickle(self.tree, 'taxtree.pkl')
+
+    def load_tree(self):
+        tree = nx.DiGraph()
+        tree.add_nodes_from(self.node_reader())
+        tree.add_edges_from(self.edge_reader())
+        return tree
+
+    def get_subtree_ids(self, name: str) -> Set:
+        for node, data in self.tree.nodes(data=True):
+            if data.get('name') == name:
+                taxid = node
+                break
+        else:
+            return set()
+
+        return nx.descendants(self.tree, taxid) + [taxid]
+
+    def get_lineage(self, tax_id: int) -> str:
+        if tax_id not in self.tree:
+            return "Unknown"
+        path = nx.shortest_path(self.tree, self.root, tax_id)
+        return '; '.join(self.tree.nodes[node].get('name')
+                         for node in path[1:])
+
+    def get_name(self, tax_id: int) -> str:
+        if tax_id not in self.tree:
+            return "Unknown"
+        return self.tree.nodes[tax_id].get('name')
+
+
+class TaxonomyNull(Taxonomy):
+    """Implementation of Taxonomy Class not doing anything
+
+    Used when no taxonomy data is provided.
+    """
+    def load_tree_binary(self):
+        return None
+
+    def save_tree_binary(self):
+        pass
+
+    def load_tree(self):
+        pass
+
+    def get_name(self, tax_id: int) -> str:
+        return "Unknown"
+
+    def get_lineage(self, tax_id: int) -> str:
+        return "Unknown"
+
+    def get_subtree_ids(self, name: str) -> Set[int]:
+        return set()
+
+    def make_filter(self, include=None, exclude=None):
+        def null_filter(_tax_id: int) -> bool:
+            """Always return true"""
+            return True
+        return null_filter
+
+    @staticmethod
+    def is_null():
+        return True
+
+
+def load_taxonomy(path: str):
+    """Makes object of class Taxonomy
+
+    If ``path`` is ``None``, returns an object of
+    class `TaxonomyNull`, otherwise instanciates
+    `TaxonomyGT`
+    """
+    if path is None:
+        return TaxonomyNull(path)
+    return TaxonomyGT(path)

@@ -12,6 +12,12 @@ Env(name="virprof_r", base="bioconda",
         "r-optparse",
     ])
 
+Env(name="virprof_py", base="bioconda",
+    packages=[
+        "ymp",
+        "graph-tool",
+    ])
+
 
 with Stage("classify"):
     rule blast_classify:
@@ -29,8 +35,10 @@ with Stage("classify"):
             ncbi_dir = lambda wc, input: os.path.dirname(input.ncbi_nodes)
         threads:
             1
+        conda:
+            "virprof_py"
         shell:
-            "./scripts/blast_classify.py"
+            "python -m virprof"
             " --out {output.result}"
             " {input.blast7}"
             " {input.coverage}"
