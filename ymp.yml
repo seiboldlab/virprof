@@ -1,9 +1,10 @@
+# Projects run with the pipeline. Each has a single CSV
+# defining ids, samples and fastq file locations.
+# IMPORTANT: Files MUST have a column named "sample" for
+# grouping by the pipeline later.
 projects:
   gala:
-    data:
-      - gala.csv
-  gala_cov:
-    data: gala_cov.csv
+    data: gala.csv
   daps:
     data: daps.csv
   inspire:
@@ -17,77 +18,23 @@ projects:
   enigma:
     data: enigma.csv
 
+# Here the pipeline is defined in three parts:
+# 1. Selection of non-human reads
+# 2. Assembly, read mapping and counting
+# 3. Blast based binning and annotation
 pipelines:
-  gala_nonhuman_reads:
-    - gala
+  remove_human_reads:
+    # Trims reads and removes human reads by mapping to
+    # hg38 reference first with hisat2 and then with bowtie2.
     - trim_bbmapAQ10
     - ref_hg38
     - map_hisat2
     - extract_readsf12
     - map_bowtie2
     - extract_readsf12
-  gala_cleaned:
-    - gala_nonhuman_reads
-    - ref_SilvaSSU
-    - map_bbmap
-    - extract_readsF2
-    - ref_SilvaLSU
-    - map_bbmap
-    - extract_readsF2
-  gala_assembly:
-    - gala_nonhuman_reads
-    - dust_bbmapE60
-    - assemble_metaspades
-    - format_bbmapL200
-    - index_bowtie2
-    - map_bowtie2
-    - sort_bam
-    - coverage_samtools
-  gala_annotation:
-    - gala_assembly
-    - ref_hg38
-    - annotate_blastE2MegaBest
-    - extract_seqsNomatch
-    - ref_NT
-    - annotate_blastE10Best
-    - ref_NcbiTaxonomy
-    - classify
-  daps_nonhuman_reads:
-    - daps
-    - trim_bbmapAQ10
-    - ref_hg38
-    - map_hisat2
-    - extract_readsf12
-    - map_bowtie2
-    - extract_readsf12
-  daps_assembly:
-    - daps_nonhuman_reads
-    - dust_bbmapE60
-    - assemble_metaspades
-    - format_bbmapL200
-    - index_bowtie2
-    - map_bowtie2
-    - sort_bam
-    - coverage_samtools
-  daps_annotation:
-    - daps_assembly
-    - ref_hg38
-    - annotate_blastE2MegaBest
-    - extract_seqsNomatch
-    - ref_NT
-    - annotate_blastE10Best
-    - ref_NcbiTaxonomy
-    - classify
-  inspire_nonhuman_reads:
-    - inspire
-    - trim_bbmapAQ10
-    - ref_hg38
-    - map_hisat2
-    - extract_readsf12
-    - map_bowtie2
-    - extract_readsf12
-  inspire_assembly:
-    - inspire_nonhuman_reads
+  assemble_and_map:
+    # Removes low-entropy reads, assembles into contigs
+    # >200bp length and computes coverage.
     - dust_bbmapE60
     - group_sample
     - assemble_metaspades
@@ -96,8 +43,10 @@ pipelines:
     - map_bowtie2
     - sort_bam
     - coverage_samtools
-  inspire_annotation:
-    - inspire_assembly
+  blast_classify:
+    # Removes human contigs with megablast, executes
+    # BlastN search against NT and creates annotated
+    # bins.
     - ref_hg38
     - annotate_blastE2MegaBest
     - extract_seqsNomatch
@@ -105,131 +54,43 @@ pipelines:
     - annotate_blastE10Best
     - ref_NcbiTaxonomy
     - classify
-  sarp_nonhuman_reads:
-    - sarp
-    - trim_bbmapAQ10
-    - ref_hg38
-    - map_hisat2
-    - extract_readsf12
-    - map_bowtie2
-    - extract_readsf12
-  sarp_assembly:
-    - sarp_nonhuman_reads
-    - dust_bbmapE60
-    - assemble_metaspades
-    - format_bbmapL200
-    - index_bowtie2
-    - map_bowtie2
-    - sort_bam
-    - coverage_samtools
-  sarp_annotation:
-    - sarp_assembly
-    - ref_hg38
-    - annotate_blastE2MegaBest
-    - extract_seqsNomatch
-    - ref_NT
-    - annotate_blastE10Best
-    - ref_NcbiTaxonomy
-    - classify
-  covid_nonhuman_reads:
-    - covid
-    - trim_bbmapAQ10
-    - ref_hg38
-    - map_hisat2
-    - extract_readsf12
-    - map_bowtie2
-    - extract_readsf12
-  covid_assembly:
-    - covid_nonhuman_reads
-    - dust_bbmapE60
-    - assemble_metaspades
-    - format_bbmapL200
-    - index_bowtie2
-    - map_bowtie2
-    - sort_bam
-    - coverage_samtools
-  covid_annotation:
-    - covid_assembly
-    - ref_hg38
-    - annotate_blastE2MegaBest
-    - extract_seqsNomatch
-    - ref_NT
-    - annotate_blastE10Best
-    - ref_NcbiTaxonomy
-    - classify
-  sunbeam_nonhuman_reads:
-    - sunbeam
-    - trim_bbmapAQ10
-    - ref_hg38
-    - map_hisat2
-    - extract_readsf12
-    - map_bowtie2
-    - extract_readsf12
-  sunbeam_assembly:
-    - sunbeam_nonhuman_reads
-    - dust_bbmapE60
-    - assemble_metaspades
-    - format_bbmapL200
-    - index_bowtie2
-    - map_bowtie2
-    - sort_bam
-    - coverage_samtools
-  sunbeam_annotation:
-    - sunbeam_assembly
-    - ref_hg38
-    - annotate_blastE2MegaBest
-    - extract_seqsNomatch
-    - ref_NT
-    - annotate_blastE10Best
-    - ref_NcbiTaxonomy
-    - classify
-  enigma_nonhuman_reads:
-    - enigma
-    - trim_bbmapAQ10
-    - ref_hg38
-    - map_hisat2
-    - extract_readsf12
-    - map_bowtie2
-    - extract_readsf12
-  enigma_assembly:
-    - enigma_nonhuman_reads
-    - dust_bbmapE60
-    - assemble_metaspades
-    - format_bbmapL200
-    - index_bowtie2
-    - map_bowtie2
-    - sort_bam
-    - coverage_samtools
-  enigma_annotation:
-    - enigma_assembly
-    - ref_hg38
-    - annotate_blastE2MegaBest
-    - extract_seqsNomatch
-    - ref_NT
-    - annotate_blastE10Best
-    - ref_NcbiTaxonomy
-    - classify
+  result:
+    # Runs the full pipeline.
+    - remove_human_reads
+    - assemble_and_map
+    - blast_classify
 
+# Local cluster configuration:
 cluster:
+  # Which cluster engine profile to use
   profile: lsf
   profiles:
     lsf:
       args:
-        queue: "-q foo24"
-        #queue: "-q normal"
+        # Add parameter selecting the queue
+        #queue: "-q foo24"
+        queue: "-q normal"
     default:
-      max_jobs_per_second: 5
-      latency_wait: 120
+      # Limit how many jobs we keep in the queue
+      # (Note: This is jobs, not cores as the name would suggest)
       cluster_cores: 50
-#      cluster_cores: 100
-#      cluster_cores: 35
-
+      # Limit the number of jobs submitted per second
+      max_jobs_per_second: 5
+      # Wait very long for files to appear. Our NFS can be
+      # extremely slow to sync from node to node.
+      latency_wait: 300
 limits:
+  # All jobs should request at least 2GB RAM.
   min_mem: 2G
+  # Scale large jobs (mapping, assembly) down to the
+  # max memory our regular compute nodes have available.
   max_mem: 45G
 
+# Configure local references
 references:
+  # Human reference used for read and contig filtering:
   hg38:
+    # The index files for Bowtie2
     - url:
         /data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
       type: dirx
@@ -241,6 +102,7 @@ references:
         ALL.rev.1.bt2: genome.rev.1.bt2
         ALL.rev.2.bt2: genome.rev.2.bt2
         ALL.fasta: genome.fa
+    # The index files for Blast
     - url: /data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
       type: dirx
       files:
@@ -250,6 +112,7 @@ references:
         ALL.nsi: genome_blastn.nsi
         ALL.nsd: genome_blastn.nsd
         ALL.nog: genome_blastn.nog
+    # The index files for Hisat2
     - url: /Seibold/data/Reference/HISAT/grch38_snp_tran/
       type: dirx
       files:
@@ -261,45 +124,7 @@ references:
         ALL.6.ht2: genome_snp_tran.6.ht2
         ALL.7.ht2: genome_snp_tran.7.ht2
         ALL.8.ht2: genome_snp_tran.8.ht2
-  RespVir:
-    - url: /data/reference/NCBI_nt/NCBI_NT_21Aug2018/RespVir/
-      type: dirx
-      files:
-        ALL.nin: RespVir.fa.nin
-        ALL.nhr: RespVir.fa.nhr
-        ALL.nsq: RespVir.fa.nsq
-  RespVir_F:
-    - url: /data/reference/NCBI_nt/NCBI_NT_21Aug2018/RespVir/
-      type: dirx
-      files:
-        ALL.nin: RespVirF.fa.nin
-        ALL.nhr: RespVirF.fa.nhr
-        ALL.nsq: RespVirF.fa.nsq
-  RespVir_G:
-    - url: /data/reference/NCBI_nt/NCBI_NT_21Aug2018/RespVir/
-      type: dirx
-      files:
-        ALL.nin: RespVirG2.nin
-        ALL.nhr: RespVirG2.nhr
-        ALL.nsq: RespVirG2.nsq
-        ALL.nsi: RespVirG2.nsi
-        ALL.nsd: RespVirG2.nsd
-        ALL.nog: RespVirG2.nog
-
-  RespVir_NG:
-    - url: RespVir_NG/
-      type: dirx
-      files:
-        ALL.nin: respvir.fasta.nin
-        ALL.nhr: respvir.fasta.nhr
-        ALL.nsq: respvir.fasta.nsq
-        ALL.nsi: respvir.fasta.nsi
-        ALL.nsd: respvir.fasta.nsd
-        ALL.nog: respvir.fasta.nog
-
-  vf2:
-    - url: VF2_detections.fasta
-
+  # NCBI Nucleotide database for Blast
   NT:
     - url: /data/reference/NCBI_nt/NCBI_NT_2020-05-01/
       type: path
@@ -307,18 +132,15 @@ references:
         - nt
       match:
         - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
-        #- taxdb.{bti,btd}
-
+  # NCBI Taxonomy dump for classification
   NcbiTaxonomy:
     - url: /data/reference/NCBI/taxonomy/
       type: dirx
       files:
         ALL.NCBI.nodes.dmp: nodes.dmp
         ALL.NCBI.names.dmp: names.dmp
-
+  # SILVA databases for removing rRNA (unused at this time)
   SilvaSSU:
     - url: https://www.arb-silva.de/fileadmin/silva_databases/release_138/Exports/SILVA_138_SSURef_NR99_tax_silva_trunc.fasta.gz
   SilvaLSU:
     - url: https://www.arb-silva.de/fileadmin/silva_databases/release_132/Exports/SILVA_132_LSURef_tax_silva_trunc.fasta.gz
-
-
