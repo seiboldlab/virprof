@@ -13,11 +13,13 @@ import csv
 import os
 import logging
 
+from typing import List, Tuple, Dict, Type, Iterator, Iterable, Callable, Optional
+
 import click
 import tqdm  # type: ignore
 import ymp.blast  # type: ignore
 
-from .blastbin import HitChain, CoverageHitChain
+from .blastbin import BlastHit, HitChain, CoverageHitChain
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
 
@@ -32,10 +34,10 @@ class TqdmHandler(logging.Handler):
     clobbering lines.
 
     """
-    def __init__(self):
+    def __init__(self) -> None:
         logging.Handler.__init__(self)
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
             tqdm.tqdm.write(msg)
@@ -45,7 +47,7 @@ class TqdmHandler(logging.Handler):
             self.handleError(record)
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Sets up python logging facility"""
     logging.basicConfig(
         level=logging.INFO,
@@ -55,17 +57,17 @@ def setup_logging():
     )
 
 
-def setup_profiling():
+def setup_profiling() -> None:
     """Start yappi profiler
 
     Profiling ends and results are printed when the program ends.
 
     Requires "yappi" to have been installed.
     """
-    import yappi
+    import yappi  # type: ignore
     import atexit
 
-    def dump_profile():
+    def dump_profile() -> None:
         """Print the profile at exit"""
         stats = yappi.get_func_stats()
         stats.sort("ttot")
@@ -83,7 +85,10 @@ def setup_profiling():
     yappi.start()
 
 
-def parse_file_args(files):
+def parse_file_args(files: List[click.utils.LazyFile]
+                   ) -> Tuple[Type[HitChain],
+                              Dict[str, Tuple[click.utils.LazyFile,
+                                              Dict[str, click.utils.LazyFile]]]]:
     """Composes sample dictionary from list of files passed on cmdline
 
     - If we have only files ending in ``.blast7``, each is a sample of
@@ -125,7 +130,7 @@ def parse_file_args(files):
     # Build result dictionary
     samples = {}
     if cov_files:
-        chain_class = CoverageHitChain
+        chain_class: Type[HitChain] = CoverageHitChain
         if len(blast7_files) > 1:
             basenames = set(cov_files.keys()) | set(blast7_files.keys())
             missing_files = set(
@@ -154,10 +159,13 @@ def parse_file_args(files):
     return chain_class, samples
 
 
-def group_hits_by_qacc(hits):
-    """Groups input hits into lists with same query accession"""
+def group_hits_by_qacc(hits: List[BlastHit]) -> Iterator[List[BlastHit]]:
+    """Groups input hits into lists with same query accession
+
+    Assumes that the hits are sorted by qacc (as is the case for BLAST)
+    """
     qacc = None
-    group = []
+    group: List[BlastHit] = []
     for hit in hits:
         if hit.qacc != qacc:
             if group:
@@ -169,7 +177,8 @@ def group_hits_by_qacc(hits):
         yield group
 
 
-def prefilter_hits(hitgroups, prefilter):
+def prefilter_hits(hitgroups: Iterable[List[BlastHit]],
+                   prefilter: Callable[[int], bool]) -> List[BlastHit]:
     """Prefilter hits"""
     n_queries = n_filtered = 0
     hits = []
@@ -193,8 +202,10 @@ def prefilter_hits(hitgroups, prefilter):
     return hits
 
 
-def load_coverage(chain_tpl, cov_files):
+def load_coverage(chain_tpl: HitChain, cov_files: Dict[str, click.utils.LazyFile]) -> None:
     """Load coverage into chain template"""
+    if not isinstance(chain_tpl, CoverageHitChain):
+        return
     cov = {}
     for cov_sample, cov_fd in cov_files.items():
         LOG.info("Loading coverage file %s", cov_sample)
@@ -225,33 +236,40 @@ def load_coverage(chain_tpl, cov_files):
 @click.option('--num-words', type=int, default=4,
               help="Number of words to add to 'words' field")
 @click.option('--profile', is_flag=True)
-def main(files, out, ncbi_taxonomy=None, include=None,
-         exclude=None, no_standard_excludes=False,
-         chain_penalty=20, num_words=4, profile=False):
+def main(files: List[click.utils.LazyFile],
+         out: click.utils.LazyFile,
+         include: List[str],
+         exclude: List[str],
+         ncbi_taxonomy: Optional[str] = None,
+         no_standard_excludes: bool = False,
+         chain_penalty: int = 20,
+         num_words: int = 4,
+         profile: bool = False) -> bool:
     # pylint: disable=too-many-arguments
     """Merge and classify contigs based on BLAST search results
 
     """
+    import pdb; pdb.set_trace()
     setup_logging()
     if profile:
         setup_profiling()
 
     if not files:
         LOG.info("No files to process")
-        return
+        return True
     chain_class, samples = parse_file_args(files)
-    
+
     chain_tpl = chain_class(chain_penalty=chain_penalty)
     wordscorer = WordScorer(keepwords=num_words)
     taxonomy = load_taxonomy(ncbi_taxonomy)
 
     if not no_standard_excludes:
-        exclude += (
+        exclude += [
             'Homo sapiens',
             'Mus musculus',
             'artificial sequences',
             'unclassified sequences',
-        )
+        ]
         # cellular organisms
         # Microviridae
         # Caudovirales
@@ -302,6 +320,7 @@ def main(files, out, ncbi_taxonomy=None, include=None,
                 row['taxname'] = taxonomy.get_name(taxid)
 
             writer.writerow(row)
+    return True
 
 
 if __name__ == "__main__":

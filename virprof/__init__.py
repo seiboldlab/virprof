@@ -1,1 +1,1 @@
-from .taxonomy import Taxonomy, load_taxonomy
+"""Contains the custom code for blast based binning"""

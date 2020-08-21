@@ -4,13 +4,13 @@ import os
 import csv
 import logging
 from abc import ABC, abstractmethod
-from typing import Set, List
+from typing import Set, List, Any, Iterator, Dict, Tuple, Callable, Optional
 
-import graph_tool as gt
-import graph_tool.topology as gt_topology
-import graph_tool.search as gt_search
-import graph_tool.util as gt_util
-import networkx as nx
+import graph_tool as gt  # type: ignore
+import graph_tool.topology as gt_topology  # type: ignore
+import graph_tool.search as gt_search  # type: ignore
+import graph_tool.util as gt_util  # type: ignore
+import networkx as nx  # type: ignore
 
 LOG = logging.getLogger(__name__)
 
@@ -26,14 +26,14 @@ class Taxonomy(ABC):
       path: Path to the place where names.dmp and nodes.dmp
             can be found.
     """
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: Optional[str]) -> None:
         self.path = path
         if path is None:
-            self.names_fn: str = None
-            self.nodes_fn: str = None
+            self.names_fn: Optional[str] = None
+            self.nodes_fn: Optional[str] = None
         else:
-            self.names_fn = os.path.join(self.path, "names.dmp")
-            self.nodes_fn = os.path.join(self.path, "nodes.dmp")
+            self.names_fn = os.path.join(path, "names.dmp")
+            self.nodes_fn = os.path.join(path, "nodes.dmp")
 
         try:
             self.tree = self.load_tree_binary()
@@ -42,17 +42,17 @@ class Taxonomy(ABC):
             self.save_tree_binary()
 
     @abstractmethod
-    def load_tree_binary(self):
+    def load_tree_binary(self) -> Any:
         """Load the tree from implementation specific binary"""
         raise NotImplementedError()
 
     @abstractmethod
-    def save_tree_binary(self):
+    def save_tree_binary(self) -> None:
         """Save the tree to implementation specific binary"""
         raise NotImplementedError()
 
     @abstractmethod
-    def load_tree(self):
+    def load_tree(self) -> Any:
         """Load the tree from NCBI dmp files"""
         raise NotImplementedError()
 
@@ -65,7 +65,7 @@ class Taxonomy(ABC):
         """
         return 1
 
-    def node_reader(self):
+    def node_reader(self) -> Iterator[Tuple[int, Dict[str, str]]]:
         """Reader for NCBI names.dmp listing nodes and properties
 
         Returns:
@@ -73,6 +73,8 @@ class Taxonomy(ABC):
            latter has ``name`` set to the scientific name from
            the NCBI file.
         """
+        if self.names_fn is None:
+            return
         with open(self.names_fn, "r") as names_fd:
             reader = csv.DictReader(
                 names_fd, delimiter='|',
@@ -85,12 +87,14 @@ class Taxonomy(ABC):
                     data = dict((('name', row['name'].strip()),))
                     yield tax_id, data
 
-    def edge_reader(self):
+    def edge_reader(self) -> Iterator[Tuple[int, int]]:
         """Reader for NCBI nodes.dmp, listing node and parent ids
 
         Returns:
            Generator over taxids ``(source, target)``
         """
+        if self.nodes_fn is None:
+            return
         with open(self.nodes_fn, "r") as nodes_fd:
             reader = csv.DictReader(
                 nodes_fd, delimiter='|',
@@ -132,7 +136,7 @@ class Taxonomy(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_subtree_ids(self, name: str) -> Set:
+    def get_subtree_ids(self, name: str) -> Set[int]:
         """Get the ``tax_id``s for node ``name`` and all subnodes
 
         Args:
@@ -143,8 +147,9 @@ class Taxonomy(ABC):
         """
         raise NotImplementedError()
 
-    def make_filter(self, include: List[str] = None,
-                    exclude: List[str] = None):
+    def make_filter(self,
+                    include: Optional[List[str]] = None,
+                    exclude: Optional[List[str]] = None) -> Callable[[int], bool]:
         """Create a filtering function
 
         Args:
@@ -241,7 +246,7 @@ class TaxonomyGT(Taxonomy):
         return '; '.join(self.tree.vp.name[node]
                          for node in nodes[1:])
 
-    def get_subtree_ids(self, name):
+    def get_subtree_ids(self, name: str) -> Set[int]:
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
         if len(vertices) != 1:
             return set()
@@ -258,27 +263,28 @@ class TaxonomyNX(Taxonomy):
 
     No longer actually used.
     """
-    def load_tree_binary(self):
+    def load_tree_binary(self) -> nx.DiGraph:
         return nx.read_gpickle('taxtree.pkl')
 
-    def save_tree_binary(self):
+    def save_tree_binary(self) -> None:
         nx.write_gpickle(self.tree, 'taxtree.pkl')
 
-    def load_tree(self):
+    def load_tree(self) -> nx.DiGraph:
         tree = nx.DiGraph()
         tree.add_nodes_from(self.node_reader())
         tree.add_edges_from(self.edge_reader())
         return tree
 
-    def get_subtree_ids(self, name: str) -> Set:
+    def get_subtree_ids(self, name: str) -> Set[int]:
         for node, data in self.tree.nodes(data=True):
             if data.get('name') == name:
-                taxid = node
+                taxid: int = node
                 break
         else:
             return set()
-
-        return nx.descendants(self.tree, taxid) + [taxid]
+        ids = set(*nx.descendants(self.tree, taxid))
+        ids.add(taxid)
+        return ids
 
     def get_lineage(self, tax_id: int) -> str:
         if tax_id not in self.tree:
@@ -290,7 +296,8 @@ class TaxonomyNX(Taxonomy):
     def get_name(self, tax_id: int) -> str:
         if tax_id not in self.tree:
             return "Unknown"
-        return self.tree.nodes[tax_id].get('name')
+        name: str = self.tree.nodes[tax_id].get('name')
+        return name
 
 
 class TaxonomyNull(Taxonomy):
@@ -298,13 +305,13 @@ class TaxonomyNull(Taxonomy):
 
     Used when no taxonomy data is provided.
     """
-    def load_tree_binary(self):
-        return None
-
-    def save_tree_binary(self):
+    def load_tree_binary(self) -> None:
         pass
 
-    def load_tree(self):
+    def save_tree_binary(self) -> None:
+        pass
+
+    def load_tree(self) -> None:
         pass
 
     def get_name(self, tax_id: int) -> str:
@@ -316,18 +323,20 @@ class TaxonomyNull(Taxonomy):
     def get_subtree_ids(self, name: str) -> Set[int]:
         return set()
 
-    def make_filter(self, include=None, exclude=None):
+    def make_filter(self,
+                    include: Optional[List[str]] = None,
+                    exclude: Optional[List[str]] = None) -> Callable[[int], bool]:
         def null_filter(_tax_id: int) -> bool:
             """Always return true"""
             return True
         return null_filter
 
     @staticmethod
-    def is_null():
+    def is_null() -> bool:
         return True
 
 
-def load_taxonomy(path: str):
+def load_taxonomy(path: Optional[str]) -> Taxonomy:
     """Makes object of class Taxonomy
 
     If ``path`` is ``None``, returns an object of

@@ -1,8 +1,17 @@
 """Implements joining of blast hits into subject-accession bins"""
 
-from typing import NamedTuple
+import copy
+import logging
+import math
+from collections import defaultdict
+from typing import NamedTuple, List, Iterator, Optional, Tuple, Iterable, Dict, Any, Mapping
+
+import tqdm  # type: ignore
+
+LOG = logging.getLogger(__name__)
 
 class BlastHit(NamedTuple):
+    # pylint: disable=too-few-public-methods
     """Base type for a BLAST hit
 
     This class is only used for type checking.
@@ -19,6 +28,7 @@ class BlastHit(NamedTuple):
     length: int
     stitle: str
     staxids: List[int]
+    bitscore: int
 
 
 class HitChain:
@@ -77,7 +87,7 @@ class HitChain:
             2)
 
     @classmethod
-    def bitscore(cls, score: float, blast: str = "blastn"):
+    def bitscore(cls, score: float, blast: str = "blastn") -> float:
         """Compute BLAST bitscore
 
         Args:
@@ -93,7 +103,7 @@ class HitChain:
             2)
 
     def __init__(self,
-                 hits: List[BlastHit] = None,
+                 hits: Optional[List[BlastHit]] = None,
                  chain_penalty: int = 20) -> None:
         self.hits = hits.copy() if hits else list()
         self.chain_penalty = chain_penalty
@@ -124,7 +134,7 @@ class HitChain:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self)})"
 
-    def __copy__(self):
+    def __copy__(self) -> "HitChain":
         return self.__class__(self.hits, self.chain_penalty)
 
     def __hash__(self) -> int:
@@ -132,7 +142,9 @@ class HitChain:
             self._hash = hash(tuple(self.hits))
         return self._hash
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, HitChain):
+            return NotImplemented
         return self.hits == other.hits
 
     def overlaps(self, hit: BlastHit) -> bool:
@@ -200,7 +212,9 @@ class HitChain:
         self.hits.append(hit)
         self._reset()
 
-    def prune(self, hits: List[BlastHit], full_sequence=False) -> None:
+    def prune(self,
+              hits: List[BlastHit],
+              full_sequence: bool = False) -> None:
         """Remove BLAST hits from chain
 
         If ``full_sequence`` is ``True``, hits are removed if
@@ -350,7 +364,7 @@ class HitChain:
         """The accession numbers for each hit in this HitChain"""
         return list(hit.qacc for hit in self.hits)
 
-    def qranges(self, qacc: str = None) -> List[Tuple[int, int]]:
+    def qranges(self, qacc: Optional[str] = None) -> List[Tuple[int, int]]:
         """A list of ranges covered by the hits in this HitChain"""
         return [
             (hit.qstart, hit.qend)
@@ -370,7 +384,7 @@ class HitChain:
         Uses the current HitChain as start point.
         """
         # start with empty chain
-        chains = [copy(self)]
+        chains = [copy.copy(self)]
         hitset.sort(key=lambda h: min(h.sstart, h.send))
         if len(hitset) > 10:
             hitset = tqdm.tqdm(hitset, desc=hitset[0].sacc)
@@ -384,7 +398,7 @@ class HitChain:
                 try:
                     chain.append(hit)
                 except self.OverlapException:
-                    newchain = copy(chain)
+                    newchain = copy.copy(chain)
                     newchain.trunc(sstart)
                     newchain.prune([hit])
                     newchains.add(newchain)
@@ -401,7 +415,7 @@ class HitChain:
         hitsets = defaultdict(list)
         for hit in hits:
             hitsets[hit.sacc].append(hit)
-        log.info("Making chains from %i hitsets", len(hitsets))
+        LOG.info("Making chains from %i hitsets", len(hitsets))
         return [chain
                 for hitset in tqdm.tqdm(hitsets.values(),
                                         desc="Making chains",
@@ -435,11 +449,11 @@ class HitChain:
 
             for chain in chains:
                 chain.prune(result.hits, full_sequence=True)
-            chains = [chain for chain in chains if len(chain) > 0]
+            chains = [chain for chain in chains if chain]
             pbar.update(total - len(chains))
             total = len(chains)
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         """Convert class to dict for writing to CSV"""
         return {
             'sacc': self.sacc,
@@ -456,28 +470,30 @@ class HitChain:
         }
 
     @property
-    def fields(self):
+    def fields(self) -> List[str]:
         """List keys of ``to_dict()``"""
         return list(self.to_dict().keys())
 
 
 class CoverageHitChain(HitChain):
     """HitChain also calculating coverage(s)"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._coverages = None
+    def __init__(self,
+                 hits: Optional[List[BlastHit]] = None,
+                 chain_penalty: int = 20) -> None:
+        super().__init__(hits, chain_penalty)
+        self._coverages: Mapping[str, Mapping[str, Mapping[str, str]]] = {}
 
-    def set_coverage(self, coverages):
+    def set_coverage(self, coverages: Mapping[str, Mapping[str, Mapping[str, str]]]) -> None:
         """Set coverage data"""
         self._coverages = coverages
 
-    def __copy__(self):
-        cpy = super().__copy__()
+    def __copy__(self) -> "CoverageHitChain":
+        cpy = self.__class__(self.hits, self.chain_penalty)
         cpy.set_coverage(self._coverages)
         return cpy
 
     @property
-    def numreads(self):
+    def numreads(self) -> int:
         """Number of reads"""
         if self._coverages is None:
             return -1
@@ -487,7 +503,7 @@ class CoverageHitChain(HitChain):
             for cov in self._coverages.values()
         )
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         res = super().to_dict()
         res.update({
             'numreads': self.numreads
