@@ -14,36 +14,53 @@ Env(name="virprof_r", base="bioconda",
 
 Env(name="virprof_py", base="bioconda",
     packages=[
-        "ymp",
+        "ymp=0.2.1",
         "graph-tool",
     ])
 
 
 with Stage("classify"):
+    rule blast_classify_index:
+        message: "Creating taxonomy index for virprof bin&classify"
+        input:
+            ncbi_nodes = "{:prev:}/{target}.NCBI.nodes.dmp",
+            ncbi_names = "{:prev:}/{target}.NCBI.names.dmp"
+        output:
+            "{:this:}/{target}.taxonomy.gt"
+        log:
+            "{:this:}/{target}.taxonomy.gt.log"
+        threads:
+            1
+        params:
+            taxonomy_prefix = lambda wc, input: input.ncbi_names[:-len("names.dmp")]
+        conda:
+            "virprof_py"
+        shell:
+            "python -m virprof index-tree"
+            "  --library graph_tool"
+            "  --ncbi-taxonomy {params.taxonomy_prefix}"
+            "  --out {output}"
+
     rule blast_classify:
         message: "Classifying {input.blast7}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
-            blast7 = "{:prev:}/{:target:}.blast7",
-            ncbi_nodes = "{:prev:}/{:target:}.NCBI.nodes.dmp",
-            ncbi_names = "{:prev:}/{:target:}.NCBI.names.dmp"
+            blast7   = "{:prev:}/{:target:}.blast7",
+            taxonomy = "{:this:}/ALL.taxonomy.gt"
         output:
-            result = "{:this:}/{target}.virus.csv"
+            result   = "{:this:}/{target}.virus.csv"
         log:
-                     "{:this:}/{target}.log"
-        params:
-            ncbi_dir = lambda wc, input: os.path.dirname(input.ncbi_nodes)
+                       "{:this:}/{target}.log"
         threads:
             1
         conda:
             "virprof_py"
         shell:
-            "python -m virprof"
+            "python -m virprof blastbin"
             " --out {output.result}"
+            " --ncbi-taxonomy {input.taxonomy}"
             " {input.blast7}"
             " {input.coverage}"
-            " --ncbi-taxonomy {params.ncbi_dir}"
-            " --exclude 'cellular organisms'"
             " >{log} 2>&1"
 
     rule aggregate_virus:

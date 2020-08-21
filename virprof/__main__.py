@@ -216,7 +216,12 @@ def load_coverage(chain_tpl: HitChain, cov_files: Dict[str, click.utils.LazyFile
     if cov:
         chain_tpl.set_coverage(cov)
 
-@click.command()
+@click.group()
+def cli() -> None:
+    """Use any of the subcommands"""
+
+
+@cli.command()
 @click.argument('files', type=click.File('r', lazy=True), nargs=-1)
 @click.option('--out', '-o', type=click.File('w'), default='-',
               help="Output CSV file")
@@ -236,20 +241,19 @@ def load_coverage(chain_tpl: HitChain, cov_files: Dict[str, click.utils.LazyFile
 @click.option('--num-words', type=int, default=4,
               help="Number of words to add to 'words' field")
 @click.option('--profile', is_flag=True)
-def main(files: List[click.utils.LazyFile],
-         out: click.utils.LazyFile,
-         include: List[str],
-         exclude: List[str],
-         ncbi_taxonomy: Optional[str] = None,
-         no_standard_excludes: bool = False,
-         chain_penalty: int = 20,
-         num_words: int = 4,
-         profile: bool = False) -> bool:
+def blastbin(files: List[click.utils.LazyFile],
+             out: click.utils.LazyFile,
+             include: Tuple[str, ...],
+             exclude: Tuple[str, ...],
+             ncbi_taxonomy: Optional[str] = None,
+             no_standard_excludes: bool = False,
+             chain_penalty: int = 20,
+             num_words: int = 4,
+             profile: bool = False) -> bool:
     # pylint: disable=too-many-arguments
     """Merge and classify contigs based on BLAST search results
 
     """
-    import pdb; pdb.set_trace()
     setup_logging()
     if profile:
         setup_profiling()
@@ -264,12 +268,12 @@ def main(files: List[click.utils.LazyFile],
     taxonomy = load_taxonomy(ncbi_taxonomy)
 
     if not no_standard_excludes:
-        exclude += [
+        exclude += (
             'Homo sapiens',
             'Mus musculus',
             'artificial sequences',
             'unclassified sequences',
-        ]
+        )
         # cellular organisms
         # Microviridae
         # Caudovirales
@@ -322,7 +326,23 @@ def main(files: List[click.utils.LazyFile],
             writer.writerow(row)
     return True
 
+@cli.command()
+@click.option('--out', '-o', type=click.File('w'), required=True,
+              help="Output binary")
+@click.option('--library', '-b', type=click.Choice(['graph_tool', 'networkx']),
+              default='graph_tool',
+              help="Tree library to use")
+@click.option('--ncbi-taxonomy', type=click.Path(), required=True,
+              help="Path to the NCBI taxonomy dump directory")
+def index_tree(out: click.utils.LazyFile,
+               library: str,
+               ncbi_taxonomy: str) -> bool:
+    """Parse NCBI taxonomy from dump files and write tree to binary"""
+    taxonomy = load_taxonomy(ncbi_taxonomy, library=library)
+    taxonomy.save_tree_binary(out.name)
+    return True
+
 
 if __name__ == "__main__":
     # pylint: disable=unexpected-keyword-arg, no-value-for-parameter
-    main(prog_name="python -m virprof")
+    cli(prog_name="python -m virprof")

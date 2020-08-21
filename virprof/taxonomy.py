@@ -4,7 +4,7 @@ import os
 import csv
 import logging
 from abc import ABC, abstractmethod
-from typing import Set, List, Any, Iterator, Dict, Tuple, Callable, Optional
+from typing import Set, Sequence, Any, Iterator, Dict, Tuple, Callable, Optional
 
 import graph_tool as gt  # type: ignore
 import graph_tool.topology as gt_topology  # type: ignore
@@ -23,23 +23,46 @@ class Taxonomy(ABC):
     respectively.
 
     Args:
-      path: Path to the place where names.dmp and nodes.dmp
-            can be found.
+      path: Either path to directory containing names.dmp and nodes.dmp or
+            path to the binary dump of the tree.
     """
+    #: Name of file containing nodes
+    NODES_FN = "nodes.dmp"
+    #: Name of file containing names
+    NAMES_FN = "names.dmp"
+
     def __init__(self, path: Optional[str]) -> None:
         self.path = path
-        if path is None:
-            self.names_fn: Optional[str] = None
-            self.nodes_fn: Optional[str] = None
-        else:
-            self.names_fn = os.path.join(path, "names.dmp")
-            self.nodes_fn = os.path.join(path, "nodes.dmp")
 
-        try:
-            self.tree = self.load_tree_binary()
-        except FileNotFoundError:
-            self.tree = self.load_tree()
-            self.save_tree_binary()
+        if path is not None:
+            if os.path.isdir(path):
+                self.tree = self.load_tree()
+            elif os.path.exists(path):
+                self.tree = self.load_tree_binary()
+            else:
+                self.tree = self.load_tree()
+
+    def _find_file(self, filename: str) -> Optional[str]:
+        if self.path is None:
+            return None
+        path = os.path.join(self.path, filename)
+        if os.path.exists(path):
+            return path
+        path = "".join((self.path, filename))
+        if os.path.exists(path):
+            return path
+        raise RuntimeError("Unable to find {filename} with prefix {self.path}")
+
+
+    @property
+    def names_fn(self) -> Optional[str]:
+        """Path to the names.dmp file"""
+        return self._find_file(self.NAMES_FN)
+
+    @property
+    def nodes_fn(self) -> Optional[str]:
+        """Path to the nodes.dmp file"""
+        return self._find_file(self.NODES_FN)
 
     @abstractmethod
     def load_tree_binary(self) -> Any:
@@ -47,7 +70,7 @@ class Taxonomy(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def save_tree_binary(self) -> None:
+    def save_tree_binary(self, path: str) -> None:
         """Save the tree to implementation specific binary"""
         raise NotImplementedError()
 
@@ -148,8 +171,8 @@ class Taxonomy(ABC):
         raise NotImplementedError()
 
     def make_filter(self,
-                    include: Optional[List[str]] = None,
-                    exclude: Optional[List[str]] = None) -> Callable[[int], bool]:
+                    include: Optional[Sequence[str]] = None,
+                    exclude: Optional[Sequence[str]] = None) -> Callable[[int], bool]:
         """Create a filtering function
 
         Args:
@@ -226,10 +249,10 @@ class TaxonomyGT(Taxonomy):
         return tree
 
     def load_tree_binary(self) -> gt.Graph:
-        return gt.load_graph('taxtree.gt')
+        return gt.load_graph(self.path)
 
-    def save_tree_binary(self) -> None:
-        self.tree.save('taxtree.gt')
+    def save_tree_binary(self, path: str) -> None:
+        self.tree.save(path)
 
     def get_name(self, tax_id: int) -> str:
         try:
@@ -264,10 +287,10 @@ class TaxonomyNX(Taxonomy):
     No longer actually used.
     """
     def load_tree_binary(self) -> nx.DiGraph:
-        return nx.read_gpickle('taxtree.pkl')
+        return nx.read_gpickle(self.path)
 
-    def save_tree_binary(self) -> None:
-        nx.write_gpickle(self.tree, 'taxtree.pkl')
+    def save_tree_binary(self, path: str) -> None:
+        nx.write_gpickle(self.tree, path)
 
     def load_tree(self) -> nx.DiGraph:
         tree = nx.DiGraph()
@@ -308,7 +331,7 @@ class TaxonomyNull(Taxonomy):
     def load_tree_binary(self) -> None:
         pass
 
-    def save_tree_binary(self) -> None:
+    def save_tree_binary(self, _path: str) -> None:
         pass
 
     def load_tree(self) -> None:
@@ -324,8 +347,8 @@ class TaxonomyNull(Taxonomy):
         return set()
 
     def make_filter(self,
-                    include: Optional[List[str]] = None,
-                    exclude: Optional[List[str]] = None) -> Callable[[int], bool]:
+                    include: Optional[Sequence[str]] = None,
+                    exclude: Optional[Sequence[str]] = None) -> Callable[[int], bool]:
         def null_filter(_tax_id: int) -> bool:
             """Always return true"""
             return True
@@ -336,13 +359,24 @@ class TaxonomyNull(Taxonomy):
         return True
 
 
-def load_taxonomy(path: Optional[str]) -> Taxonomy:
+def load_taxonomy(path: Optional[str], library: Optional[str] = None) -> Taxonomy:
     """Makes object of class Taxonomy
 
     If ``path`` is ``None``, returns an object of
     class `TaxonomyNull`, otherwise instanciates
     `TaxonomyGT`
     """
+    if library is None:
+        if path is None:
+            return TaxonomyNull(None)
+        elif path.endswith(".nx"):
+            library = "networkx"
+        else:
+            library = "graph_tool"
     if path is None:
-        return TaxonomyNull(path)
+        raise RuntimeError(
+            "If taxonomy library is specified, path cannot be None"
+        )
+    if library == "networkx":
+        return TaxonomyNX(path)
     return TaxonomyGT(path)
