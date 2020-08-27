@@ -19,8 +19,41 @@ Env(name="virprof_py", base="bioconda",
     ])
 
 
-with Stage("classify"):
-    rule blast_classify_index:
+with Stage("vp_remove_matched") as S:
+    S.add_param("U", typ="int", name="min_unaligned_bp", default=0)
+
+    rule vp_filter_blast:
+        message: "Filtering contigs"
+        input:
+            fasta  = "{:prev:}/{:target:}.fasta.gz",
+            blast7 = "{:prev:}/{:target:}.blast7"
+        output:
+            fasta  = "{:this:}/{target}.fasta.gz"
+        log:
+            "{:this:}/{target}.log"
+        threads:
+            1
+        conda:
+            "virprof_py"
+        shell:
+            "python -m virprof filter-blast"
+            " --min-unaligned-bp {params.min_unaligned_bp}"
+            " --out {output.fasta}"
+            " --in-fasta {input.fasta}"
+            " --in-blast7 {input.blast7}"
+            " >{log} 2>&1"
+
+    rule vp_filter_blast_all:
+        message:
+            "Finished {output}"
+        input:
+            "{:this:}/{:targets:}.fasta.gz"
+        output:
+            touch("{:this:}/all_targets.stamp")
+
+
+with Stage("vp_classify"):
+    rule vp_index_tree:
         message: "Creating taxonomy index for virprof bin&classify"
         input:
             ncbi_nodes = "{:prev:}/{target}.NCBI.nodes.dmp",
@@ -41,7 +74,7 @@ with Stage("classify"):
             "  --ncbi-taxonomy {params.taxonomy_prefix}"
             "  --out {output}"
 
-    rule blast_classify:
+    rule vp_blastbin:
         message: "Classifying {input.blast7}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
@@ -63,7 +96,7 @@ with Stage("classify"):
             " {input.coverage}"
             " >{log} 2>&1"
 
-    rule aggregate_virus:
+    rule vp_aggregate_classifiations:
         message: "Creating virus summary"
         input:
             #virushostdb="{:prev:}/virushostdb.csv",
@@ -94,7 +127,7 @@ with Stage("classify"):
             "  {input.calls}"
             "  >{log} 2>&1"
 
-    rule collect_all:
+    rule vp_classify_all:
         input:
             "{:this:}/virus_summary.xlsx"
         output:

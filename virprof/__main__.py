@@ -22,6 +22,7 @@ import ymp.blast  # type: ignore
 from .blastbin import BlastHit, HitChain, CoverageHitChain
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
+from .fasta import get_accs_from_fasta, filter_fasta
 
 
 LOG = logging.getLogger(__name__)
@@ -254,7 +255,6 @@ def blastbin(files: List[click.utils.LazyFile],
     """Merge and classify contigs based on BLAST search results
 
     """
-    setup_logging()
     if profile:
         setup_profiling()
 
@@ -326,6 +326,7 @@ def blastbin(files: List[click.utils.LazyFile],
             writer.writerow(row)
     return True
 
+
 @cli.command()
 @click.option('--out', '-o', type=click.File('w'), required=True,
               help="Output binary")
@@ -343,6 +344,45 @@ def index_tree(out: click.utils.LazyFile,
     return True
 
 
+@cli.command()
+@click.option("--in-blast7", "in_blast7", type=click.File('r'), required=True,
+              help="input blast7 format file")
+@click.option("--in-fasta", "in_fasta", type=click.File('r'), required=True,
+              help="input blast7 format file")
+@click.option("--out", "-o", "outfile", type=click.File('w'), required=True,
+              help="output blast7 format file")
+@click.option("--min-unaligned-bp", type=int, default=0,
+              help="minimum number of unaligned basepairs")
+def filter_blast(in_blast7: click.utils.LazyFile,
+                 in_fasta: click.utils.LazyFile,
+                 outfile: click.utils.LazyFile,
+                 min_unaligned_bp: int) -> bool:
+    toremove = set()
+
+    LOG.info("Loading Blast7")
+    reader = ymp.blast.reader(in_blast7)
+    hitgroups = list(group_hits_by_qacc(reader))
+    LOG.info("%i distinct query sequences had matches", len(hitgroups))
+
+    LOG.info("Making Chains")
+    for hitgroup in hitgroups:
+        all_chains = HitChain().make_chains(hitgroup)
+        best_chains = HitChain().greedy_select_chains(all_chains)
+        for chain, _ in best_chains:
+            remain = chain.qlen - chain.alen
+            if remain < min_unaligned_bp:
+                toremove.add(hitgroup[0].qacc)
+    LOG.info("%i query sequences had less than %i bp unaligned and will be removed",
+             len(toremove), min_unaligned_bp)
+    LOG.info("(i.e. %i query sequences were matched but are kept)",
+             len(hitgroups) - len(toremove))
+
+    LOG.info("Filtering FASTA")
+    filter_fasta(in_fasta, outfile, toremove, remove=True)
+    LOG.info("Done")
+
+
 if __name__ == "__main__":
+    setup_logging()
     # pylint: disable=unexpected-keyword-arg, no-value-for-parameter
     cli(prog_name="python -m virprof")

@@ -51,11 +51,11 @@ pipelines:
     # bins.
     - ref_hg38
     - annotate_blastE2MegaBest
-    - extract_seqsNomatch
+    - vp_remove_matchedU200
     - ref_NT
     - annotate_blastE10Best
     - ref_NcbiTaxonomy
-    - classify
+    - vp_classify
   result:
     # Runs the full pipeline.
     - remove_human_reads
