@@ -10,6 +10,56 @@ import tqdm  # type: ignore
 
 LOG = logging.getLogger(__name__)
 
+# Values for Lambda and K used by BLAST to calculate evalues.
+#
+# These were empirically determined by Altschul et al and are
+# hard-coded into BLAST.
+BLAST_CONSTANTS = {
+    # 'megablast': (1., 0.41),... unclear
+    # word size 28, gap open 0, gap_extend 0, score 1/-2
+    'blastn': (0.625, 0.41),
+    # word size 11, gap open 5, gap_extend 2, score 2/-3
+}
+
+def calc_log10_evalue(score: float, query_len: int,
+                      database_len: int = 1004024614,
+                      blast: str = "blastn") -> float:
+    """Compute BLAST evalue
+
+    Args:
+        score: BLAST score
+        query_len: Length of query sequence
+        database_len: Length of queried database
+        blast: blast setting (only ``blastn`` for now)
+
+    Returns:
+        Exponent of E-Value
+    """
+    blast_l, blast_k = cls.BLAST_CONSTANTS[blast]
+    return round((- blast_l * score
+                  + math.log(blast_k)
+                  + math.log(database_len)
+                  + math.log(query_len))
+                 /
+                 math.log(10),
+                 2)
+
+
+def bitscore(cls, score: float, blast: str = "blastn") -> float:
+    """Compute BLAST bitscore
+
+    Args:
+        score: BLAST score
+        blast: blast setting (only ``blastn`` for now)
+    """
+    blast_l, blast_k = cls.BLAST_CONSTANTS[blast]
+    return - round((- blast_l * score
+                    + math.log(blast_k))
+                   /
+                   math.log(2),
+                   2)
+
+
 class BlastHit(NamedTuple):
     # pylint: disable=too-few-public-methods
     """Base type for a BLAST hit
@@ -45,62 +95,12 @@ class HitChain:
         chain_penalty: Penalty added to score for each item in the
             list beyond the first.
     """
-    # Values for Lambda and K used by BLAST to calculate evalues.
-    #
-    # These were empirically determined by Altschul et al and are
-    # hard-coded into BLAST.
-    BLAST_CONSTANTS = {
-        # 'megablast': (1., 0.41),... unclear
-        # word size 28, gap open 0, gap_extend 0, score 1/-2
-        'blastn': (0.625, 0.41),
-        # word size 11, gap open 5, gap_extend 2, score 2/-3
-    }
 
     class OverlapException(Exception):
         """Raised if trying to append hit overlapping with
         hits already contained within the hitchain.
         """
 
-    @classmethod
-    def calc_log10_evalue(cls, score: float, query_len: int,
-                          database_len: int = 1004024614,
-                          blast: str = "blastn") -> float:
-        """Compute BLAST evalue
-
-        Args:
-          score: BLAST score
-          query_len: Length of query sequence
-          database_len: Length of queried database
-          blast: blast setting (only ``blastn`` for now)
-
-        Returns:
-          Exponent of E-Value
-        """
-        blast_l, blast_k = cls.BLAST_CONSTANTS[blast]
-        return round(
-            (- blast_l * score
-             + math.log(blast_k)
-             + math.log(database_len)
-             + math.log(query_len))
-            /
-            math.log(10),
-            2)
-
-    @classmethod
-    def bitscore(cls, score: float, blast: str = "blastn") -> float:
-        """Compute BLAST bitscore
-
-        Args:
-          score: BLAST score
-          blast: blast setting (only ``blastn`` for now)
-        """
-        blast_l, blast_k = cls.BLAST_CONSTANTS[blast]
-        return - round(
-            (- blast_l * score
-             + math.log(blast_k))
-            /
-            math.log(2),
-            2)
 
     def __init__(self,
                  hits: Optional[List[BlastHit]] = None,
@@ -316,7 +316,7 @@ class HitChain:
         "Logarithm base 10 of the E-value computed for the combined hits"
         if self.qlen == 0:
             return 0
-        return self.calc_log10_evalue(self.score, self.qlen)
+        return calc_log10_evalue(self.score, self.qlen)
 
     @property
     def sacc(self) -> str:
