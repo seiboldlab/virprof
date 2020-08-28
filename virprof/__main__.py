@@ -180,7 +180,24 @@ def group_hits_by_qacc(hits: List[BlastHit]) -> Iterator[List[BlastHit]]:
 
 def prefilter_hits(hitgroups: Iterable[List[BlastHit]],
                    prefilter: Callable[[int], bool]) -> List[BlastHit]:
-    """Prefilter hits"""
+    """Filter ``hitgroups`` using ``prefilter`` function.
+
+    The input hitgroups are expected to each comprise HSPs from the
+    same query sequence. Query sequences (i.e. the group of HSPs) are
+    removed based the return value of the ``prefilter`` function. For
+    each query, the taxids of the matched subject sequence are fed to
+    the function. If it returns `False` for more than half of the
+    matches within 90% bitscore of the best match, the query/hitgroup
+    is excluded from the output.
+
+    Args:
+      hitgroups: BlastHits grouped by query accession
+      prefilter: function flagging NCBI taxids to keep
+
+    Returns:
+      Filtered subset of hitgroups
+
+    """
     n_queries = n_filtered = 0
     hits = []
     for hitgroup in hitgroups:
