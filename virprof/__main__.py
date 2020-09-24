@@ -19,7 +19,7 @@ import click
 import tqdm  # type: ignore
 import ymp.blast  # type: ignore
 
-from .blastbin import BlastHit, HitChain, CoverageHitChain
+from .blastbin import BlastHit, HitChain, CoverageHitChain, greedy_select_chains
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
 from .fasta import get_accs_from_fasta, filter_fasta
@@ -324,18 +324,17 @@ def blastbin(files: List[click.utils.LazyFile],
         load_coverage(chain_tpl, cov_files)
         all_chains = chain_tpl.make_chains(filtered_hits)
         sample_fd.close()
-        best_chains = chain_tpl.greedy_select_chains(all_chains)
+        best_chains = greedy_select_chains(all_chains)
 
-        for chain, altchains in best_chains:
-            allchains = [chain] + (altchains or [])
-            taxid = wordscorer.score_taxids(allchains)
+        for chains in best_chains:
+            taxid = wordscorer.score_taxids(chains)
             if not taxfilter(taxid):
                 continue
 
-            row = chain.to_dict()
+            row = chains[0].to_dict()
             row['sample'] = sample
             row['taxid'] = taxid
-            row['words'] = wordscorer.score(allchains)
+            row['words'] = wordscorer.score(chains)
             if not taxonomy.is_null():
                 row['lineage'] = taxonomy.get_lineage(taxid)
                 row['taxname'] = taxonomy.get_name(taxid)

@@ -35,7 +35,7 @@ def calc_log10_evalue(score: float, query_len: int,
     Returns:
         Exponent of E-Value
     """
-    blast_l, blast_k = cls.BLAST_CONSTANTS[blast]
+    blast_l, blast_k = BLAST_CONSTANTS[blast]
     return round((- blast_l * score
                   + math.log(blast_k)
                   + math.log(database_len)
@@ -45,14 +45,14 @@ def calc_log10_evalue(score: float, query_len: int,
                  2)
 
 
-def bitscore(cls, score: float, blast: str = "blastn") -> float:
+def bitscore(score: float, blast: str = "blastn") -> float:
     """Compute BLAST bitscore
 
     Args:
         score: BLAST score
         blast: blast setting (only ``blastn`` for now)
     """
-    blast_l, blast_k = cls.BLAST_CONSTANTS[blast]
+    blast_l, blast_k = BLAST_CONSTANTS[blast]
     return - round((- blast_l * score
                     + math.log(blast_k))
                    /
@@ -81,6 +81,12 @@ class BlastHit(NamedTuple):
     bitscore: int
 
 
+class OverlapException(Exception):
+    """Raised if trying to append hit overlapping with
+    hits already contained within the hitchain.
+    """
+
+
 class HitChain:
     """Chain of BLAST hits
 
@@ -91,16 +97,9 @@ class HitChain:
 
     Args:
         hits: collection of hits
-
         chain_penalty: Penalty added to score for each item in the
             list beyond the first.
     """
-
-    class OverlapException(Exception):
-        """Raised if trying to append hit overlapping with
-        hits already contained within the hitchain.
-        """
-
 
     def __init__(self,
                  hits: Optional[List[BlastHit]] = None,
@@ -128,7 +127,7 @@ class HitChain:
     def __str__(self) -> str:
         return (
             f"acc={self.sacc} e={self.log10_evalue} "
-            f"l={self.qlen} r={self.sranges_str()}"
+            f"l={self.qlen} r={self.sranges()}"
         )
 
     def __repr__(self) -> str:
@@ -147,101 +146,29 @@ class HitChain:
             return NotImplemented
         return self.hits == other.hits
 
-    def overlaps(self, hit: BlastHit) -> bool:
-        """Checks for overlap with ``hit``
-
-        Args:
-           hit: The blast hit to check for overlaps
-        Returns:
-           True if ``hit`` overlaps on query or subject side
-        """
-        return False #self.overlaps_subject(hit) # or self.overlaps_query(hit)
-
-    def overlaps_subject(self, hit: BlastHit) -> bool:
-        """Checks for subject overlap with ``hit``
-
-        This assumes that the HitChain is filled left to
-        right. No checks for gaps in the middle are done.
-
-        Args:
-          hit: The blast hit to check for overlaps
-        Returns:
-          True if ``hit`` overlaps on subject side
-        """
-        return self.send > min(hit.sstart, hit.send)
-
-    def overlaps_query(self, hit: BlastHit) -> bool:
-        """Checks for query overlap with ``hit``.
-
-        This will compare ``hit`` to all BlastHits comprising this
-        HitChain. If hit has the same query accession and overlaps
-        the hit region on the query range on any hit, ``True`` is
-        returned.
-
-        Args:
-          hit: The blast hit to check for overlaps
-        Returns:
-          True if ``hit`` overlaps on query side
-        """
-        return next(self.get_query_overlaps(hit), None) is not None
-
-    def get_query_overlaps(self, hit: BlastHit) -> Iterator[BlastHit]:
-        """Finds hits overlapping ``hit`` on query side
-
-        Args:
-          hit: The blast hit to check for overlaps
-        Returns:
-          An iterator over blast hits with query accession matching
-          ``hit`` and overlapping query side of ``hit``.
-        """
-        start, end = sorted((hit.qstart, hit.qend))
-        qacc = hit.qacc
-        for ohit in filter(lambda h: h.qacc == qacc, self.hits):
-            ostart, oend = sorted((ohit.qstart, ohit.qend))
-            if not oend < start and not end < ostart:
-                yield ohit
-
     def append(self, hit: BlastHit) -> None:
         """Append a BLAST hit to the chain
 
         Args:
           hit: A BLAST hit
         """
-        if self.overlaps(hit):
-            raise self.OverlapException()
         self.hits.append(hit)
         self._reset()
 
-    def prune(self,
-              hits: List[BlastHit],
-              full_sequence: bool = False) -> None:
+    def prune(self, hits: List[BlastHit]) -> None:
         """Remove BLAST hits from chain
 
-        If ``full_sequence`` is ``True``, hits are removed if
-        matching query accession number, otherwise, overlapping
-        hits are removed.
+        Removes hits from chain having qacc matching any of ``hits``.
 
         Args:
            hits: List of hits
-           full_sequence: Whether to remove based on acc only
         """
         oldlen = len(self.hits)
-        if full_sequence:
-            accs = set(q.qacc for q in hits)
-            self.hits = [
-                hit for hit in self.hits
-                if hit.qacc not in accs
-            ]
-        else:
-            ohits = set(
-                ohit
-                for hit in hits
-                for ohit in self.get_query_overlaps(hit)
-            )
-            self.hits = [
-                ohit for ohit in self.hits
-                if ohit not in ohits
-            ]
+        accs = set(q.qacc for q in hits)
+        self.hits = [
+            hit for hit in self.hits
+            if hit.qacc not in accs
+        ]
         if oldlen != len(self.hits):
             self._reset()
 
@@ -333,10 +260,6 @@ class HitChain:
         """List of NCBI Taxids for subject"""
         return self.hits[0].staxids if self.hits else []
 
-    def staxids_str(self) -> str:
-        """Semi-colon separated string listing NCBI taxids for subject"""
-        return ";".join((str(i) for i in self.staxids))
-
     @property
     def send(self) -> int:
         """Position of the last base covered by the hits in the HitChain
@@ -349,23 +272,33 @@ class HitChain:
         return max(hit.send, hit.sstart)
 
     def sranges(self) -> List[Tuple[int, int]]:
-        """List of ranges covered by the hits in this HitChain"""
+        """Ranges of subject sequence covered by the hits in this HitChain
+
+        Returns:
+          List of pairs with start and end positions (start < end).
+        """
         return [(hit.sstart, hit.send)
                 if hit.sstart < hit.send
                 else (hit.send, hit.sstart)
                 for hit in self.hits]
 
-    def sranges_str(self) -> str:
-        """Semicolon separated string of `sranges()`"""
-        return ";".join("{}-{}".format(*tpl) for tpl in self.sranges())
-
     @property
     def qaccs(self) -> List[str]:
-        """The accession numbers for each hit in this HitChain"""
-        return list(hit.qacc for hit in self.hits)
+        """The accession numbers for each hit in this HitChain
+
+        This list may contain duplicates!
+        """
+        return [hit.qacc for hit in self.hits]
 
     def qranges(self, qacc: Optional[str] = None) -> List[Tuple[int, int]]:
-        """A list of ranges covered by the hits in this HitChain"""
+        """Ranges of query sequences covered by the hits in this HitChain
+
+        Args:
+           qacc: Only get ranges for this query accession
+
+        Returns:
+           List of pairs with start and end positions (start < end).
+        """
         return [
             (hit.qstart, hit.qend)
             if hit.qstart < hit.qend
@@ -374,40 +307,18 @@ class HitChain:
             if qacc is None or hit.qacc == qacc
         ]
 
-    def qranges_str(self) -> str:
-        """Semicolon separated string of qranges"""
-        return ";".join("{}-{}".format(*tpl) for tpl in self.qranges())
-
-    def _make_chains(self, hitset: List[BlastHit]) -> List["HitChain"]:
-        """Generates hit chains for set of hits with single sacc
+    def make_chain_single(self, hitset: List[BlastHit]) -> List["HitChain"]:
+        """Generates hit chain for set of hits with single sacc
 
         Uses the current HitChain as start point.
         """
-        # start with empty chain
-        chains = [copy.copy(self)]
         hitset.sort(key=lambda h: min(h.sstart, h.send))
-        if len(hitset) > 10:
-            hitset = tqdm.tqdm(hitset, desc=hitset[0].sacc)
-
-        # iterate over hits in order of range on target
+        chain = copy.copy(self)
         for hit in hitset:
-            newchains = set()
-            sstart = min(hit.sstart, hit.send)
-            # iterate over open chains
-            for chain in chains:
-                try:
-                    chain.append(hit)
-                except self.OverlapException:
-                    newchain = copy.copy(chain)
-                    newchain.trunc(sstart)
-                    newchain.prune([hit])
-                    newchains.add(newchain)
-            for chain in newchains:
-                chain.append(hit)
-                chains.append(chain)
-        return chains
+            chain.append(hit)
+        return [chain]
 
-    def make_chains(self, hits: Iterable[BlastHit]) -> List["HitChain"]:
+    def make_chains(self, hits: Iterable[BlastHit], **args) -> List["HitChain"]:
         """Generates hit chains for set of hits
 
         Uses the current HitChain as start point
@@ -415,58 +326,29 @@ class HitChain:
         hitsets = defaultdict(list)
         for hit in hits:
             hitsets[hit.sacc].append(hit)
-        LOG.info("Making chains from %i hitsets", len(hitsets))
-        return [chain
-                for hitset in tqdm.tqdm(hitsets.values(),
-                                        desc="Making chains",
-                                        disable=None)
-                for chain in self._make_chains(hitset)]
-
-    @classmethod
-    def greedy_select_chains(
-            cls, chains: List["HitChain"],
-            alt: float = 0.9) -> Iterator[
-                Tuple["HitChain", List["HitChain"]]]:
-        """Greedily selects hit chains with best e-value score"""
-        total = len(chains)
-        pbar = tqdm.tqdm(total=total, desc="Pruning chains")
-        while chains:
-            best_chain_id = min(range(len(chains)),
-                                key=lambda i: chains[i].log10_evalue)
-            result = chains.pop(best_chain_id)
-            qaccs = set(result.qaccs)
-            altresult = sorted((
-                chain for chain in chains
-                if chain != result
-                and chain.log10_evalue < alt * result.log10_evalue
-                and chain.alen > alt * result.alen
-                and chain.qlen > alt * result.qlen
-                and (len(qaccs.intersection(set(chain.qaccs)))
-                     > len(qaccs) * alt)
-            ), key=lambda res: res.log10_evalue)
-
-            yield result, altresult
-
-            for chain in chains:
-                chain.prune(result.hits, full_sequence=True)
-            chains = [chain for chain in chains if chain]
-            pbar.update(total - len(chains))
-            total = len(chains)
+        return [
+            chain
+            for hitset in hitsets.values()
+            for chain in self.make_chain_single(hitset, **args)
+        ]
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert class to dict for writing to CSV"""
+        def range_str(ranges):
+            return ";".join("{}-{}".format(*rang) for rang in ranges)
+
         return {
             'sacc': self.sacc,
             'stitle': self.stitle,
-            'staxids': self.staxids_str(),
+            'staxids': ";".join((str(i) for i in self.staxids)),
             'log_evalue': self.log10_evalue,
             'pident': self.pident,
             'qlen': self.qlen,
             'alen': self.alen,
             'n_frag': len(self.hits),
             'qaccs': ";".join(self.qaccs),
-            'qranges': self.qranges_str(),
-            'sranges': self.sranges_str(),
+            'qranges': range_str(self.qranges()),
+            'sranges': range_str(self.sranges())
         }
 
     @property
@@ -475,8 +357,118 @@ class HitChain:
         return list(self.to_dict().keys())
 
 
+class CheckOverlaps:
+    def overlaps(self, hit: BlastHit) -> bool:
+        """Checks for overlap with ``hit``
+
+        Args:
+           hit: The blast hit to check for overlaps
+        Returns:
+           True if ``hit`` overlaps on query or subject side
+        """
+        return self.overlaps_subject(hit) or self.overlaps_query(hit)
+
+    def overlaps_subject(self, hit: BlastHit) -> bool:
+        """Checks for subject overlap with ``hit``
+
+        This assumes that the HitChain is filled left to
+        right. No checks for gaps in the middle are done.
+
+        Args:
+          hit: The blast hit to check for overlaps
+        Returns:
+          True if ``hit`` overlaps on subject side
+        """
+        return self.send > min(hit.sstart, hit.send)
+
+    def overlaps_query(self, hit: BlastHit) -> bool:
+        """Checks for query overlap with ``hit``.
+
+        This will compare ``hit`` to all BlastHits comprising this
+        HitChain. If hit has the same query accession and overlaps
+        the hit region on the query range on any hit, ``True`` is
+        returned.
+
+        Args:
+          hit: The blast hit to check for overlaps
+        Returns:
+          True if ``hit`` overlaps on query side
+        """
+        return next(self.get_query_overlaps(hit), None) is not None
+
+    def get_query_overlaps(self, hit: BlastHit) -> Iterator[BlastHit]:
+        """Finds hits overlapping ``hit`` on query side
+
+        Args:
+          hit: The blast hit to check for overlaps
+        Returns:
+          An iterator over blast hits with query accession matching
+          ``hit`` and overlapping query side of ``hit``.
+        """
+        start, end = sorted((hit.qstart, hit.qend))
+        qacc = hit.qacc
+        for ohit in filter(lambda h: h.qacc == qacc, self.hits):
+            ostart, oend = sorted((ohit.qstart, ohit.qend))
+            if not oend < start and not end < ostart:
+                yield ohit
+
+    def prune_overlapping(self, hits: List[BlastHit]) -> None:
+        """Remove overlapping BLAST hits from chain
+
+        Removes hits from chain having qacc matching any of ``hits``
+        and having qstart/qstop overlapping the hit.
+
+        Args:
+           hits: List of hits
+
+        """
+        oldlen = len(self.hits)
+        overlapping = set(
+            ohit
+            for hit in hits
+            for ohit in self.get_query_overlaps(hit)
+        )
+        self.hits = [
+            ohit for ohit in self.hits
+            if ohit not in ohits
+        ]
+        if oldlen != len(self.hits):
+            self._reset()
+
+
+    def make_chain_single(self, hitset: List[BlastHit],
+                          check_overlap = True) -> List["HitChain"]:
+        """Generates hit chains for set of hits with single sacc
+
+        Uses the current HitChain as start point.
+        """
+        # start with empty chain
+        chains = [copy.copy(self)]
+        hitset.sort(key=lambda h: min(h.sstart, h.send))
+        if len(hitset) > 50:
+            hitset = tqdm.tqdm(hitset, desc=hitset[0].sacc)
+
+        # iterate over hits in order of range on target
+        for hit in hitset:
+            newchains = set()
+            sstart = min(hit.sstart, hit.send)
+            # iterate over open chains
+            for chain in chains:
+                if chain.overlaps(hit):
+                    newchain = copy.copy(chain)
+                    newchain.trunc(sstart)
+                    newchain.prune_overlapping([hit])
+                    newchains.add(newchain)
+                else:
+                    chain.append(hit)
+            for chain in newchains:
+                chain.append(hit)
+                chains.append(chain)
+        return chains
+
+
 class CoverageHitChain(HitChain):
-    """HitChain also calculating coverage(s)"""
+    """HitChain also calculating read counts"""
     def __init__(self,
                  hits: Optional[List[BlastHit]] = None,
                  chain_penalty: int = 20) -> None:
@@ -497,10 +489,14 @@ class CoverageHitChain(HitChain):
         """Number of reads"""
         if self._coverages is None:
             return -1
+        # Count unique qaccs only
+        qaccs = set(self.qaccs)
+        # Count from all supplied coverage files (=each sequencing unit)
+        covs = self._coverages.values()
         return sum(
             int(cov[qacc]['numreads'])
-            for qacc in self.qaccs
-            for cov in self._coverages.values()
+            for qacc in qaccs
+            for cov in covs
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -509,3 +505,43 @@ class CoverageHitChain(HitChain):
             'numreads': self.numreads
         })
         return res
+
+
+
+def greedy_select_chains(chains: List["HitChain"],
+                         alt: float = 0.9) -> Iterator[List["HitChain"]]:
+    """Greedily selects hit chains with best e-value score
+
+    Iteratively finds and returns the best scoring chain together with
+    chains with similarily good results. After each iteration, query
+    sequences used are removed from the candidate hit chains.
+
+    Similarly good chains are those that are within ``alt`` of the
+    best scoring chain on evalue, alen and qlen and comprise at least
+    90% of the same query sequences.
+
+    """
+    while chains:
+        best_chain_idx = min(range(len(chains)),
+                             key=lambda i: chains[i].log10_evalue)
+        best_chain = chains.pop(best_chain_idx)
+        qaccs = set(best_chain.qaccs)
+
+        # find similarly soring chains
+        extra_chains = [
+            chain for chain in chains
+            if chain != best_chain
+            and chain.log10_evalue < alt * best_chain.log10_evalue
+            and chain.alen > alt * best_chain.alen
+            and chain.qlen > alt * best_chain.qlen
+            and (len(qaccs.intersection(set(chain.qaccs))) > len(qaccs)/10)
+        ]
+        extra_chains.sort(key=lambda res: res.log10_evalue)
+
+        yield [best_chain] + extra_chains
+
+        # remove used query accs from remaining chains
+        for chain in chains:
+            chain.prune(best_chain.hits)
+        # remove chains now empty
+        chains = [chain for chain in chains if chain]
