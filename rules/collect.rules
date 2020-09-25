@@ -92,8 +92,8 @@ with Stage("vp_classify"):
             "python -m virprof blastbin"
             " --out {output.result}"
             " --ncbi-taxonomy {input.taxonomy}"
-            " {input.blast7}"
-            " {input.coverage}"
+            " --in-blast7 {input.blast7}"
+            " --in-coverage {input.coverage}"
             " >{log} 2>&1"
 
     rule vp_aggregate_classifiations:

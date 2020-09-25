@@ -9,6 +9,7 @@ scoring chains of HSPs explaining the contigs with a minimal number of
 subject sequences.
 """
 
+
 import csv
 import os
 import logging
@@ -84,80 +85,6 @@ def setup_profiling() -> None:
 
     atexit.register(dump_profile)
     yappi.start()
-
-
-def parse_file_args(files: List[click.utils.LazyFile]
-                   ) -> Tuple[Type[HitChain],
-                              Dict[str, Tuple[click.utils.LazyFile,
-                                              Dict[str, click.utils.LazyFile]]]]:
-    """Composes sample dictionary from list of files passed on cmdline
-
-    - If we have only files ending in ``.blast7``, each is a sample of
-      its own.
-    - If we have an equal number of ``.blast7`` and ``.coverage``
-      files, each pair is a sample and the basenames must match.
-    - If we have one file ending in ``.blast7`` and a number of
-      ``.coverage`` files, we have one sample with multiple coverage
-      files (e.g. from a co-assembly over technical replicates or time
-      series).
-
-    Returns:
-      A dictionary with sample names (file base names) as key and
-      pairs of file-descriptor and coverage-file dictionary as
-      value. The coverage-file dictionary itself has the coverage file
-      basename as keys and the respective file-descriptor as values. E.g.
-
-        ```
-           {'sample1': (sample_1_blast7_file, {'coverage1': coverage1_fd})}
-        ```
-    """
-    # Sort file arguments by extension
-    cov_files = {}
-    blast7_files = {}
-    other_files = []
-    for fdes in files:
-        name = os.path.basename(fdes.name)
-        if name.endswith('.coverage'):
-            cov_files[name[:-len('.coverage')]] = fdes
-        elif name.endswith('.blast7'):
-            blast7_files[name[:-len('.blast7')]] = fdes
-        else:
-            other_files.append(name)
-    if other_files:
-        raise click.BadArgumentUsage(
-            f"Unknown file type in arguments: {other_files}"
-        )
-
-    # Build result dictionary
-    samples = {}
-    if cov_files:
-        chain_class: Type[HitChain] = CoverageHitChain
-        if len(blast7_files) > 1:
-            basenames = set(cov_files.keys()) | set(blast7_files.keys())
-            missing_files = set(
-                name for name in basenames
-                if name not in cov_files
-                or name not in blast7_files
-            )
-            if missing_files:
-                raise click.BadArgumentUsage(
-                    f"Missing either blast7 or coverage file for:"
-                    f" {missing_files}"
-                )
-            for name in basenames:
-                samples[name] = (blast7_files[name], {name: cov_files[name]})
-            LOG.info("Processing %i samples with coverage", len(samples))
-        else:
-            name = next(iter(blast7_files.keys()))
-            samples[name] = (blast7_files[name], cov_files)
-            LOG.info("Processing single sample with %i coverage files",
-                     len(cov_files))
-    else:
-        chain_class = HitChain
-        for name in blast7_files:
-            samples[name] = (blast7_files[name], {})
-        LOG.info("Processing %i samples without coverage", len(samples))
-    return chain_class, samples
 
 
 def group_hits_by_qacc(hits: List[BlastHit]) -> Iterator[List[BlastHit]]:
@@ -240,11 +167,16 @@ def cli() -> None:
 
 
 @cli.command()
-@click.argument('files', type=click.File('r', lazy=True), nargs=-1)
+@click.option('--in-blast7', '-b', type=click.File('r'), required=True,
+              help="BLAST result file in format 7")
+@click.option('--in-coverage', '-c', type=click.File('r'), multiple=True,
+              help="Samtools coverage result file")
+@click.option('--in-fasta', '-f', type=click.File('r'),
+              help="FASTA file with contigs")
 @click.option('--out', '-o', type=click.File('w'), default='-',
               help="Output CSV file")
 @click.option('--ncbi-taxonomy', '-t', type=click.Path(),
-              help="Path to an unpacked NCBI taxonomy")
+              help="Path to NCBI taxonomy (tree or raw)")
 @click.option('--include', '-i', multiple=True,
               help="Scientific name of NCBI taxonomy node identifying"
               " subtree to include in output")
@@ -259,7 +191,9 @@ def cli() -> None:
 @click.option('--num-words', type=int, default=4,
               help="Number of words to add to 'words' field")
 @click.option('--profile', is_flag=True)
-def blastbin(files: List[click.utils.LazyFile],
+def blastbin(in_blast7: click.utils.LazyFile,
+             in_coverage: click.utils.LazyFile,
+             in_fasta: click.utils.LazyFile,
              out: click.utils.LazyFile,
              include: Tuple[str, ...],
              exclude: Tuple[str, ...],
@@ -275,13 +209,15 @@ def blastbin(files: List[click.utils.LazyFile],
     if profile:
         setup_profiling()
 
-    if not files:
-        LOG.info("No files to process")
-        return True
-    chain_class, samples = parse_file_args(files)
+    if in_coverage:
+        chain_tpl = CoverageHitChain(chain_penalty=chain_penalty)
+    else:
+        chain_tpl = HitChain(chain_penalty=chain_penalty)
 
-    chain_tpl = chain_class(chain_penalty=chain_penalty)
+    sample = os.path.basename(in_blast7.name).rstrip(".gz").rstrip(".blast7")
+
     wordscorer = WordScorer(keepwords=num_words)
+    LOG.info("Loading taxonomy from {}".format(ncbi_taxonomy))
     taxonomy = load_taxonomy(ncbi_taxonomy)
 
     if not no_standard_excludes:
@@ -291,18 +227,16 @@ def blastbin(files: List[click.utils.LazyFile],
             'artificial sequences',
             'unclassified sequences',
         )
-        # cellular organisms
-        # Microviridae
-        # Caudovirales
+    LOG.info("Excluding: {}".format(exclude))
+
     prefilter = taxonomy.make_filter(exclude=exclude)
     taxfilter = taxonomy.make_filter(include, exclude)
 
-    field_list = ['sample']
-    field_list += ['words']
+    field_list = ['sample', 'words']
     if not taxonomy.is_null():
         field_list += ['taxname']
     field_list += chain_tpl.fields
-    field_list += ['taxid']
+    field_list += ['taxid', 'saccs']
     if not taxonomy.is_null():
         field_list += ['lineage']
     LOG.info("Output fields: %s", ' '.join(field_list))
@@ -311,35 +245,26 @@ def blastbin(files: List[click.utils.LazyFile],
     writer.writeheader()
     LOG.info("Writing to: %s", out.name)
 
-    if len(samples) > 1:
-        sample_iter = tqdm.tqdm(samples.items())
-    else:
-        sample_iter = samples.items()
+    reader = ymp.blast.reader(in_blast7)
+    hitgroups = group_hits_by_qacc(reader)
+    filtered_hits = prefilter_hits(hitgroups, prefilter)
+    load_coverage(chain_tpl, in_coverage)
+    all_chains = chain_tpl.make_chains(filtered_hits)
+    best_chains = greedy_select_chains(all_chains)
 
-    for sample, (sample_fd, cov_files) in sample_iter:
-        LOG.info("Processing %s", sample)
-        reader = ymp.blast.reader(sample_fd)
-        hitgroups = group_hits_by_qacc(reader)
-        filtered_hits = prefilter_hits(hitgroups, prefilter)
-        load_coverage(chain_tpl, cov_files)
-        all_chains = chain_tpl.make_chains(filtered_hits)
-        sample_fd.close()
-        best_chains = greedy_select_chains(all_chains)
-
-        for chains in best_chains:
-            taxid = wordscorer.score_taxids(chains)
-            if not taxfilter(taxid):
-                continue
-
-            row = chains[0].to_dict()
-            row['sample'] = sample
-            row['taxid'] = taxid
-            row['words'] = wordscorer.score(chains)
-            if not taxonomy.is_null():
-                row['lineage'] = taxonomy.get_lineage(taxid)
-                row['taxname'] = taxonomy.get_name(taxid)
-
-            writer.writerow(row)
+    for chains in best_chains:
+        taxid = wordscorer.score_taxids(chains)
+        if not taxfilter(taxid):
+            continue
+        row = chains[0].to_dict()
+        row['sample'] = sample
+        row['taxid'] = taxid
+        row['words'] = wordscorer.score(chains)
+        row['saccs'] = " ".join(chain.sacc for chain in chains)
+        if not taxonomy.is_null():
+            row['lineage'] = taxonomy.get_lineage(taxid)
+            row['taxname'] = taxonomy.get_name(taxid)
+        writer.writerow(row)
     return True
 
 
