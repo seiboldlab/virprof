@@ -23,7 +23,7 @@ import ymp.blast  # type: ignore
 from .blastbin import BlastHit, HitChain, CoverageHitChain, greedy_select_chains
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
-from .fasta import get_accs_from_fasta, filter_fasta
+from .fasta import get_accs_from_fasta, filter_fasta, read_from_command
 
 
 LOG = logging.getLogger(__name__)
@@ -214,7 +214,14 @@ def blastbin(in_blast7: click.utils.LazyFile,
     else:
         chain_tpl = HitChain(chain_penalty=chain_penalty)
 
-    sample = os.path.basename(in_blast7.name).rstrip(".gz").rstrip(".blast7")
+    sample = os.path.basename(in_blast7.name)
+    if in_blast7.name.endswith(".gz"):
+        sample = sample.rstrip(".blast7.gz")
+        unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
+        reader = ymp.blast.reader(unzip)
+    else:
+        sample = sample.rstrip(".blast7")
+        reader = ymp.blast.reader(in_blast7)
 
     wordscorer = WordScorer(keepwords=num_words)
     LOG.info("Loading taxonomy from {}".format(ncbi_taxonomy))
@@ -245,7 +252,6 @@ def blastbin(in_blast7: click.utils.LazyFile,
     writer.writeheader()
     LOG.info("Writing to: %s", out.name)
 
-    reader = ymp.blast.reader(in_blast7)
     hitgroups = group_hits_by_qacc(reader)
     filtered_hits = prefilter_hits(hitgroups, prefilter)
     load_coverage(chain_tpl, in_coverage)
@@ -301,7 +307,11 @@ def filter_blast(in_blast7: click.utils.LazyFile,
     toremove = set()
 
     LOG.info("Loading Blast7")
-    reader = ymp.blast.reader(in_blast7)
+    if in_blast7.name.endswith(".gz"):
+        unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
+        reader = ymp.blast.reader(unzip)
+    else:
+        reader = ymp.blast.reader(in_blast7)
     hitgroups = list(group_hits_by_qacc(reader))
     LOG.info("%i distinct query sequences had matches", len(hitgroups))
 

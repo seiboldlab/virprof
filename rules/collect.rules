@@ -26,7 +26,7 @@ with Stage("vp_remove_matched") as S:
         message: "Filtering contigs"
         input:
             fasta  = "{:prev:}/{:target:}.fasta.gz",
-            blast7 = "{:prev:}/{:target:}.blast7"
+            blast7 = "{:prev:}/{:target:}.blast7.gz"
         output:
             fasta  = "{:this:}/{target}.fasta.gz"
         log:
@@ -78,7 +78,7 @@ with Stage("vp_classify"):
         message: "Classifying {input.blast7}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
-            blast7   = "{:prev:}/{:target:}.blast7",
+            blast7   = "{:prev:}/{:target:}.blast7.gz",
             taxonomy = "{:this:}/ALL.taxonomy.gt"
         output:
             result   = "{:this:}/{target}.virus.csv"
