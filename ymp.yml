@@ -20,47 +20,84 @@ projects:
   sunbeam:
     data: projects/sunbeam.csv
 
-# Here the pipeline is defined in three parts:
-# 1. Selection of non-human reads
-# 2. Assembly, read mapping and counting
-# 3. Blast based binning and annotation
 pipelines:
-  remove_human_reads:
-    # Trims reads and removes human reads by mapping to
-    # hg38 reference first with hisat2 and then with bowtie2.
-    - trim_bbmapAQ10
-    - ref_hg38
+  qc:
+    - qc_fastqc
+    - trim_bbmapAQ10L70
+    - qc_fastqc
+
+  enrich:
+    - map_bbmapS
+    - extract_readsG12
+
+  deplete:
     - map_hisat2
     - extract_readsf12
     - map_bowtie2
     - extract_readsf12
-  assemble_and_map:
-    # Removes low-entropy reads, assembles into contigs
-    # >200bp length and computes coverage.
+
+  deplete_human:
+    - trim_bbmapAQ10L70
+    - ref_hs37
+    - index_bmtagger
+    - remove_bmtagger
+
+  assemble_single:
+    - group_sample
+    - assemble_spadesSc
+    - format_bbmapL200
+
+  assemble_meta:
     - dust_bbmapE60
     - group_sample
-    - assemble_metaspades
+    - assemble_spadesMeta
     - format_bbmapL200
+
+  coverage:
     - index_bowtie2
-    - map_bowtie2
+    - map_bowtie2S
     - sort_bam
     - coverage_samtools
-  blast_classify:
-    # Removes human contigs with megablast, executes
-    # BlastN search against NT and creates annotated
-    # bins.
+
+  blastbin:
     - ref_hg38
     - annotate_blastE2MegaBest
-    - vp_remove_matchedU200
+    - blastfilter_vpU200
     - ref_NT
     - annotate_blastE10Best
     - ref_NcbiTaxonomy
-    - vp_classify
-  result:
-    # Runs the full pipeline.
-    - remove_human_reads
-    - assemble_and_map
-    - blast_classify
+    - blastbin_vp
+
+    # Reference guidedworkflow
+  targeted_scov2:
+    - qc
+    - ref_scov2
+    - enrich
+    - assemble_single
+    - coverage
+    - blastbin
+  targeted_hrvc:
+    - qc
+    - ref_hrvc
+    - enrich
+    - assemble_single
+    - coverage
+    - blastbin
+
+  genericA:
+    - qc
+    - ref_hg38
+    - deplete
+    - assemble_meta
+    - coverage
+    - blastbin
+  genericB:
+    - qc
+    - deplete_human
+    - assemble_meta
+    - coverage
+    - blastbin
+
 
 # Local cluster configuration:
 cluster:

@@ -19,7 +19,7 @@ Env(name="virprof_py", base="bioconda",
     ])
 
 
-with Stage("vp_remove_matched") as S:
+with Stage("blastfilter_vp") as S:
     S.add_param("U", typ="int", name="min_unaligned_bp", default=0)
 
     rule vp_filter_blast:
@@ -52,7 +52,7 @@ with Stage("vp_remove_matched") as S:
             touch("{:this:}/all_targets.stamp")
 
 
-with Stage("vp_classify"):
+with Stage("blastbin_vp"):
     rule vp_index_tree:
         message: "Creating taxonomy index for virprof bin&classify"
         input:
@@ -78,6 +78,7 @@ with Stage("vp_classify"):
         message: "Classifying {input.blast7}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
+            fasta    = "{:prev:}/{:target:}.fasta.gz",
             blast7   = "{:prev:}/{:target:}.blast7.gz",
             taxonomy = "{:this:}/ALL.taxonomy.gt"
         output:
@@ -94,6 +95,7 @@ with Stage("vp_classify"):
             " --ncbi-taxonomy {input.taxonomy}"
             " --in-blast7 {input.blast7}"
             " --in-coverage {input.coverage}"
+            " --in-fasta {input.fasta}"
             " >{log} 2>&1"
 
     rule vp_aggregate_classifiations:
