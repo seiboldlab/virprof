@@ -183,3 +183,9 @@ references:
     - url: https://www.arb-silva.de/fileadmin/silva_databases/release_138/Exports/SILVA_138_SSURef_NR99_tax_silva_trunc.fasta.gz
   SilvaLSU:
     - url: https://www.arb-silva.de/fileadmin/silva_databases/release_132/Exports/SILVA_132_LSURef_tax_silva_trunc.fasta.gz
+  hrvc:
+    - url: data/hrv_c_15.fasta.gz
+  scov2:
+    - url: data/sars_cov_2.fasta.gz
+  hrvpb:
+    - url: data/hrv_pb_unaligned.fasta.gz
