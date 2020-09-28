@@ -13,6 +13,7 @@ subject sequences.
 import csv
 import os
 import logging
+import gzip
 
 from typing import List, Tuple, Dict, Type, Iterator, Iterable, Callable, Optional
 
@@ -217,7 +218,8 @@ def blastbin(in_blast7: click.utils.LazyFile,
     sample = os.path.basename(in_blast7.name)
     if in_blast7.name.endswith(".gz"):
         sample = sample.rstrip(".blast7.gz")
-        unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
+        #unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
+        unzip = gzip.open(in_blast7.name)
         reader = ymp.blast.reader(unzip)
     else:
         sample = sample.rstrip(".blast7")
@@ -308,7 +310,8 @@ def filter_blast(in_blast7: click.utils.LazyFile,
 
     LOG.info("Loading Blast7")
     if in_blast7.name.endswith(".gz"):
-        unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
+        #unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
+        unzip = gzip.open(in_blast7.name, "rt")
         reader = ymp.blast.reader(unzip)
     else:
         reader = ymp.blast.reader(in_blast7)
