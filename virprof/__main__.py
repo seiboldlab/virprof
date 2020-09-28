@@ -321,8 +321,9 @@ def filter_blast(in_blast7: click.utils.LazyFile,
     LOG.info("Making Chains")
     for hitgroup in hitgroups:
         all_chains = HitChain().make_chains(hitgroup)
-        best_chains = HitChain().greedy_select_chains(all_chains)
-        for chain, _ in best_chains:
+        best_chains = greedy_select_chains(all_chains)
+        for chains in best_chains:
+            chain = chains[0]
             remain = chain.qlen - chain.alen
             if remain < min_unaligned_bp:
                 toremove.add(hitgroup[0].qacc)
