@@ -148,20 +148,6 @@ def prefilter_hits(hitgroups: Iterable[List[BlastHit]],
     return hits
 
 
-def load_coverage(chain_tpl: HitChain, cov_files: Dict[str, click.utils.LazyFile]) -> None:
-    """Load coverage into chain template"""
-    if not isinstance(chain_tpl, CoverageHitChain):
-        return
-    cov = {}
-    for cov_sample, cov_fd in cov_files.items():
-        LOG.info("Loading coverage file %s", cov_sample)
-        cov_reader = csv.DictReader(cov_fd, delimiter="\t")
-        cov_data = {row['#rname']: row for row in cov_reader}
-        cov[cov_sample] = cov_data
-        cov_fd.close()
-    if cov:
-        chain_tpl.set_coverage(cov)
-
 @click.group()
 def cli() -> None:
     """Use any of the subcommands"""
@@ -212,6 +198,16 @@ def blastbin(in_blast7: click.utils.LazyFile,
 
     if in_coverage:
         chain_tpl = CoverageHitChain(chain_penalty=chain_penalty)
+        cov = {}
+        for cov_fd in in_coverage:
+            fname = os.path.basename(cov_fd.name)
+            cov_sample = fname.rstrip(".coverage")
+            LOG.info("Loading coverage file %s", cov_sample)
+            cov_reader = csv.DictReader(cov_fd, delimiter="\t")
+            cov_data = {row['#rname']: row for row in cov_reader}
+            cov[cov_sample] = cov_data
+            cov_fd.close()
+        chain_tpl.set_coverage(cov)
     else:
         chain_tpl = HitChain(chain_penalty=chain_penalty)
 
@@ -256,7 +252,6 @@ def blastbin(in_blast7: click.utils.LazyFile,
 
     hitgroups = group_hits_by_qacc(reader)
     filtered_hits = prefilter_hits(hitgroups, prefilter)
-    load_coverage(chain_tpl, in_coverage)
     all_chains = chain_tpl.make_chains(filtered_hits)
     best_chains = greedy_select_chains(all_chains)
 
