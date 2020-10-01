@@ -239,6 +239,11 @@ class HitChain:
         return self._pident
 
     @property
+    def pidents(self) -> List[float]:
+        "Percent identiy for each hit"
+        return [hit.pident for hit in self.hits]
+
+    @property
     def log10_evalue(self) -> float:
         "Logarithm base 10 of the E-value computed for the combined hits"
         if self.qlen == 0:
@@ -338,14 +343,15 @@ class HitChain:
             return ";".join("{}-{}".format(*rang) for rang in ranges)
 
         return {
-            'sacc': self.sacc,
-            'stitle': self.stitle,
-            'staxids': ";".join((str(i) for i in self.staxids)),
             'log_evalue': self.log10_evalue,
-            'pident': self.pident,
             'qlen': self.qlen,
             'alen': self.alen,
             'n_frag': len(self.hits),
+            'sacc': self.sacc,
+            'stitle': self.stitle,
+            'staxids': ";".join((str(i) for i in self.staxids)),
+            'pident': self.pident,
+            'pidents': ";".join((str(pid) for pid in self.pidents)),
             'qaccs': ";".join(self.qaccs),
             'qranges': range_str(self.qranges()),
             'sranges': range_str(self.sranges())
@@ -435,7 +441,6 @@ class CheckOverlaps:
         if oldlen != len(self.hits):
             self._reset()
 
-
     def make_chain_single(self, hitset: List[BlastHit],
                           check_overlap = True) -> List["HitChain"]:
         """Generates hit chains for set of hits with single sacc
@@ -505,7 +510,6 @@ class CoverageHitChain(HitChain):
             'numreads': self.numreads
         })
         return res
-
 
 
 def greedy_select_chains(chains: List["HitChain"],
