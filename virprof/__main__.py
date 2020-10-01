@@ -216,7 +216,11 @@ def blastbin(in_blast7: click.utils.LazyFile,
         sample = sample.rstrip(".blast7.gz")
         #unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
         unzip = gzip.open(in_blast7.name, "rt")
-        reader = ymp.blast.reader(unzip)
+        if unzip.read(1) == "":
+            reader = []
+        else:
+            unzip.seek(0)
+            reader = ymp.blast.reader(unzip)
     else:
         sample = sample.rstrip(".blast7")
         reader = ymp.blast.reader(in_blast7)
