@@ -238,12 +238,10 @@ def blastbin(in_blast7: click.utils.LazyFile,
     taxfilter = taxonomy.make_filter(include, exclude)
 
     field_list = ['sample', 'words']
-    if not taxonomy.is_null():
-        field_list += ['taxname']
     field_list += chain_tpl.fields
     field_list += ['taxid', 'saccs']
     if not taxonomy.is_null():
-        field_list += ['lineage']
+        field_list += ['taxname', 'lineage']
     LOG.info("Output fields: %s", ' '.join(field_list))
 
     writer = csv.DictWriter(out, field_list)
