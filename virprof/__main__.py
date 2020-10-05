@@ -309,7 +309,11 @@ def filter_blast(in_blast7: click.utils.LazyFile,
     if in_blast7.name.endswith(".gz"):
         #unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
         unzip = gzip.open(in_blast7.name, "rt")
-        reader = ymp.blast.reader(unzip)
+        if unzip.read(1) == "":
+            reader = []
+        else:
+            unzip.seek(0)
+            reader = ymp.blast.reader(unzip)
     else:
         reader = ymp.blast.reader(in_blast7)
     hitgroups = list(group_hits_by_qacc(reader))
