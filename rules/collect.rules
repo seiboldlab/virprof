@@ -129,8 +129,38 @@ with Stage("blastbin_vp"):
             "  {input.calls}"
             "  >{log} 2>&1"
 
+    rule vp_show_bins:
+        message: "Visualizing binning"
+        input:
+            calls = "{:this:}/{:targets:}.virus.csv"
+        output:
+            plot =  "{:this:}/{target}.virus.pdf"
+        log:
+            "{:this:}/{target}.show_bins.log"
+        threads:
+            1
+        conda:
+            "virprof_r"
+        params:
+            page_width = 22,
+            page_height = 18,
+            plots_per_page = 5,
+            min_alen = 200,
+            min_reads = 3
+        shell:
+            "./scripts/show_bins.R"
+            " --input {input.calls}"
+            " --output {output.plot}"
+            " --page-width {params.page_width}"
+            " --page-height {params.page_height}"
+            " --plots-per-page {params.plots_per_page}"
+            " --min-alen {params.min_alen}"
+            " --min-reads {params.min_reads}"
+            " >{log} 2>&1"
+
     rule vp_classify_all:
         input:
-            "{:this:}/virus_summary.xlsx"
+            summary = "{:this:}/virus_summary.xlsx",
+            plots = "{:this:}/{:targets:}.virus.pdf"
         output:
             touch("{:this:}/all_targets.stamp")
