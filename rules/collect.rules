@@ -10,6 +10,9 @@ Env(name="virprof_r", base="bioconda",
         "r-tibble",
         "r-openxlsx",
         "r-optparse",
+        "r-tidyverse",
+        "r-patchwork",
+        "r-ggrepel"
     ])
 
 Env(name="virprof_py", base="bioconda",
@@ -132,7 +135,7 @@ with Stage("blastbin_vp"):
     rule vp_show_bins:
         message: "Visualizing binning"
         input:
-            calls = "{:this:}/{:targets:}.virus.csv"
+            calls = "{:this:}/{target}.virus.csv"
         output:
             plot =  "{:this:}/{target}.virus.pdf"
         log:
