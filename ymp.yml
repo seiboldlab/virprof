@@ -1,7 +1,5 @@
 # Projects run with the pipeline. Each has a single CSV
-# defining ids, samples and fastq file locations.
-# IMPORTANT: Files MUST have a column named "sample" for
-# grouping by the pipeline later.
+# defining units, samples and fastq file locations.
 projects:
   covid:
     data: projects/covid.csv
@@ -22,92 +20,85 @@ projects:
 
 pipelines:
   qc:
-    - qc_fastqc
-    - trim_bbmapAQ10L70
-    - qc_fastqc
+    stages:
+      - qc_fastqc
+      - trim_bbmapAQ10L70
+      - qc_fastqc
 
   enrich:
-    - map_bbmapS
-    - extract_readsG12
+    stages:
+      - map_bbmapS
+      - extract_readsG12
 
   deplete:
-    - map_hisat2
-    - extract_readsf12
-    - map_bowtie2
-    - extract_readsf12
-
-  deplete_human:
-    - trim_bbmapAQ10L70
-    - ref_hs37
-    - index_bmtagger
-    - remove_bmtagger
+    stages:
+      - map_hisat2
+      - extract_readsf12
+      - map_bowtie2
+      - extract_readsf12
 
   assemble_single:
-    - group_sample
-    - assemble_spadesSc
-    - format_bbmapL200
+    stages:
+      - group_sample
+      - assemble_spadesSc
+      - format_bbmapL200
 
   assemble_meta:
-    - dust_bbmapE60
-    - group_sample
-    - assemble_spadesMeta
-    - format_bbmapL200
+    stages:
+      - dust_bbmapE60:
+          hide: true
+      - group_sample
+      - assemble_spadesMeta
+      - format_bbmapL200
 
   coverage:
-    - index_bowtie2
-    - map_bowtie2S
-    - sort_bam
-    - coverage_samtools
+    stages:
+      - index_bowtie2
+      - map_bowtie2S
+      - sort_bam
+      - coverage_samtools
 
   blastbin:
-    - ref_hg38
-    - annotate_blastE2MegaBest
-    - blastfilter_vpU200
-    - ref_NT
-    - annotate_blastE10Best
-    - ref_NcbiTaxonomy
-    - blastbin_vp
+    stages:
+      - ref_hg38
+      - annotate_blastE2MegaBest
+      - blastfilter_vpU200
+      - ref_NT
+      - annotate_blastE10Best
+      - ref_NcbiTaxonomy
+      - blastbin_vp
 
-    # Reference guidedworkflow
-  targeted_scov2:
-    - qc
-    - ref_scov2
-    - enrich
-    - assemble_single
-    - coverage
-    - blastbin
-  targeted_hrvc:
-    - qc
-    - ref_hrvc
-    - enrich
-    - assemble_single
-    - coverage
-    - blastbin
+  # Reference guidedworkflow
+  targeted:
+    stages:
+      - qc
+      - enrich
+      - assemble_single
+      - coverage
+      - blastbin
 
-  genericA:
-    - qc
-    - ref_hg38
-    - deplete
-    - assemble_meta
-    - coverage
-    - blastbin
-  genericB:
-    - qc
-    - deplete_human
-    - assemble_meta
-    - coverage
-    - blastbin
+  generic:
+    stages:
+      - qc
+      - ref_hg38
+      - deplete
+      - assemble_meta
+      - coverage
+      - blastbin
 
 
 # Local cluster configuration:
 cluster:
   # Which cluster engine profile to use
-  profile: lsf
+  profile: slurm
   profiles:
+    slurm:
+      args:
+        # Add parameter selecting the queue
+        queue: "-p debug"
     lsf:
       args:
         # Add parameter selecting the queue
-        #queue: "-q foo24"
         queue: "-q normal"
     default:
       # Limit how many jobs we keep in the queue
@@ -117,13 +108,16 @@ cluster:
       max_jobs_per_second: 5
       # Wait very long for files to appear. Our NFS can be
       # extremely slow to sync from node to node.
-      latency_wait: 300
+      latency_wait: 600
+
+
 limits:
   # All jobs should request at least 2GB RAM.
   min_mem: 2G
   # Scale large jobs (mapping, assembly) down to the
   # max memory our regular compute nodes have available.
-  max_mem: 45G
+  max_mem: 368G
+
 
 # Configure local references
 references:
