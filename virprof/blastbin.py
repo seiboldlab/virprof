@@ -264,6 +264,11 @@ class HitChain:
         return calc_log10_evalue(self.blast_score, self.qlen)
 
     @property
+    def score(self) -> float:
+        "Compute overall score for this hit chain"
+        return self.log10_evalue
+
+    @property
     def sacc(self) -> str:
         """The reference accession number (sacc BLAST format field)"""
         return self.hits[0].sacc if self.hits else ""
@@ -575,8 +580,8 @@ def greedy_select_chains(chains: List["HitChain"],
 
     """
     while chains:
-        best_chain_idx = min(range(len(chains)),
-                             key=lambda i: chains[i].log10_evalue)
+        best_chain_idx = max(range(len(chains)),
+                             key=lambda i: chains[i].score)
         best_chain = chains.pop(best_chain_idx)
         qaccs = set(best_chain.qaccs)
 
@@ -584,6 +589,7 @@ def greedy_select_chains(chains: List["HitChain"],
         extra_chains = [
             chain for chain in chains
             if chain != best_chain
+            and chain.score > alt * best_chain.score
             and chain.log10_evalue < alt * best_chain.log10_evalue
             and chain.alen > alt * best_chain.alen
             and chain.qlen > alt * best_chain.qlen
