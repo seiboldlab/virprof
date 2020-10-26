@@ -111,6 +111,7 @@ class HitChain:
         self._qlen: Optional[int] = None
         self._alen: Optional[int] = None
         self._pident: Optional[float] = None
+        self._qpident: Optional[float] = None
         self._hash: Optional[int] = None
 
     def _reset(self) -> None:
@@ -119,6 +120,7 @@ class HitChain:
         self._qlen = None
         self._alen = None
         self._pident = None
+        self._qpident = None
         self._hash = None
 
     def __len__(self) -> int:
@@ -237,6 +239,15 @@ class HitChain:
             pident = matches / self.alen
             self._pident = round(pident, 1)
         return self._pident
+
+    @property
+    def qpident(self) -> Optional[float]:
+        "Aggregated query percent identity for all items in the HitChain"
+        if self._qpident is None and self.alen:
+            matches = sum(hit.pident * hit.length for hit in self.hits)
+            qpident = matches / self.qlen
+            self._qpident = round(qpident, 1)
+        return self._qpident
 
     @property
     def pidents(self) -> List[float]:
