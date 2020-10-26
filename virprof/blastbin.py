@@ -538,6 +538,20 @@ class CoverageHitChain(HitChain):
             for cov in self._coverages.values()
         )
 
+    def prefilter_hits(
+            self,
+            hitgroups: Iterable[List[BlastHit]],
+            min_read_count: int
+    ) -> Iterable[List[BlastHit]]:
+        filtered = 0
+        for hitgroup in hitgroups:
+            qacc = hitgroup[0].qacc
+            if sum(self.get_numreads(qacc)) >= min_read_count:
+                yield hitgroup
+            else:
+                filtered += 1
+        LOG.info(f"Removed {filtered} contigs having < {min_read_count} reads")
+
     def to_dict(self) -> Dict[str, Any]:
         res = super().to_dict()
         res.update({

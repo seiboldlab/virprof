@@ -173,6 +173,9 @@ def cli() -> None:
 @click.option('--no-standard-excludes', '-E', type=bool,
               help="Do not exclude Human, artificial and unclassified"
               " sequences by default", default=False)
+@click.option("--min-read-count", type=int, default=2,
+              help="Exclude contigs with less than this number of reads."
+              " Requires --in-coverage to be set to take effect.")
 @click.option('--chain-penalty', type=int, default=20,
               help="Cost to BLAST score for concatenating two hits")
 @click.option('--num-words', type=int, default=4,
@@ -186,6 +189,7 @@ def blastbin(in_blast7: click.utils.LazyFile,
              exclude: Tuple[str, ...],
              ncbi_taxonomy: Optional[str] = None,
              no_standard_excludes: bool = False,
+             min_read_count = 2,
              chain_penalty: int = 20,
              num_words: int = 4,
              profile: bool = False) -> bool:
@@ -251,6 +255,8 @@ def blastbin(in_blast7: click.utils.LazyFile,
     LOG.info("Writing to: %s", out.name)
 
     hitgroups = group_hits_by_qacc(reader)
+    if in_coverage:
+        hitgroups = chain_tpl.prefilter_hits(hitgroups, min_read_count)
     filtered_hits = prefilter_hits(hitgroups, prefilter)
     all_chains = chain_tpl.make_chains(filtered_hits)
     best_chains = greedy_select_chains(all_chains)
