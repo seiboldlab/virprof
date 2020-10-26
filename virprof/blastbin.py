@@ -496,10 +496,21 @@ class CoverageHitChain(HitChain):
     def set_coverage(self, coverages: Mapping[str, Mapping[str, Mapping[str, str]]]) -> None:
         """Set coverage data"""
         self._coverages = coverages
+        self._units = list(coverages.keys())
+        self._numreads = {
+            qacc: [int(coverages[unit][qacc]['numreads'])
+                   for unit in self._units]
+            for qacc in coverages[self._units[0]]
+        }
+
+    def _copy_coverage(self, other):
+        self._coverages = other._coverages
+        self._units = other._units
+        self._numreads = other._numreads
 
     def __copy__(self) -> "CoverageHitChain":
         cpy = self.__class__(self.hits, self.chain_penalty)
-        cpy.set_coverage(self._coverages)
+        cpy._copy_coverage(self)
         return cpy
 
     @property
@@ -509,18 +520,29 @@ class CoverageHitChain(HitChain):
             return -1
         # Count unique qaccs only
         qaccs = set(self.qaccs)
-        # Count from all supplied coverage files (=each sequencing unit)
-        covs = self._coverages.values()
-        return sum(
-            int(cov[qacc]['numreads'])
-            for qacc in qaccs
-            for cov in covs
+        return sum(sum(self._numreads[qacc]) for qacc in qaccs)
+
+    def get_numreads(self, qacc) -> List[int]:
+        return self._numreads[qacc]
+
+    @property
+    def numreadss(self) -> str:
+        """Number of reads"""
+        if self._coverages is None:
+            return ""
+        return ";".join(
+            ":".join(
+                cov[qacc]['numreads']
+                for qacc in self.qaccs
+            )
+            for cov in self._coverages.values()
         )
 
     def to_dict(self) -> Dict[str, Any]:
         res = super().to_dict()
         res.update({
-            'numreads': self.numreads
+            'numreads': self.numreads,
+            'numreads_indiv': self.numreadss
         })
         return res
 
