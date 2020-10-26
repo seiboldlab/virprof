@@ -231,8 +231,6 @@ def blastbin(in_blast7: click.utils.LazyFile,
 
     if not no_standard_excludes:
         exclude += (
-            'Homo sapiens',
-            'Mus musculus',
             'artificial sequences',
             'unclassified sequences',
         )
