@@ -108,6 +108,7 @@ class HitChain:
         self.chain_penalty = chain_penalty
 
         self._score: Optional[float] = None
+        self._blast_score: Optional[float] = None
         self._qlen: Optional[int] = None
         self._alen: Optional[int] = None
         self._pident: Optional[float] = None
@@ -116,6 +117,7 @@ class HitChain:
 
     def _reset(self) -> None:
         """Reset cached score and length values"""
+        self._blast_score = None
         self._score = None
         self._qlen = None
         self._alen = None
@@ -222,14 +224,14 @@ class HitChain:
         return self._alen
 
     @property
-    def score(self) -> float:
+    def blast_score(self) -> float:
         "Aggegated BLAST score for all items in the HitChain"
-        if self._score is None:
-            self._score = (
+        if self._blast_score is None:
+            self._blast_score = (
                 sum(hit.score for hit in self.hits)
                 - self.chain_penalty * (len(self) - 1)
             )
-        return self._score
+        return self._blast_score
 
     @property
     def pident(self) -> Optional[float]:
@@ -259,7 +261,7 @@ class HitChain:
         "Logarithm base 10 of the E-value computed for the combined hits"
         if self.qlen == 0:
             return 0
-        return calc_log10_evalue(self.score, self.qlen)
+        return calc_log10_evalue(self.blast_score, self.qlen)
 
     @property
     def sacc(self) -> str:
