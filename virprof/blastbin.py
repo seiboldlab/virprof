@@ -266,7 +266,9 @@ class HitChain:
     @property
     def score(self) -> float:
         "Compute overall score for this hit chain"
-        return self.log10_evalue
+        if self._score is None:
+            self._score = -self.log10_evalue
+        return self._score
 
     @property
     def sacc(self) -> str:
