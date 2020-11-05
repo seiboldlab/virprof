@@ -114,6 +114,8 @@ cluster:
 limits:
   # All jobs should request at least 2GB RAM.
   min_mem: 2G
+  # All jobs should request at least 8GB RAM.
+  min_mem: 8G
   # Scale large jobs (mapping, assembly) down to the
   # max memory our regular compute nodes have available.
   max_mem: 368G
