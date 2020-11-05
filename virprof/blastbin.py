@@ -537,13 +537,7 @@ class CoverageHitChain(HitChain):
         """Number of reads"""
         if self._coverages is None:
             return ""
-        return ";".join(
-            ":".join(
-                cov[qacc]['numreads']
-                for qacc in self.qaccs
-            )
-            for cov in self._coverages.values()
-        )
+        return ";".join(str(sum(self.get_numreads(qacc))) for qacc in self.qaccs)
 
     def prefilter_hits(
             self,
