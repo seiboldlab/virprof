@@ -325,13 +325,11 @@ class HitChain:
         Returns:
            List of pairs with start and end positions (start < end).
         """
-        return [
-            (hit.qstart, hit.qend)
-            if hit.qstart < hit.qend
-            else (hit.qend, hit.qstart)
-            for hit in self.hits
-            if qacc is None or hit.qacc == qacc
-        ]
+        # These are always qstart <= qend
+        if qacc is None:
+            return [(hit.qstart, hit.qend) for hit in self.hits]
+        return [(hit.qstart, hit.qend) for hit in self.hits
+                if hit.qacc == qacc]
 
     def make_chain_single(self, hitset: List[BlastHit]) -> List["HitChain"]:
         """Generates hit chain for set of hits with single sacc
