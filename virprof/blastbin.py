@@ -305,6 +305,9 @@ class HitChain:
                 else (hit.send, hit.sstart)
                 for hit in self.hits]
 
+    def range_reversed(self) -> List[bool]:
+        return [hit.sstart > hit.send for hit in self.hits]
+
     @property
     def qaccs(self) -> List[str]:
         """The accession numbers for each hit in this HitChain
@@ -372,7 +375,8 @@ class HitChain:
             'pidents': ";".join((str(pid) for pid in self.pidents)),
             'qaccs': ";".join(self.qaccs),
             'qranges': range_str(self.qranges()),
-            'sranges': range_str(self.sranges())
+            'sranges': range_str(self.sranges()),
+            'reversed': ";".join('T' if rev else 'F' for rev in self.range_reversed()),
         }
 
     @property
