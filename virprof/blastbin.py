@@ -557,7 +557,7 @@ class CoverageHitChain(HitChain):
         res = super().to_dict()
         res.update({
             'numreads': self.numreads,
-            'numreads_indiv': self.numreadss
+            'numreadss': self.numreadss
         })
         return res
 
