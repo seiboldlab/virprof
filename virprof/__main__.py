@@ -271,6 +271,10 @@ def blastbin(in_blast7: click.utils.LazyFile,
             'uncultured eukaryote',
             'uncultured fungus',
         )
+        exclude += (
+            'Hominidae',
+        )
+
     LOG.info("Excluding: {}".format(exclude))
 
     taxfilter_pre = taxonomy.make_filter(exclude=prefilter)
