@@ -135,8 +135,12 @@ def prefilter_hits_taxonomy(hitgroups: Iterable[List[BlastHit]],
             for hit in hitgroup
             if hit.bitscore > minscore
         ]
-        if top_keep.count(True) >= len(top_keep)/2 :
-            result.append(hitgroup)
+        if top_keep.count(True) >= len(top_keep)/2:
+            filtered = [
+                hit for hit in hitgroup
+                if all(prefilter(taxid) for taxid in hit.staxids)
+            ]
+            result.append(filtered)
         else:
             n_filtered += 1
     LOG.info(f"Removed {n_filtered} contigs matching prefilter taxonomy branches")
