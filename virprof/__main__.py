@@ -106,8 +106,8 @@ def group_hits_by_qacc(hits: List[BlastHit]) -> Iterator[List[BlastHit]]:
         yield group
 
 
-def prefilter_hits(hitgroups: Iterable[List[BlastHit]],
-                   prefilter: Callable[[int], bool]) -> List[BlastHit]:
+def prefilter_hits_taxonomy(hitgroups: Iterable[List[BlastHit]],
+                            prefilter: Callable[[int], bool]) -> List[BlastHit]:
     """Filter ``hitgroups`` using ``prefilter`` function.
 
     The input hitgroups are expected to each comprise HSPs from the
@@ -126,26 +126,48 @@ def prefilter_hits(hitgroups: Iterable[List[BlastHit]],
       Filtered subset of hitgroups
 
     """
-    n_queries = n_filtered = 0
-    hits = []
+    n_filtered = 0
+    result = []
     for hitgroup in hitgroups:
-        n_queries += 1
         minscore = max(hit.bitscore for hit in hitgroup) * 0.9
         top_keep = [
             all(prefilter(taxid) for taxid in hit.staxids)
             for hit in hitgroup
             if hit.bitscore > minscore
         ]
-        keep_group = len(top_keep)/2 < top_keep.count(True)
-        if keep_group:
-            hits += hitgroup
+        if top_keep.count(True) >= len(top_keep)/2 :
+            result.append(hitgroup)
         else:
             n_filtered += 1
-    LOG.info("  %i query sequences (contigs) had hits",
-             n_queries)
-    LOG.info("  %i matched excludes", n_filtered)
-    LOG.info("  %i HSPs to process", len(hits))
-    return hits
+    LOG.info(f"Removed {n_filtered} contigs matching prefilter taxonomy branches")
+    return result
+
+
+def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
+    n_filtered = 0
+    result = []
+    for hitgroup in hitgroups:
+        result_group = []
+        hit_iter = iter(hitgroup)
+        hitsets = [[next(hit_iter)]]
+        for hit in hit_iter:
+            if hitsets[-1][-1].sacc != hit.sacc:
+                hitsets.append([])
+            hitsets[-1].append(hit)
+        best_score = sum(hit.score for hit in hitsets[0])
+        best_pident = sum(hit.pident for hit in hitsets[0]) / len(hitsets[0])
+        min_pident = 100 - (100 - best_pident + 1) * 1.5
+        min_score = best_score * 0.9
+        for hitset in hitsets:
+            cur_score = sum(hit.score for hit in hitset)
+            cur_pident = sum(hit.pident for hit in hitset) / len(hitset)
+            if cur_score > min_score and cur_pident > min_pident:
+                result_group.extend(hitset)
+            else:
+                n_filtered += len(hitset)
+        result.append(result_group)
+    LOG.info(f"Removed {n_filtered} hits with comparatively low score")
+    return result
 
 
 @click.group()
@@ -240,7 +262,7 @@ def blastbin(in_blast7: click.utils.LazyFile,
         )
     LOG.info("Excluding: {}".format(exclude))
 
-    prefilter = taxonomy.make_filter(exclude=exclude)
+    taxfilter_pre = taxonomy.make_filter(exclude=exclude)
     taxfilter = taxonomy.make_filter(include, exclude)
 
     field_list = ['sample', 'words']
@@ -254,11 +276,19 @@ def blastbin(in_blast7: click.utils.LazyFile,
     writer.writeheader()
     LOG.info("Writing to: %s", out.name)
 
-    hitgroups = group_hits_by_qacc(reader)
+    hitgroups = list(group_hits_by_qacc(reader))
+    LOG.info("Found %i contigs with %i hits",
+             len(hitgroups), sum(len(hitgroup) for hitgroup in hitgroups))
+
+    # Filter
     if in_coverage:
-        hitgroups = chain_tpl.prefilter_hits(hitgroups, min_read_count)
-    filtered_hits = prefilter_hits(hitgroups, prefilter)
-    all_chains = chain_tpl.make_chains(filtered_hits)
+        hitgroups = list(chain_tpl.filter_hitgroups(hitgroups, min_read_count))
+    filtered_hits = prefilter_hits_taxonomy(hitgroups, taxfilter_pre)
+    filtered_hits = prefilter_hits_score(hitgroups)
+    LOG.info("After prefiltering, %i contigs with %i hits remain",
+             len(filtered_hits), sum(len(hitgroup) for hitgroup in filtered_hits))
+
+    all_chains = chain_tpl.make_chains(hit for hitgroup in filtered_hits for hit in hitgroup)
     best_chains = greedy_select_chains(all_chains)
 
     for chains in best_chains:
