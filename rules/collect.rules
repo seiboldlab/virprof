@@ -12,7 +12,8 @@ Env(name="virprof_r", base="bioconda",
         "r-optparse",
         "r-tidyverse",
         "r-patchwork",
-        "r-ggrepel"
+        "r-ggrepel",
+        "bedtools"
     ])
 
 Env(name="virprof_py", base="bioconda",
