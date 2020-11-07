@@ -196,6 +196,9 @@ def cli() -> None:
 @click.option('--exclude', '-e', multiple=True,
               help="Scientific name of NCBI taxonomy node identifying"
               " subtree to exclude from output")
+@click.option('--prefilter', '-e', multiple=True,
+              help="Scientific name of NCBI taxonomy node identifying"
+              " subtree to exclude from input")
 @click.option('--no-standard-excludes', '-E', type=bool,
               help="Do not exclude Human, artificial and unclassified"
               " sequences by default", default=False)
@@ -213,6 +216,7 @@ def blastbin(in_blast7: click.utils.LazyFile,
              out: click.utils.LazyFile,
              include: Tuple[str, ...],
              exclude: Tuple[str, ...],
+             prefilter: Tuple[str, ...],
              ncbi_taxonomy: Optional[str] = None,
              no_standard_excludes: bool = False,
              min_read_count = 2,
@@ -260,13 +264,13 @@ def blastbin(in_blast7: click.utils.LazyFile,
     taxonomy = load_taxonomy(ncbi_taxonomy)
 
     if not no_standard_excludes:
-        exclude += (
+        prefilter += (
             'artificial sequences',
             'unclassified sequences',
         )
     LOG.info("Excluding: {}".format(exclude))
 
-    taxfilter_pre = taxonomy.make_filter(exclude=exclude)
+    taxfilter_pre = taxonomy.make_filter(exclude=prefilter)
     taxfilter = taxonomy.make_filter(include, exclude)
 
     field_list = ['sample', 'words']
@@ -288,7 +292,7 @@ def blastbin(in_blast7: click.utils.LazyFile,
     if in_coverage:
         hitgroups = list(chain_tpl.filter_hitgroups(hitgroups, min_read_count))
     filtered_hits = prefilter_hits_taxonomy(hitgroups, taxfilter_pre)
-    filtered_hits = prefilter_hits_score(hitgroups)
+    filtered_hits = prefilter_hits_score(filtered_hits)
     LOG.info("After prefiltering, %i contigs with %i hits remain",
              len(filtered_hits), sum(len(hitgroup) for hitgroup in filtered_hits))
 
@@ -297,8 +301,6 @@ def blastbin(in_blast7: click.utils.LazyFile,
 
     for chains in best_chains:
         taxid = wordscorer.score_taxids(chains)
-        if not taxfilter(taxid):
-            continue
         row = chains[0].to_dict()
         row['sample'] = sample
         row['taxid'] = taxid
@@ -307,6 +309,11 @@ def blastbin(in_blast7: click.utils.LazyFile,
         if not taxonomy.is_null():
             row['lineage'] = taxonomy.get_lineage(taxid)
             row['taxname'] = taxonomy.get_name(taxid)
+
+        if not taxfilter(taxid):
+            LOG.info("Excluding %s -- %s", row['taxname'], row['words'])
+            continue
+        LOG.info("Found     %s -- %s", row['taxname'], row['words'])
         writer.writerow(row)
     return True
 
