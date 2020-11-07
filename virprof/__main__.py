@@ -267,6 +267,9 @@ def blastbin(in_blast7: click.utils.LazyFile,
         prefilter += (
             'artificial sequences',
             'unclassified sequences',
+            'uncultured bacterium',
+            'uncultured eukaryote',
+            'uncultured fungus',
         )
     LOG.info("Excluding: {}".format(exclude))
 
