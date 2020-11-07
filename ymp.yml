@@ -17,6 +17,8 @@ projects:
     data: projects/sarp.csv
   sunbeam:
     data: projects/sunbeam.csv
+  test:
+    data: projects/test.csv
 
 pipelines:
   qc:
@@ -86,7 +88,6 @@ pipelines:
       - coverage
       - blastbin
 
-
 # Local cluster configuration:
 cluster:
   # Which cluster engine profile to use
@@ -95,15 +96,15 @@ cluster:
     slurm:
       args:
         # Add parameter selecting the queue
-        queue: "-p debug"
+        queue: "-p normal"
     lsf:
       args:
         # Add parameter selecting the queue
-        queue: "-q normal"
+        queue: "-q foo24"
     default:
       # Limit how many jobs we keep in the queue
       # (Note: This is jobs, not cores as the name would suggest)
-      cluster_cores: 50
+      cluster_cores: 500
       # Limit the number of jobs submitted per second
       max_jobs_per_second: 5
       # Wait very long for files to appear. Our NFS can be
@@ -112,13 +113,11 @@ cluster:
 
 
 limits:
-  # All jobs should request at least 2GB RAM.
-  min_mem: 2G
   # All jobs should request at least 8GB RAM.
   min_mem: 8G
   # Scale large jobs (mapping, assembly) down to the
   # max memory our regular compute nodes have available.
-  max_mem: 368G
+  max_mem: 256G
 
 
 # Configure local references
