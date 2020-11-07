@@ -541,7 +541,7 @@ class CoverageHitChain(HitChain):
             return ""
         return ";".join(str(sum(self.get_numreads(qacc))) for qacc in self.qaccs)
 
-    def prefilter_hits(
+    def filter_hitgroups(
             self,
             hitgroups: Iterable[List[BlastHit]],
             min_read_count: int
