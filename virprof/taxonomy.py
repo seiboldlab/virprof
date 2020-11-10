@@ -260,12 +260,20 @@ class TaxonomyGT(Taxonomy):
         except ValueError:
             return 'Unknown'
 
+    def _get_path_to_root(self, target):
+        res = [target]
+        while int(target) != self.root:
+            target = next(target.in_edges()).source()
+            res.append(target)
+        res.reverse()
+        return res
+
     def get_lineage(self, tax_id: int) -> str:
         try:
             target = self.tree.vertex(tax_id)
         except ValueError:
             return 'Unknown'
-        nodes, _ = gt_topology.shortest_path(self.tree, self.root, target)
+        nodes = self._get_path_to_root(target)
         return '; '.join(self.tree.vp.name[node]
                          for node in nodes[1:])
 
