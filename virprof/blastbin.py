@@ -100,29 +100,19 @@ class HitChain:
         chain_penalty: Penalty added to score for each item in the
             list beyond the first.
     """
+    __slots__ = ("hits", "chain_penalty", "_hash", "_score")
 
     def __init__(self,
                  hits: Optional[List[BlastHit]] = None,
                  chain_penalty: int = 20) -> None:
         self.hits = hits.copy() if hits else list()
         self.chain_penalty = chain_penalty
-
-        self._score: Optional[float] = None
-        self._blast_score: Optional[float] = None
-        self._qlen: Optional[int] = None
-        self._alen: Optional[int] = None
-        self._pident: Optional[float] = None
-        self._qpident: Optional[float] = None
-        self._hash: Optional[int] = None
+        self._hash = None
+        self._score = None
 
     def _reset(self) -> None:
         """Reset cached score and length values"""
-        self._blast_score = None
         self._score = None
-        self._qlen = None
-        self._alen = None
-        self._pident = None
-        self._qpident = None
         self._hash = None
 
     def __len__(self) -> int:
@@ -142,7 +132,8 @@ class HitChain:
 
     def __hash__(self) -> int:
         if self._hash is None:
-            self._hash = hash(tuple(self.hits))
+            val = self._hash = hash(tuple(self.hits))
+            return val
         return self._hash
 
     def __eq__(self, other: object) -> bool:
@@ -201,15 +192,13 @@ class HitChain:
         Note that ``len(hitChain)`` returns the number of items, not
         the length in basepairs.
         """
-        if self._qlen is None:
-            seen = set()
-            qlen = 0
-            for hit in self.hits:
-                if hit.qacc not in seen:
-                    seen.add(hit.qacc)
-                    qlen += hit.qlen
-            self._qlen = qlen  # placate mypy
-        return self._qlen
+        seen = set()
+        qlen = 0
+        for hit in self.hits:
+            if hit.qacc not in seen:
+                seen.add(hit.qacc)
+                qlen += hit.qlen
+        return qlen
 
     @property
     def alen(self) -> int:
@@ -218,38 +207,35 @@ class HitChain:
         Note that ``len(hitChain)`` returns the number of items, not
         the length in basepairs.
         """
-        if self._alen is None:
-            alen = sum(hit.length for hit in self.hits)
-            self._alen = alen  # placate mypy
-        return self._alen
+        return sum(hit.length for hit in self.hits)
 
     @property
     def blast_score(self) -> float:
         "Aggegated BLAST score for all items in the HitChain"
-        if self._blast_score is None:
-            self._blast_score = (
-                sum(hit.score for hit in self.hits)
-                - self.chain_penalty * (len(self) - 1)
-            )
-        return self._blast_score
+        return (
+            sum(hit.score for hit in self.hits)
+            - self.chain_penalty * (len(self) - 1)
+        )
 
     @property
     def pident(self) -> Optional[float]:
         "Aggregated percent identity for all items in the HitChain"
-        if self._pident is None and self.alen:
-            matches = sum(hit.pident * hit.length for hit in self.hits)
-            pident = matches / self.alen
-            self._pident = round(pident, 1)
-        return self._pident
+        if not self.alen:
+            return None
+
+        matches = sum(hit.pident * hit.length for hit in self.hits)
+        pident = matches / self.alen
+        return round(pident, 1)
 
     @property
     def qpident(self) -> Optional[float]:
         "Aggregated query percent identity for all items in the HitChain"
-        if self._qpident is None and self.alen:
-            matches = sum(hit.pident * hit.length for hit in self.hits)
-            qpident = matches / self.qlen
-            self._qpident = round(qpident, 1)
-        return self._qpident
+        if not self.alen:
+            return None
+
+        matches = sum(hit.pident * hit.length for hit in self.hits)
+        qpident = matches / self.qlen
+        return round(qpident, 1)
 
     @property
     def pidents(self) -> List[float]:
@@ -267,7 +253,8 @@ class HitChain:
     def score(self) -> float:
         "Compute overall score for this hit chain"
         if self._score is None:
-            self._score = -self.log10_evalue
+            val = self._score = -self.log10_evalue
+            return val
         return self._score
 
     @property
