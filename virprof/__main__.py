@@ -160,7 +160,7 @@ def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
             hitsets[-1].append(hit)
         best_score = sum(hit.score for hit in hitsets[0])
         best_pident = sum(hit.pident for hit in hitsets[0]) / len(hitsets[0])
-        min_pident = 100 - (100 - best_pident) * 1.5 - 1
+        min_pident = 100 - (100 - best_pident) * 1.5 - .5
         min_score = best_score * 0.9
         for hitset in hitsets:
             cur_score = sum(hit.score for hit in hitset)
