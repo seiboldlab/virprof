@@ -136,7 +136,8 @@ with Stage("blastbin_vp"):
     rule vp_show_bins:
         message: "Visualizing binning"
         input:
-            calls = "{:this:}/{target}.virus.csv"
+            calls = "{:this:}/{target}.virus.csv",
+            bam    = "{:prev:}/{:target:}.sorted.bam"
         output:
             plot =  "{:this:}/{target}.virus.pdf"
         log:
@@ -154,6 +155,7 @@ with Stage("blastbin_vp"):
         shell:
             "./scripts/show_bins.R"
             " --input {input.calls}"
+            " --input-bam {input.bam}"
             " --output {output.plot}"
             " --page-width {params.page_width}"
             " --page-height {params.page_height}"
