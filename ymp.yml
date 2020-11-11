@@ -99,6 +99,7 @@ cluster:
       args:
         # Add parameter selecting the queue
         queue: "-p normal"
+        comment: "--comment {output[0]}"
     lsf:
       args:
         # Add parameter selecting the queue
