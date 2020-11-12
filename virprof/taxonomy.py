@@ -4,6 +4,7 @@ import os
 import csv
 import logging
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from typing import Set, Sequence, Any, Iterator, Dict, Tuple, Callable, Optional
 
 import graph_tool as gt  # type: ignore
@@ -98,6 +99,7 @@ class Taxonomy(ABC):
         """
         if self.names_fn is None:
             return
+        LOG.info("Reading nodes from '%s'", self.names_fn)
         with open(self.names_fn, "r") as names_fd:
             reader = csv.DictReader(
                 names_fd, delimiter='|',
@@ -110,7 +112,7 @@ class Taxonomy(ABC):
                     data = dict((('name', row['name'].strip()),))
                     yield tax_id, data
 
-    def edge_reader(self) -> Iterator[Tuple[int, int]]:
+    def edge_reader(self) -> Iterator[Tuple[int, int, str]]:
         """Reader for NCBI nodes.dmp, listing node and parent ids
 
         Returns:
@@ -118,6 +120,7 @@ class Taxonomy(ABC):
         """
         if self.nodes_fn is None:
             return
+        LOG.info("Reading edges from '%s'", self.nodes_fn)
         with open(self.nodes_fn, "r") as nodes_fd:
             reader = csv.DictReader(
                 nodes_fd, delimiter='|',
@@ -128,7 +131,7 @@ class Taxonomy(ABC):
             for row in reader:
                 source_node = int(row['parent_id'])
                 target_node = int(row['tax_id'])
-                yield source_node, target_node
+                yield source_node, target_node, row['rank']
 
     @abstractmethod
     def get_name(self, tax_id: int) -> str:
@@ -238,6 +241,7 @@ class Taxonomy(ABC):
 class TaxonomyGT(Taxonomy):
     """NCBI Taxonomy class using ``graph-tool`` to manage tree"""
     def load_tree(self) -> gt.Graph:
+        LOG.info("Loading graph from '%s'", self.nodes_fn)
         tree = gt.load_graph_from_csv(
             self.nodes_fn,
             directed=True, eprop_types=[], string_vals=False,
@@ -246,6 +250,9 @@ class TaxonomyGT(Taxonomy):
         tree.vp.name = tree.new_vertex_property("string")
         for tax_id, data in self.node_reader():
             tree.vp.name[tree.vertex(tax_id)] = data['name']
+        tree.vp.rank = tree.new_vertex_property("string")
+        for _, tax_id, rank in self.edge_reader():
+            tree.vp.rank[tree.vertex(tax_id)] = rank.strip()
         return tree
 
     def load_tree_binary(self) -> gt.Graph:
@@ -268,14 +275,15 @@ class TaxonomyGT(Taxonomy):
         res.reverse()
         return res
 
-    def get_lineage(self, tax_id: int) -> str:
+    def get_lineage(self, tax_id: int) -> OrderedDict:
         try:
             target = self.tree.vertex(tax_id)
         except ValueError:
             return 'Unknown'
         nodes = self._get_path_to_root(target)
-        return '; '.join(self.tree.vp.name[node]
-                         for node in nodes[1:])
+        return OrderedDict((self.tree.vp.rank[node],  self.tree.vp.name[node])
+                           for node in nodes[1:])
+
 
     def get_subtree_ids(self, name: str) -> Set[int]:
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)

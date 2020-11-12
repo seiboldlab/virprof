@@ -284,7 +284,7 @@ def blastbin(in_blast7: click.utils.LazyFile,
     field_list += chain_tpl.fields
     field_list += ['taxid', 'saccs']
     if not taxonomy.is_null():
-        field_list += ['taxname', 'lineage']
+        field_list += ['taxname', 'species', 'lineage', 'lineage_ranks']
     LOG.info("Output fields: %s", ' '.join(field_list))
 
     writer = csv.DictWriter(out, field_list)
@@ -314,8 +314,11 @@ def blastbin(in_blast7: click.utils.LazyFile,
         row['words'] = wordscorer.score(chains)
         row['saccs'] = " ".join(chain.sacc for chain in chains)
         if not taxonomy.is_null():
-            row['lineage'] = taxonomy.get_lineage(taxid)
+            lineage = taxonomy.get_lineage(taxid)
+            row['lineage'] = '; '.join(lineage.values())
+            row['lineage_ranks'] = '; '.join(lineage.keys())
             row['taxname'] = taxonomy.get_name(taxid)
+            row['species'] = lineage.get('species', 'Unknown')
 
         if not taxfilter(taxid):
             LOG.info("Excluding %s -- %s", row['taxname'], row['words'])
