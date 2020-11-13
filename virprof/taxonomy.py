@@ -276,9 +276,12 @@ class TaxonomyGT(Taxonomy):
         return res
 
     def get_lineage(self, tax_id: int) -> OrderedDict:
+        # Get node and check that it's "real":
         try:
             target = self.tree.vertex(tax_id)
-        except ValueError:
+            # Check target has parent by tiggering StopIteration if it does not
+            next(target.in_edges())
+        except (ValueError, StopIteration):
             return OrderedDict((('no rank', 'Unknown'),))
         nodes = self._get_path_to_root(target)
         return OrderedDict((self.tree.vp.rank[node],  self.tree.vp.name[node])
