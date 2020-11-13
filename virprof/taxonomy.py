@@ -279,7 +279,7 @@ class TaxonomyGT(Taxonomy):
         try:
             target = self.tree.vertex(tax_id)
         except ValueError:
-            return OrderedDict(('no rank', 'Unknown'))
+            return OrderedDict((('no rank', 'Unknown'),))
         nodes = self._get_path_to_root(target)
         return OrderedDict((self.tree.vp.rank[node],  self.tree.vp.name[node])
                            for node in nodes[1:])
