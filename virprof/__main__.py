@@ -235,7 +235,10 @@ def blastbin(in_blast7: click.utils.LazyFile,
         cov = {}
         for cov_fd in in_coverage:
             fname = os.path.basename(cov_fd.name)
-            cov_sample = fname.rstrip(".coverage")
+            cov_sample, _, ext = fname.rpartition(".")
+            if ext != "coverage":
+                LOG.warning("Parsing of filename '%s' failed. Should end in .coverage",
+                            fname)
             LOG.info("Loading coverage file %s", cov_sample)
             cov_reader = csv.DictReader(cov_fd, delimiter="\t")
             cov_data = {row['#rname']: row for row in cov_reader}
@@ -245,9 +248,12 @@ def blastbin(in_blast7: click.utils.LazyFile,
     else:
         chain_tpl = HitChain(chain_penalty=chain_penalty)
 
-    sample = os.path.basename(in_blast7.name)
-    if in_blast7.name.endswith(".gz"):
-        sample = sample.rstrip(".blast7.gz")
+    fname = os.path.basename(in_blast7.name)
+    if fname.endswith(".gz"):
+        sample, _, ext = fname[:-3].rpartition(".")
+        if ext != "blast7":
+            LOG.warning("Parsing of filename '%s' failed. Should end in .blast7.gz",
+                        fname)
         #unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
         unzip = gzip.open(in_blast7.name, "rt")
         if unzip.read(1) == "":
@@ -256,8 +262,11 @@ def blastbin(in_blast7: click.utils.LazyFile,
             unzip.seek(0)
             reader = ymp.blast.reader(unzip)
     else:
-        sample = sample.rstrip(".blast7")
+        sample, _, ext = fname.rpartition(".")
+        if ext != "blast7":
+            LOG.warning("Parsing of filename '%s' failed. Should end in .blast7")
         reader = ymp.blast.reader(in_blast7)
+    LOG.info("Using sample=%s", sample)
 
     wordscorer = WordScorer(keepwords=num_words)
     LOG.info("Loading taxonomy from {}".format(ncbi_taxonomy))
