@@ -275,18 +275,38 @@ class TaxonomyGT(Taxonomy):
         res.reverse()
         return res
 
-    def get_lineage(self, tax_id: int) -> OrderedDict:
+    def _get_vertex(self, tax_id: int):
         # Get node and check that it's "real":
         try:
-            target = self.tree.vertex(tax_id)
+            vertex = self.tree.vertex(tax_id)
             # Check target has parent by tiggering StopIteration if it does not
-            next(target.in_edges())
+            next(vertex.in_edges())
         except (ValueError, StopIteration):
-            return OrderedDict((('no rank', 'Unknown'),))
-        nodes = self._get_path_to_root(target)
-        return OrderedDict((self.tree.vp.rank[node],  self.tree.vp.name[node])
-                           for node in nodes[1:])
+            return None
+        return vertex
 
+    def get_lineage(self, tax_id: int) -> Sequence[str]:
+        target = self._get_vertex(tax_id)
+        if target is None:
+            return ['Unknown']
+        nodes = self._get_path_to_root(target)
+        return [self.tree.vp.name[node] for node in nodes[1:]]
+
+    def get_lineage_ranks(self, tax_id: int) -> Sequence[str]:
+        target = self._get_vertex(tax_id)
+        if target is None:
+            return ['no rank']
+        nodes = self._get_path_to_root(target)
+        return [self.tree.vp.rank[node] for node in nodes[1:]]
+
+    def get_rank(self, tax_id: int, rank: str) -> str:
+        target = self._get_vertex(tax_id)
+        if target is not None:
+            nodes = self._get_path_to_root(target)
+            for node in reversed(nodes):
+                if self.tree.vp.rank[node] == rank:
+                    return self.tree.vp.name[node]
+        return 'Unknown'
 
     def get_subtree_ids(self, name: str) -> Set[int]:
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)

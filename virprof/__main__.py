@@ -323,11 +323,10 @@ def blastbin(in_blast7: click.utils.LazyFile,
         row['words'] = wordscorer.score(chains)
         row['saccs'] = " ".join(chain.sacc for chain in chains)
         if not taxonomy.is_null():
-            lineage = taxonomy.get_lineage(taxid)
-            row['lineage'] = '; '.join(lineage.values())
-            row['lineage_ranks'] = '; '.join(lineage.keys())
+            row['lineage'] = '; '.join(taxonomy.get_lineage(taxid))
+            row['lineage_ranks'] = '; '.join(taxonomy.get_lineage_ranks(taxid))
             row['taxname'] = taxonomy.get_name(taxid)
-            row['species'] = lineage.get('species', 'Unknown')
+            row['species'] = taxonomy.get_rank(taxid, 'species')
 
         if not taxfilter(taxid):
             LOG.info("Excluding %s -- %s", row['taxname'], row['words'])
