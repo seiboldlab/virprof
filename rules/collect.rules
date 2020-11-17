@@ -123,7 +123,7 @@ with Stage("blastbin_vp"):
         conda:
             "virprof_r"
         shell:
-            "./scripts/aggregate_classifications.R"
+            "./R/aggregate_classifications.R"
             "  --filter '{params.filter}'"
             "  --filter-host '{params.filter_host}'"
             "  --min-alen '{params.min_alen}'"
@@ -153,7 +153,7 @@ with Stage("blastbin_vp"):
             min_alen = 200,
             min_reads = 3
         shell:
-            "./scripts/show_bins.R"
+            "./R/show_bins.R"
             " --input {input.calls}"
             " --input-bam {input.bam}"
             " --output {output.plot}"
