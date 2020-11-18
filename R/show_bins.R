@@ -1,10 +1,11 @@
 #!/usr/bin/env Rscript
+library(here)
 library(optparse)
 library(tidyverse)
 library(patchwork)
 library(ggrepel)
 library(grid)
-
+source(here("R", "gene_plot.R"))
 
 parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
     option_list <- list(
@@ -67,64 +68,6 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
 }
 
 
-compress_axis <- function(occ_ranges) {
-    if (nrow(occ_ranges) == 0) {
-        return("identity")
-    }
-    cur_start <- cur_stop <- 0
-    for (j in 1:nrow(occ_ranges)) {
-        rng <- occ_ranges[j,]
-        if (rng$start > cur_stop + 50) {
-            cur_start <- rng$start
-        } else {
-            rng$start <- cur_start
-        }
-        cur_stop <- max(cur_stop, rng$stop)
-        rng$stop <- cur_stop
-        occ_ranges[j,] <- rng
-    }
-    ranges <- occ_ranges %>%
-        group_by(start) %>%
-        summarize(stop=max(stop), .groups="drop") %>%
-        ungroup() %>%
-        mutate(
-            newstop = cumsum(stop-start+50),
-            newstart = newstop-(stop-start)
-        )
-
-    inv <- function(x) {
-        x_na = is.na(x)
-        seen = is.na(x)
-        for (j in 1:nrow(ranges)) {
-            matches <- between(x, ranges$newstart[[j]], ranges$newstop[[j]])
-            matches <- matches & !seen
-            seen <- matches | seen
-            x[matches] <- x[matches] - ranges$newstop[[j]] + ranges$stop[[j]]
-        }
-        x[x_na] <- NA
-        x
-    }
-
-    trans <- function(x) {
-        x_na = is.na(x)
-        seen = is.na(x)
-        for (j in 1:nrow(ranges)) {
-            matches <- between(x, ranges$start[[j]], ranges$stop[[j]])
-            matches <- matches & !seen
-            seen <- matches | seen
-            x[matches] <- x[matches] - ranges$stop[[j]] + ranges$newstop[[j]]
-        }
-        x[x_na] <- NA
-        x
-    }
-
-    breaks <- function(x) {
-        x <- unique(sort(c(ranges$start, ranges$stop)))
-        x
-    }
-
-    scales::trans_new("compress_axis", trans, inv, breaks)
-}
 
 
 #' Turn each alignment into a row of its own
