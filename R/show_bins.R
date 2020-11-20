@@ -365,13 +365,6 @@ run <- function() {
             numreads >= opt$options$min_reads
         )
 
-    message("Writing output to ", opt$options$output, " ...")
-    pdf(
-        file = opt$options$output,
-        width = opt$options$page_width,
-        height = opt$options$page_height
-    )
-
     message("Parsing input data ...")
     alignments <- parse_blastbins(data)
     message("Placing contigs ...")
@@ -395,26 +388,36 @@ run <- function() {
         filter(!is.na(sacc)) %>%
         pull(sacc)
 
+    if (length(saccs) ==  0) {
+        return(NULL)
+    }
+
     if (opt$options$max_plots > 0) {
         saccs <- head(saccs, opt$options$max_plots)
     }
 
-    if (length(saccs) > 0) {
-        if (!is.null(opt$options$input_bam)) {
-            depths <- coverage_depth(opt$options$input_bam)
-        } else {
-            depths <- NULL
-        }
+    if (!is.null(opt$options$input_bam)) {
+        depths <- coverage_depth(opt$options$input_bam)
+    } else {
+        depths <- NULL
 
-        plot_pages(opt$options$plots_per_page, saccs, function(acc) {
-            reference <- data %>% filter(sacc == acc)
-            df <- ranges %>% filter(sacc == acc) %>%
-                mutate(
-                    contig=sub("NODE_(.*)_length_([0-9]*)_.*", "\\1", qaccs)
-                )
-            plot_ranges(reference, df, depths)
-        })
-   }
+    }
+
+    message("Writing output to ", opt$options$output, " ...")
+    pdf(
+        file = opt$options$output,
+        width = opt$options$page_width,
+        height = opt$options$page_height
+    )
+
+    plot_pages(opt$options$plots_per_page, saccs, function(acc) {
+        reference <- data %>% filter(sacc == acc)
+        df <- ranges %>% filter(sacc == acc) %>%
+            mutate(
+                contig=sub("NODE_(.*)_length_([0-9]*)_.*", "\\1", qaccs)
+            )
+        plot_ranges(reference, df, depths)
+    })
 
     dev.off()
 }
