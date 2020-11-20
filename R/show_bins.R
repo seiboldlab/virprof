@@ -67,95 +67,97 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
     opt
 }
 
-
-
-
-#' Turn each alignment into a row of its own
-split_alignments <- function(data) {
+#' Parses CSV from python blastbin
+#'
+#' The CSV contains one row per bin, combining multiple contigs and
+#' alignments. For plotting, we split this here into multiple data
+#' rows again - one per alignment. The fields qaccs, qranges, sranges,
+#' reversed, pidents and numreadss each contain semi-colon separated
+#' per contig data. The qranges and sranges also contain
+#' dash-separated start/end positions. Lastly, we undo the sorting of
+#' start/stop positions and flip contigs for which the majority of
+#' alignments are reversed.
+#'
+#' @param data Data.frame containing data from blastbin output
+#' @return data.frame containing alignments
+#'   qstart, qstop 1-indexed first and last position of alignment in query
+#'   sstart, sstop 1-indexed first and last position of alignment in subject
+#'   flip TRUE if the contig coordinates (qstart, qstop) have been flipped
+#'   qaccs Query accession
+#'   sacc  Subject accession
+#'   pidents Percent Identity
+#'   numreadss Count of reads mapped to contig
+#'   qlen Length of query/contig
+#'
+parse_blastbins <- function(data) {
     data %>%
+        # Split alignments from row-per-bin data
         separate_rows(qranges, sranges, reversed, qaccs, pidents, numreadss, sep=";") %>%
         mutate(
             pidents=as.numeric(pidents),
             numreadss=as.numeric(numreadss),
-            reversed=as.logical(reversed=="T")
+            reversed=as.logical(reversed=="T"),
+            ## FIXME: The contig length should come from python
+            qlen=as.integer(sub("NODE_.*_length_([0-9]*)_.*", "\\1", qaccs))
         ) %>%
         separate(qranges, c("qstart", "qstop"), convert = TRUE) %>%
         separate(sranges, c("sstart", "sstop"), convert = TRUE) %>%
-        arrange(-log_evalue, sacc, sstart)
+        # Restore qstart/qstop order
+        mutate(
+            qstart.tmp = if_else(reversed, qstop, qstart),
+            qstop = if_else(reversed, qstart, qstop),
+            qstart = qstart.tmp
+        ) %>%
+        select(-qstart.tmp) %>%
+        ## Flip entire contig if majority of alignments are reversed
+        group_by(qaccs) %>%
+        mutate(
+            flip = as.logical(median(reversed))
+        ) %>%
+        ungroup() %>%
+        mutate(
+            qstart.tmp = if_else(flip, as.integer(qlen - qstart + 1), qstart),
+            qstop  = if_else(flip, as.integer(qlen - qstop  + 1), qstop),
+            qstart = qstart.tmp
+        ) %>%
+        select(-qstart.tmp) %>%
+        arrange(-log_evalue, sacc, sstart) %>%
+        ungroup()
 }
 
 
 #' Get depth from BAM file
-coverage_depth_ <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
-    message("Running bedtools genomecov on ", fname,
+coverage_depth <- function(fname) {
+    run_bedtools <- function(strand=NULL, split=FALSE, fragment=FALSE) {
+        message(
+            "Running bedtools genomecov on ", fname,
             if (!is.null(strand)) paste(" counting", strand, "strand"),
             if (split) " not counting gaps",
-            if (fragment) " counting whole fragment")
-    proc <- pipe(paste(
-        "bedtools", "genomecov",
-        "-ibam", fname,
-        "-d",
-        if (is.null(strand)) "" else paste("-du -strand", strand),
-        if (split) "-split" else "",
-        if (fragment) "-fs" else ""
-    ))
-    read_tsv(proc,
-             col_types = "cii",
-             col_names = c("contig", "pos", "depth"),
-             skip = 1)
-}
-coverage_depth <- function(fname) {
-    plus <- coverage_depth_(fname, strand="+", split=TRUE) %>% rename(plus=depth)
-    minus <- coverage_depth_(fname, strand="-", split=TRUE) %>% rename(minus=depth)
+            if (fragment) " counting whole fragment",
+            "..."
+        )
+        proc <- pipe(paste(
+            "bedtools", "genomecov",
+            "-ibam", fname,
+            "-d",
+            if (is.null(strand)) "" else paste("-du -strand", strand),
+            if (split) "-split" else "",
+            if (fragment) "-fs" else ""
+        ))
+        read_tsv(proc,
+                 col_types = "cii",
+                 col_names = c("contig", "pos", "depth"),
+                 skip = 1)
+    }
+
+    plus <- run_bedtools(strand="+", split=TRUE) %>% rename(plus=depth)
+    minus <- run_bedtools(strand="-", split=TRUE) %>% rename(minus=depth)
     result <- full_join(plus, minus, by=c("contig", "pos"))
     result$total = result$plus + result$minus
     result
 }
 
-
-#' Create offsets for qacc positions in plot
-place_contigs <- function(alignments) {
-    if (nrow(alignments) == 0) {
-        emptyres <- data.frame(
-            sacc = character(),
-            qaccs = character(),
-            cstart = numeric(),
-            cstop = numeric()
-            )
-        return(emptyres)
-    }
-    contigs <- alignments %>%
-        group_by(sacc, qaccs) %>%
-        summarize(
-            offset = min(sstart),
-            cstart = offset + min(qstart) -1,
-            cstop = cstart + as.integer(sub("NODE_.*_length_([0-9]*)_.*", "\\1", unique(qaccs))),
-            .groups = "drop"
-        ) %>%
-        select(-offset) %>%
-        arrange(sacc, cstart)
-    last_stop <- -1
-    last_sacc <- ""
-    for (i in 1:nrow(contigs)) {
-        contig <- contigs[i,]
-        if (contig$sacc != last_sacc) {
-            last_sacc <- contig$sacc
-            last_stop <- -10
-        }
-        if (contig$cstart <= last_stop + 10) {
-            offset <- last_stop - contig$cstart + 10
-            #message("Shifting ", contig$sacc, ":", contig$qaccs,
-            #        " by ", offset)
-            contig$cstart <- contig$cstart + offset
-            contig$cstop <- contig$cstop + offset
-            contigs[i,] <- contig
-        }
-        last_stop <- contig$cstop
-    }
-    contigs
-}
-
-
+#' Linewrap lineage string
 break_lineage <- function(lineage, maxlen=200, insert="\n") {
     lineage %>%
         gsub(" ", "_", .) %>%
@@ -166,7 +168,7 @@ break_lineage <- function(lineage, maxlen=200, insert="\n") {
         paste(collapse=paste0(";", insert))
 }
 
-
+#' The actual plot function
 plot_ranges <- function(reference, hits, depths) {
     heights <- c(
         labels = 1.5,
@@ -198,34 +200,97 @@ plot_ranges <- function(reference, hits, depths) {
         "qlen={reference$qlen}, ",
         "alen={reference$alen}"
     )
-
     ylabel_tpl <- paste0(
         "{reference$species}\n",
         "{reference$sacc}"
     )
+    lineage <- break_lineage(reference$lineage)
 
+    ## Calculate alignment positions for hits
     hits <- hits %>%
-        ## decide on orientation of hits
-        group_by(qaccs) %>%
+        select(sacc, qaccs, qstart, qstop, sstart, sstop, cstart, cstop, flip, contig, pidents) %>%
         mutate(
-            crev = as.logical(median(reversed)),
-            cleft  = max(cstart),
-            cright = max(cstop)
-        ) %>%
-        ungroup() %>%
-        mutate(
-            aleft  = if_else(crev, cright - qstart, cleft + qstart),
-            aright = if_else(crev, cright - qstop,  cleft + qstop)
-        ) %>%
-        select(qaccs, contig, pidents,
-               crev, cleft, cright, sstart, sstop, aleft, aright)
+            aleft  = cstart + qstart - 1,
+            aright = cstart + qstop - 1
+        )
 
+
+    ## Get unique contigs from hits
     contigs <- hits %>%
-        group_by(qaccs, crev, cleft, cright, contig) %>%
+        group_by(qaccs, flip, cstart, cstop, contig) %>%
         summarize(.groups="drop")
 
-    if (!is.null(depths)) {
-        label_dpl <- paste0(label_tpl, ", depth={mean_depth}")
+    ## Make compressed X scale
+    xtrans <-
+        bind_rows(
+            hits %>% mutate(start=sstart, stop=sstop) %>% select(start, stop),
+            hits %>% mutate(start=cstart, stop=cstop) %>% select(start, stop)
+        ) %>%
+        arrange(start, stop) %>%
+        compress_axis()
+
+    ## Setup corners for trapezoid showing alignment mapping
+    alignment_boxes <- bind_rows(
+        hits %>% mutate(y = ymax$alignments, x = aleft),
+        hits %>% mutate(y = ymax$alignments, x = aright),
+        hits %>% mutate(y = ymin$alignments, x = sstop),
+        hits %>% mutate(y = ymin$alignments, x = sstart)
+    ) %>%
+        mutate(
+            alignment = paste(qaccs, aleft, aright, sstop, sstart)
+        )
+
+    p <- ggplot() +
+        scale_y_continuous(limits = c(0, 16)) +
+        theme_minimal() +
+        theme(
+            axis.text.x = element_text(angle=90, hjust=1, size=6),
+            axis.text.y = element_blank()
+        ) +
+        scale_x_continuous(trans = xtrans)  +
+        ## Contigs
+        geom_rect(
+            data = contigs,
+            aes(xmin = cstart, xmax = cstop),
+            ymin = ymin$contigs, ymax = ymax$contigs,
+            fill = fill$contigs
+        ) +
+        ## Alignments on contigs
+        geom_rect(
+            data = hits,
+            aes(xmin = aleft, xmax = aright),
+            ymin = ymin$contig_hits, ymax = ymax$contig_hits,
+            fill = fill$contig_hits
+        ) +
+        ## Contig labels
+        geom_text_repel(
+            data = contigs,
+            aes(x = (cstart+cstop)/2, label = contig),
+            y = ymin$labels,
+            size = 2,
+            nudge_y = 3,
+            direction  = "both",
+            angle = 0,
+            vjust = 0,
+            segment.size = 0.5
+        ) +
+        ## Plot Subject sequence pieces
+        geom_rect(
+            data = hits,
+            aes(xmin=sstart, xmax=sstop),
+            ymin=ymin$subject, ymax=ymax$subject, fill=fill$subject
+        ) +
+        ## Plot Alignment connection
+        geom_polygon(
+            data = alignment_boxes,
+            aes(x = x, y = y, group = alignment, fill = pidents),
+            color=fill$alignments, alpha=.5
+        ) +
+        scale_fill_continuous(limits = c(70, 100))
+
+
+    if(!is.null(depths)) {
+        label_tpl <- paste0(label_tpl, ", depth={mean_depth}")
 
         depths <- depths %>%
             rename(qaccs=contig) %>%
@@ -235,15 +300,14 @@ plot_ranges <- function(reference, hits, depths) {
         max_depth <- max(depths$total)
         norm_depth <- pmin(mean_depth*5, max_depth)
 
-
         depth_data <- depths %>%
             mutate(
-                x = if_else(crev, cright - pos, cleft + pos),
-                fplus = if_else(total == 0, 0.5, if_else(crev, minus, plus) / total),
-                plusx = if_else(crev, minus, plus) / norm_depth,
-                minusx = if_else(crev, plus, minus) / norm_depth,
-                plus = plusx,
-                minus = minusx,
+                x = if_else(flip, cstop - pos, cstart + pos),
+                fplus = if_else(total == 0, 0.5, if_else(flip, minus, plus) / total),
+                plus.tmp = if_else(flip, minus, plus) / norm_depth,
+                minus.tmp = if_else(flip, plus, minus) / norm_depth,
+                plus = plus.tmp,
+                minus = minus.tmp,
                 total = total / norm_depth
             ) %>%
             gather(
@@ -252,49 +316,7 @@ plot_ranges <- function(reference, hits, depths) {
             select(
                 qaccs, sense, x, y
             )
-    }
 
-    p <- ggplot() +
-        scale_y_continuous(limits = c(0, 16)) +
-        theme_minimal() +
-        theme(
-            axis.text.x = element_text(angle=90, hjust=1, size=6),
-            axis.text.y = element_blank()
-        )
-
-    ## Contigs
-    p <- p +
-        geom_rect(
-            data = contigs,
-            aes(xmin = cleft, xmax = cright),
-            ymin = ymin$contigs, ymax = ymax$contigs,
-            fill = fill$contigs
-        )
-
-    ## Alignments on contigs
-    p <- p +
-        geom_rect(
-            data = hits,
-            aes(xmin = aleft, xmax = aright),
-            ymin = ymin$contig_hits, ymax = ymax$contig_hits,
-            fill = fill$contig_hits
-        )
-
-    ## Contig labels
-    p <- p +
-        geom_text_repel(
-            data = contigs,
-            aes(x = (cleft+cright)/2, label = contig),
-            y = ymin$labels,
-            size = 2,
-            nudge_y = 3,
-            direction  = "both",
-            angle = 0,
-            vjust = 0,
-            segment.size = 0.5,
-            )
-
-    if(!is.null(depths)) {
         ## Plot depths above contigs
         p <- p +
             geom_line(
@@ -308,43 +330,7 @@ plot_ranges <- function(reference, hits, depths) {
             )
     }
 
-    ## Make compressed X scale
-    occ_ranges <-
-        bind_rows(
-            hits %>% mutate(start=sstart, stop=sstop) %>% select(start, stop),
-            hits %>% mutate(start=cleft, stop=cright) %>% select(start, stop)
-        ) %>%
-        arrange(start, stop)
-
-    p <- p +
-        scale_x_continuous(trans = compress_axis(occ_ranges))
-
-    ## Plot Subject sequence pieces
-    p <- p +
-        geom_rect(data = hits,
-                  aes(xmin=sstart, xmax=sstop),
-                  ymin=ymin$subject, ymax=ymax$subject, fill=fill$subject
-                  )
-    ## Plot Alignment connection
-    alignment_boxes <- bind_rows(
-        hits %>% mutate(y = ymax$alignments, x = if_else(crev, aright, aleft)),
-        hits %>% mutate(y = ymax$alignments, x = if_else(crev, aleft, aright)),
-        hits %>% mutate(y = ymin$alignments, x = sstop),
-        hits %>% mutate(y = ymin$alignments, x = sstart)
-    ) %>%
-        mutate(
-            alignment = paste(qaccs, aleft, aright, sstop, sstart)
-        )
-    p <- p +
-        geom_polygon(
-            data = alignment_boxes,
-            aes(x = x, y = y, group = alignment, fill = pidents),
-            color=fill$alignments, alpha=.5
-        ) +
-        scale_fill_continuous(limits = c(70, 100))
-
     ## Add labels
-    lineage <- break_lineage(reference$lineage)
     p <- p +
         xlab(str_glue(label_tpl)) +
         ylab(str_glue(ylabel_tpl))
@@ -372,22 +358,27 @@ plot_pages <- function(plots_per_page, items, plot_item) {
 }
 
 run <- function() {
+    message("Loading data files ...")
     data <- read_csv(opt$options$input, col_types = cols()) %>%
         filter(
             alen >= opt$options$min_alen,
             numreads >= opt$options$min_reads
         )
 
+    message("Writing output to ", opt$options$output, " ...")
     pdf(
         file = opt$options$output,
         width = opt$options$page_width,
         height = opt$options$page_height
     )
 
-    alignments <- split_alignments(data)
+    message("Parsing input data ...")
+    alignments <- parse_blastbins(data)
+    message("Placing contigs ...")
     contigs <- place_contigs(alignments)
     ranges <- merge(contigs, alignments)
 
+    message("Ordering results ...")
     saccs <- ranges %>%
         group_by(species) %>%
         mutate(
@@ -430,6 +421,7 @@ run <- function() {
 
 if (!interactive()) {
     if (T) {
+        options(warn=2)
         opt <- parse_options()
     } else {
         opt <- parse_options(args=c("--input", "out.csv", "--input-bam", "out.bam", "--output", "out.pdf"))
