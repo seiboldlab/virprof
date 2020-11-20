@@ -102,7 +102,8 @@ parse_blastbins <- function(data) {
             numreadss=as.numeric(numreadss),
             reversed=as.logical(reversed=="T"),
             ## FIXME: The contig length should come from python
-            qlen=as.integer(sub("NODE_.*_length_([0-9]*)_.*", "\\1", qaccs))
+            qlen=as.integer(sub("NODE_.*_length_([0-9]*)_.*", "\\1", qaccs)),
+            contig=as.integer(sub("NODE_(.*)_length_([0-9]*)_.*", "\\1", qaccs))
         ) %>%
         separate(qranges, c("qstart", "qstop"), convert = TRUE) %>%
         separate(sranges, c("sstart", "sstop"), convert = TRUE) %>%
@@ -416,10 +417,7 @@ run <- function() {
 
     plot_pages(opt$options$plots_per_page, saccs, function(acc) {
         reference <- data %>% filter(sacc == acc)
-        df <- ranges %>% filter(sacc == acc) %>%
-            mutate(
-                contig=sub("NODE_(.*)_length_([0-9]*)_.*", "\\1", qaccs)
-            )
+        df <- ranges %>% filter(sacc == acc)
         plot_ranges(reference, df, depths)
     })
 
