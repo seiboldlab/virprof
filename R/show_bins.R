@@ -11,43 +11,43 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
     option_list <- list(
         make_option(c("--input"),
                     metavar = "FILE",
-                    help = "Result file from blastbin"
+                    help = "Result file from blastbin [REQUIRED]"
                     ),
         make_option(c("--input-bam"),
                     metavar = "FILE",
-                    help = "Sorted BAM mapping reads to contigs"
+                    help = "Sorted BAM mapping reads to contigs (enabled coverage plot)"
                     ),
         make_option(c("--output"),
                     metavar = "FILE",
-                    help = "Output PDF (default=%default)",
+                    help = "Output PDF (default: %default)",
                     default = "out.pdf"
                     ),
         make_option(c("--page-width"),
                     metavar = "INCHES",
-                    help = "Output PDF width (default=%default)",
+                    help = "Output PDF width (default: %default)",
                     default=22
                     ),
         make_option(c("--page-height"),
                     metavar = "INCHES",
-                    help = "Ootput PDF height (default=%default)",
+                    help = "Ootput PDF height (default: %default)",
                     default=18
                     ),
         make_option(c("--plots-per-page"),
                     metavar = "N",
-                    help = "Number of plots per page",
+                    help = "Number of plots per page (default: %default)",
                     default=5
                     ),
         make_option(c("--max-plots"),
                     metavar = "N",
-                    help = "Maximum number of plots to output",
+                    help = "Maximum number of plots to output (default: all)",
                     default=0),
         make_option(c("--min-alen"),
                     metavar = "LEN",
-                    help = "Minimum alen for rendered hits",
+                    help = "Minimum alen for rendered hits (default: %default)",
                     default = 200),
         make_option(c("--min-reads"),
                     metavar = "N",
-                    help = "Minuimum read count for rendered hits",
+                    help = "Minimum read count for rendered hits (default: %default)",
                     default = 3),
         make_option(c("--warn-level"),
                     metavar = "0|1|2",
