@@ -88,14 +88,14 @@ compress_axis <- function(include_ranges, merge_dist = 50, spacing = 50) {
 #'
 #' @param contigs data.frame with cstart and cstop columns
 #' @param spacing minimum distance between end and start of successive intervals
-center_spread_ranges <- function(contigs, spacing) {
+#' @param max_iter abort if no success after this many iterations
+center_spread_ranges <- function(contigs, spacing, max_iter = 100) {
     ## Sort the intervals
     contigs <- arrange(contigs, cstart, cstop)
     ## Make IRanges object from intervals with half spacing on either side
     ranges <- IRanges::IRanges(contigs$cstart, contigs$cstop) + spacing / 2
 
     ## Do the following until nothing overlaps anymore
-    max_iter <- 10
     iter <- 0
     while (!IRanges::isDisjoint(ranges) && iter < max_iter) {
         iter <- iter + 1
