@@ -48,7 +48,11 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
         make_option(c("--min-reads"),
                     metavar = "N",
                     help = "Minuimum read count for rendered hits",
-                    default = 3)
+                    default = 3),
+        make_option(c("--warn-level"),
+                    metavar = "0|1|2",
+                    help = "Set level reporting warnings: 0=collected, 1=immediate, 2=exit (default: %default)",
+                    default = 1)
     )
     usage <- "usage: %prog [options]"
     description <- paste(c(
@@ -424,8 +428,8 @@ run <- function() {
 
 if (!interactive()) {
     if (T) {
-        options(warn=2)
         opt <- parse_options()
+        options(warn=opt$options$warn_level)
     } else {
         opt <- parse_options(args=c("--input", "out.csv", "--input-bam", "out.bam", "--output", "out.pdf"))
 
