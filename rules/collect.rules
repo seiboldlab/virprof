@@ -13,6 +13,7 @@ Env(name="virprof_r", base="bioconda",
         "r-tidyverse",
         "r-patchwork",
         "r-ggrepel",
+        "r-here",
         "bioconductor-iranges",
         "bedtools"
     ])
