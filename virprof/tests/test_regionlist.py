@@ -1,5 +1,6 @@
 from ..regionlist import RegionList
 
+
 def test_empty():
     rl = RegionList()
     assert len(rl) == 0
@@ -21,6 +22,7 @@ def test_nonoverlapping():
     assert rl.get(30) == ["30-40"]
     assert rl.get(40) == ["30-40"]
     assert rl.get(41) == []
+
 
 def test_overlapping():
     """ 
@@ -48,6 +50,7 @@ def test_sub():
     assert rl.get(25) == ["10-40", "20-30"]
     assert rl.get(35) == ["10-40"]
 
+
 def test_super():
     """
       ---
@@ -59,6 +62,7 @@ def test_super():
     assert rl.get(15) == ["10-40"]
     assert rl.get(25) == ["20-30", "10-40"]
     assert rl.get(35) == ["10-40"]
+
 
 def test_right_match():
     """
@@ -73,6 +77,7 @@ def test_right_match():
     assert rl.get(40) == ["10-40", "20-40"]
     assert rl.get(41) == []
 
+
 def test_right_overlap():
     """
     ----
@@ -86,6 +91,7 @@ def test_right_overlap():
     assert rl.get(35) == ["20-40"]
     assert rl.get(41) == []
 
+
 def test_left_overlap():
     """
       ----
@@ -98,6 +104,7 @@ def test_left_overlap():
     assert rl.get(25) == ["20-40", "10-30"]
     assert rl.get(35) == ["20-40"]
     assert rl.get(41) == []
+
 
 def test_span():
     """
@@ -121,6 +128,7 @@ def test_span():
     assert rl.get(50) == ["0-50"]
     assert rl.get(51) == []
 
+
 def test_intersect():
     """
     --- ----
@@ -143,4 +151,18 @@ def test_intersect():
     assert rl.get(40) == ["30-40"]
     assert rl.get(41) == []
 
-    
+
+def test_remove():
+    rl = RegionList()
+    rl.add(10, 20, "10-20")
+    rl.add(30, 40, "30-40")
+    rl.add(15, 35, "15-35")
+    rl.remove(30, 40, "30-40")
+
+    rl2 = RegionList()
+    rl2.add(10, 20, "10-20")
+    rl2.add(15, 35, "15-35")
+
+    assert rl._region_starts == rl2._region_starts
+    assert rl._region_data == rl2._region_data
+    assert rl == rl2

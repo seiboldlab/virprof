@@ -11,6 +11,12 @@ class RegionList:
     def __str__(self) -> str:
         return f"{self.__class__.__name__}: starts={self._region_starts} data={self._region_data}"
 
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __eq__(self, other) -> bool:
+        return self._region_starts == other._region_starts and self._region_data == other._region_data
+
     def _find(self, start: int) -> int:
         """Find index of region containing start
         
@@ -62,5 +68,21 @@ class RegionList:
         stop_idx = self._ensure_region(stop)
         for idx in range(start_idx, stop_idx):
             self._region_data[idx].append(data)
-       
-            
+
+    def remove(self, start: int, stop: int, data) -> None:
+        """Removes a region data entry"""
+        start_idx = self._find(start)
+        stop_idx = self._find(stop)
+        for idx in range(start_idx, stop_idx + 1):
+            self._region_data[idx].remove(data)
+        dups = set()
+        for idx in range(1, len(self)):
+            if self._region_data[idx - 1] == self._region_data[idx]:
+                dups.add(idx)
+        if dups:
+            self._region_data = [self._region_data[i]
+                                 for i in range(len(self._region_data))
+                                 if i not in dups]
+            self._region_starts = [self._region_starts[i]
+                                   for i in range(len(self._region_starts))
+                                   if i not in dups]
