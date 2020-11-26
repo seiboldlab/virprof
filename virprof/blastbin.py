@@ -8,6 +8,8 @@ from typing import NamedTuple, List, Iterator, Optional, Tuple, Iterable, Dict, 
 
 import tqdm  # type: ignore
 
+from virprof.regionlist import RegionList
+
 LOG = logging.getLogger(__name__)
 
 # Values for Lambda and K used by BLAST to calculate evalues.
@@ -100,15 +102,17 @@ class HitChain:
         chain_penalty: Penalty added to score for each item in the
             list beyond the first.
     """
-    __slots__ = ("hits", "chain_penalty", "_hash", "_score")
+    __slots__ = ("hits", "chain_penalty", "_hash", "_score", "_subject_regions")
 
     def __init__(self,
                  hits: Optional[List[BlastHit]] = None,
                  chain_penalty: int = 20) -> None:
+        #: List of hits sorted by subject start
         self.hits = hits.copy() if hits else list()
         self.chain_penalty = chain_penalty
         self._hash = None
         self._score = None
+        self._subject_regions = RegionList()
 
     def _reset(self) -> None:
         """Reset cached score and length values"""
@@ -141,13 +145,14 @@ class HitChain:
             return NotImplemented
         return self.hits == other.hits
 
-    def append(self, hit: BlastHit) -> None:
-        """Append a BLAST hit to the chain
+    def add(self, hit: BlastHit) -> None:
+        """Add a BLAST hit to the chain
 
         Args:
           hit: A BLAST hit
         """
         self.hits.append(hit)
+        self._subject_regions.add(hit.sstart, hit.send, hit)
         self._reset()
 
     def prune(self, hits: List[BlastHit]) -> None:
@@ -328,7 +333,7 @@ class HitChain:
         hitset.sort(key=lambda h: min(h.sstart, h.send))
         chain = copy.copy(self)
         for hit in hitset:
-            chain.append(hit)
+            chain.add(hit)
         return [chain]
 
     def make_chains(self, hits: Iterable[BlastHit], **args) -> List["HitChain"]:
@@ -474,9 +479,9 @@ class CheckOverlaps:
                     newchain.prune_overlapping([hit])
                     newchains.add(newchain)
                 else:
-                    chain.append(hit)
+                    chain.add(hit)
             for chain in newchains:
-                chain.append(hit)
+                chain.add(hit)
                 chains.append(chain)
         return chains
 
