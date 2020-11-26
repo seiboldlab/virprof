@@ -178,3 +178,24 @@ def test_remove_all():
     rl.remove(15, 35, "15-35")
 
     assert RegionList() == rl
+
+
+def test_iter():
+    """
+    --- ----
+      ---
+    """
+    rl = RegionList()
+    rl.add(10, 20, "10-20")
+    rl.add(30, 40, "30-40")
+    rl.add(15, 35, "15-35")
+
+    expected = [
+        (10, 14, ["10-20"]),
+        (15, 20, ["10-20", "15-35"]),
+        (21, 29, ["15-35"]),
+        (30, 35, ["30-40", "15-35"]),
+        (36, 40, ["30-40"])
+    ]
+
+    assert expected == list(rl)

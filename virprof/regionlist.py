@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any, Tuple
 
 class RegionList:
     def __init__(self) -> None:
@@ -16,6 +16,14 @@ class RegionList:
 
     def __eq__(self, other) -> bool:
         return self._region_starts == other._region_starts and self._region_data == other._region_data
+
+    def __iter__(self) -> Tuple[int, int, Any]:
+        zipped = zip(self._region_starts, self._region_data)
+        start, data = next(zipped)
+        for nextstart, nextdata in zipped:
+            yield start, nextstart -1, data
+            start = nextstart
+            data = nextdata
 
     def _find(self, start: int) -> int:
         """Find index of region containing start
