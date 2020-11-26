@@ -108,7 +108,7 @@ def test_span():
     rl.add(10, 20, "10-20")
     rl.add(30, 40, "30-40")
     rl.add(0, 50, "0-50")
-#    assert rl.get(-1) == []
+    assert rl.get(-1) == []
     assert rl.get(0) == ["0-50"]
     assert rl.get(5) == ["0-50"]
     assert rl.get(10) == ["10-20", "0-50"]
@@ -126,6 +126,21 @@ def test_intersect():
     --- ----
       --- 
     """
-
+    rl = RegionList()
+    rl.add(10, 20, "10-20")
+    rl.add(30, 40, "30-40")
+    rl.add(15, 35, "15-35")
+    assert rl.get(9) == []
+    assert rl.get(10) == ["10-20"]
+    assert rl.get(14) == ["10-20"]
+    assert rl.get(15) == ["10-20", "15-35"]
+    assert rl.get(20) == ["10-20", "15-35"]
+    assert rl.get(21) == ["15-35"]
+    assert rl.get(29) == ["15-35"]
+    assert rl.get(30) == ["30-40", "15-35"]
+    assert rl.get(35) == ["30-40", "15-35"]
+    assert rl.get(36) == ["30-40"]
+    assert rl.get(40) == ["30-40"]
+    assert rl.get(41) == []
 
     
