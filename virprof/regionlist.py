@@ -19,7 +19,10 @@ class RegionList:
 
     def __iter__(self) -> Tuple[int, int, Any]:
         zipped = zip(self._region_starts, self._region_data)
-        start, data = next(zipped)
+        try:
+            start, data = next(zipped)
+        except StopIteration:
+            return
         for nextstart, nextdata in zipped:
             yield start, nextstart -1, data
             start = nextstart

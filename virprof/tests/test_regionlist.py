@@ -180,6 +180,11 @@ def test_remove_all():
     assert RegionList() == rl
 
 
+def test_iter_empty():
+    rl = RegionList()
+    assert list(rl) == list()
+
+
 def test_iter():
     """
     --- ----
