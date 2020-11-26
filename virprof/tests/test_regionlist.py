@@ -1,3 +1,5 @@
+import copy
+
 from ..regionlist import RegionList
 
 
@@ -204,3 +206,16 @@ def test_iter():
     ]
 
     assert expected == list(rl)
+
+
+def test_copy():
+    rl = RegionList()
+    rl.add(10, 20, "10-20")
+
+    rl2 = copy.copy(rl)
+    assert rl2 == rl
+
+    rl2.add(30, 40, "30-40")
+    assert rl2 != rl
+    assert rl2.get(35) == ["30-40"]
+    assert rl.get(35) == []

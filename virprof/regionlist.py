@@ -28,6 +28,12 @@ class RegionList:
             start = nextstart
             data = nextdata
 
+    def __copy__(self):
+        cpy = object.__new__(type(self))
+        cpy._region_starts = list(self._region_starts)
+        cpy._region_data = list(self._region_data)
+        return cpy
+
     def _find(self, start: int) -> int:
         """Find index of region containing start
         
