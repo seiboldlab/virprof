@@ -140,7 +140,7 @@ class HitChain:
         self.chain_penalty = other.chain_penalty
         self._hash = other._hash
         self._score = other._score
-        self._subject_regions = other._subject_regions
+        self._subject_regions = copy.copy(other._subject_regions)
 
     def __copy__(self) -> "HitChain":
         cpy = object.__new__(type(self))
@@ -187,9 +187,8 @@ class HitChain:
                 self._subject_regions = RegionList()
             else:
                 for hit in oldhits:
-                    if hit.qacc not in accs:
-                        continue
-                    self._subject_regions.remove(hit.sstart, hit.send, hit)
+                    if hit.qacc in accs:
+                        self._subject_regions.remove(hit.sstart, hit.send, hit)
             self._reset()
 
     def trunc(self, sstart: int) -> None:
