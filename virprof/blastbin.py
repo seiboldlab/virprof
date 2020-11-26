@@ -225,13 +225,13 @@ class HitChain:
         return qlen
 
     @property
-    def alen(self) -> int:
-        """Combined alignment length of all items in the HitChain.
+    def slen(self) -> int:
+        """Combined non-redundant subject length of all items in the HitChain.
 
         Note that ``len(hitChain)`` returns the number of items, not
         the length in basepairs.
         """
-        return sum(hit.length for hit in self.hits)
+        return sum(stop - start + 1 for start, stop, data in self._subject_regions if data)
 
     @property
     def blast_score(self) -> float:
@@ -244,12 +244,16 @@ class HitChain:
     @property
     def pident(self) -> Optional[float]:
         "Aggregated percent identity for all items in the HitChain"
-        if not self.alen:
+        if not self.hits:
             return None
-
-        matches = sum(hit.pident * hit.length for hit in self.hits)
-        pident = matches / self.alen
-        return round(pident, 1)
+        ## FIXME: temporary hac
+        matches = 0
+        length = 0
+        for start, stop, data in self._subject_regions:
+            if data:
+                matches += (stop - start + 1) * max(hit.pident for hit in data)
+                length += (stop - start + 1)
+        return round(matches/length, 1)
 
     @property
     def qpident(self) -> Optional[float]:
@@ -377,7 +381,7 @@ class HitChain:
         return {
             'log_evalue': self.log10_evalue,
             'qlen': self.qlen,
-            'alen': self.alen,
+            'slen': self.slen,
             'n_frag': len(self.hits),
             'sacc': self.sacc,
             'stitle': self.stitle,
@@ -596,7 +600,7 @@ def greedy_select_chains(chains: List["HitChain"],
             if chain != best_chain
             and chain.score > alt * best_chain.score
             and chain.log10_evalue < alt * best_chain.log10_evalue
-            and chain.alen > alt * best_chain.alen
+            and chain.slen > alt * best_chain.slen
             and chain.qlen > alt * best_chain.qlen
             and (len(qaccs.intersection(set(chain.qaccs))) > len(qaccs)/10)
         ]

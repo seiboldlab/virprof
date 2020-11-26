@@ -112,10 +112,10 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     default = "(.*)\\.virus\\.csv",
                     help = "Input file pattern (default: '%default')"
                     ),
-        make_option(c("--min-alen"),
+        make_option(c("--min-slen"),
                     metavar = "N",
                     default = 200,
-                    help = "Minimum alignment length (default: %default)"
+                    help = "Minimum covered subject length (default: %default)"
                     ),
         make_option(c("--min-reads"),
                     metavar = "N",
@@ -198,7 +198,7 @@ load_files <- function(samples, opt) {
         words = col_character(),
         log_evalue = col_double(),
         qlen = col_integer(),
-        alen = col_integer(),
+        slen = col_integer(),
         n_frag = col_integer(),
         sacc = col_character(),
         stitle = col_character(),
@@ -233,7 +233,7 @@ filter_hits <- function(samples, opt) {
     samples %>%
         filter(
             grepl(opt$option$filter, lineage),
-            alen >= opt$option$min_alen,
+            slen >= opt$option$min_slen,
             numreads >= opt$option$min_reads
         )
 }
@@ -445,8 +445,8 @@ merge_units <- function(samples) {
             taxname  = concat(taxname),
             numreads = sum(numreads),
             min_log_evalue = min(log_evalue),
-            pident   = round(sum(pident * alen) / sum(alen), 1),
-            alen     = sum(alen),
+            pident   = round(sum(pident * slen) / sum(slen), 1),
+            slen     = sum(slen),
             qlen     = sum(qlen),
             n_frag   = sum(n_frag),
             sacc     = concat(sacc),
@@ -466,7 +466,7 @@ merge_samples <- function(sample) {
             numreadss = paste(collapse=";", numreads),
             min_log_evalues = paste(collapse=";", min_log_evalue),
             pident2   = paste(collapse=";", pident),
-            alens     = paste(collapse=";", alen),
+            slens     = paste(collapse=";", slen),
             qlens     = paste(collapse=";", qlen),
             n_frags   = paste(collapse=";", n_frag),
             saccs     = paste(collapse=";", sacc),
@@ -515,8 +515,8 @@ if (!interactive()) {
             Tab="filtered"
         ) %>%
         add_row(
-            Value=as.character(opt$options$min_alen),
-            Description="Minimum alen (aligned bases per hit)",
+            Value=as.character(opt$options$min_slen),
+            Description="Minimum slen (subject bases covered)",
             Tab=""
         ) %>%
         add_row(

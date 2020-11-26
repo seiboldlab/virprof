@@ -41,9 +41,9 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "N",
                     help = "Maximum number of plots to output (default: all)",
                     default=0),
-        make_option(c("--min-alen"),
+        make_option(c("--min-slen"),
                     metavar = "LEN",
-                    help = "Minimum alen for rendered hits (default: %default)",
+                    help = "Minimum slen for rendered hits (default: %default)",
                     default = 200),
         make_option(c("--min-reads"),
                     metavar = "N",
@@ -203,7 +203,7 @@ plot_ranges <- function(reference, hits, depths) {
         "log(evalue)={reference$log_evalue}, ",
         "id={reference$pident}%, ",
         "qlen={reference$qlen}, ",
-        "alen={reference$alen}"
+        "slen={reference$slen}"
     )
     ylabel_tpl <- paste0(
         "{reference$species}\n",
@@ -366,7 +366,7 @@ run <- function() {
     message("Loading data files ...")
     data <- read_csv(opt$options$input, col_types = cols()) %>%
         filter(
-            alen >= opt$options$min_alen,
+            slen >= opt$options$min_slen,
             numreads >= opt$options$min_reads
         )
 
