@@ -4,7 +4,7 @@ import copy
 import logging
 import math
 from collections import defaultdict
-from typing import NamedTuple, List, Iterator, Optional, Tuple, Iterable, Dict, Any, Mapping
+from typing import NamedTuple, List, Set, Iterator, Optional, Tuple, Iterable, Dict, Any, Mapping
 
 import tqdm  # type: ignore
 
@@ -168,7 +168,7 @@ class HitChain:
         self._subject_regions.add(hit.sstart, hit.send, hit)
         self._reset()
 
-    def prune(self, hits: List[BlastHit]) -> None:
+    def prune(self, accs: Set[str]) -> None:
         """Remove BLAST hits from chain
 
         Removes hits from chain having qacc matching any of ``hits``.
@@ -177,12 +177,19 @@ class HitChain:
            hits: List of hits
         """
         oldlen = len(self.hits)
-        accs = set(q.qacc for q in hits)
+        oldhits = self.hits
         self.hits = [
-            hit for hit in self.hits
+            hit for hit in oldhits
             if hit.qacc not in accs
         ]
         if oldlen != len(self.hits):
+            if not self.hits:
+                self._subject_regions = RegionList()
+            else:
+                for hit in oldhits:
+                    if hit.qacc not in accs:
+                        continue
+                    self._subject_regions.remove(hit.sstart, hit.send, hit)
             self._reset()
 
     def trunc(self, sstart: int) -> None:
@@ -599,7 +606,8 @@ def greedy_select_chains(chains: List["HitChain"],
         yield [best_chain] + extra_chains
 
         # remove used query accs from remaining chains
+        qaccs = set(best_chain.qaccs)
         for chain in chains:
-            chain.prune(best_chain.hits)
+            chain.prune(qaccs)
         # remove chains now empty
         chains = [chain for chain in chains if chain]
