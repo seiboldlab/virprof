@@ -166,3 +166,15 @@ def test_remove():
     assert rl._region_starts == rl2._region_starts
     assert rl._region_data == rl2._region_data
     assert rl == rl2
+
+
+def test_remove_all():
+    rl = RegionList()
+    rl.add(10, 20, "10-20")
+    rl.add(30, 40, "30-40")
+    rl.add(15, 35, "15-35")
+    rl.remove(30, 40, "30-40")
+    rl.remove(10, 20, "10-20")
+    rl.remove(15, 35, "15-35")
+
+    assert RegionList() == rl

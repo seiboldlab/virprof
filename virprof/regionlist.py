@@ -79,6 +79,8 @@ class RegionList:
         for idx in range(1, len(self)):
             if self._region_data[idx - 1] == self._region_data[idx]:
                 dups.add(idx)
+        if self._region_data[0] == []:
+            dups.add(0)
         if dups:
             self._region_data = [self._region_data[i]
                                  for i in range(len(self._region_data))
