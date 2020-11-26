@@ -118,7 +118,7 @@ with Stage("blastbin_vp"):
             this="{:this:}",
             filter="^Viruses;",
             filter_host="Homo sapiens",
-            min_alen=200,
+            min_slen=200,
             min_reads=3
         threads:
             1
@@ -128,7 +128,7 @@ with Stage("blastbin_vp"):
             "./R/aggregate_classifications.R"
             "  --filter '{params.filter}'"
             "  --filter-host '{params.filter_host}'"
-            "  --min-alen '{params.min_alen}'"
+            "  --min-slen '{params.min_slen}'"
             "  --min-reads '{params.min_reads}'"
             "  --excel-out '{output.excel}'"
             "  --out '{params.this}/result_%s.csv'"
@@ -152,7 +152,7 @@ with Stage("blastbin_vp"):
             page_width = 22,
             page_height = 18,
             plots_per_page = 5,
-            min_alen = 200,
+            min_slen = 200,
             min_reads = 3
         shell:
             "./R/show_bins.R"
@@ -162,7 +162,7 @@ with Stage("blastbin_vp"):
             " --page-width {params.page_width}"
             " --page-height {params.page_height}"
             " --plots-per-page {params.plots_per_page}"
-            " --min-alen {params.min_alen}"
+            " --min-slen {params.min_slen}"
             " --min-reads {params.min_reads}"
             " >{log} 2>&1"
 
