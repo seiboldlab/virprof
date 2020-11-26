@@ -80,6 +80,8 @@ class RegionList:
 
     def add(self, start: int, stop: int, data) -> None:
         """Adds a new region ranging from ``stop`` to ``start`` inclusively"""
+        if stop < start:
+            stop, start = start, stop
         stop += 1  # make 'stop' exclusive
         start_idx = self._ensure_region(start)
         stop_idx = self._ensure_region(stop)
@@ -88,6 +90,8 @@ class RegionList:
 
     def remove(self, start: int, stop: int, data) -> None:
         """Removes a region data entry"""
+        if stop < start:
+            stop, start = start, stop
         start_idx = self._find(start)
         stop_idx = self._find(stop)
         for idx in range(start_idx, stop_idx + 1):

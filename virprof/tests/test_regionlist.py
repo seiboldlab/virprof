@@ -10,8 +10,8 @@ def test_empty():
 
 
 def test_nonoverlapping():
-    """ 
-    --- --- 
+    """
+    --- ---
     """
     rl = RegionList()
     rl.add(10, 20, "10-20")
@@ -27,8 +27,8 @@ def test_nonoverlapping():
 
 
 def test_overlapping():
-    """ 
-    --- --- 
+    """
+    --- ---
     -------
     """
     rl = RegionList()
@@ -134,7 +134,7 @@ def test_span():
 def test_intersect():
     """
     --- ----
-      --- 
+      ---
     """
     rl = RegionList()
     rl.add(10, 20, "10-20")
@@ -206,6 +206,22 @@ def test_iter():
     ]
 
     assert expected == list(rl)
+
+
+def test_reversed():
+    rl = RegionList()
+    rl2 = RegionList()
+    rl.add(10, 20, "10-20")
+    rl2.add(20, 10, "10-20")
+    assert rl == rl2
+
+    rl.add(30, 40, "30-40")
+    rl2.add(30, 40, "30-40")
+    assert rl == rl2
+
+    rl.remove(20, 10, "10-20")
+    rl2.remove(10, 20, "10-20")
+    assert rl == rl2
 
 
 def test_copy():
