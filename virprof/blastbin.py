@@ -108,11 +108,15 @@ class HitChain:
                  hits: Optional[List[BlastHit]] = None,
                  chain_penalty: int = 20) -> None:
         #: List of hits sorted by subject start
-        self.hits = hits.copy() if hits else list()
+        self.hits: List[BlastHit] = []
         self.chain_penalty = chain_penalty
         self._hash = None
         self._score = None
         self._subject_regions = RegionList()
+
+        if hits:
+            for hit in hits:
+                self.add(hit)
 
     def _reset(self) -> None:
         """Reset cached score and length values"""
@@ -131,8 +135,17 @@ class HitChain:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self)})"
 
+    def _copy_from_other(self, other):
+        self.hits = copy.copy(other.hits)
+        self.chain_penalty = other.chain_penalty
+        self._hash = other._hash
+        self._score = other._score
+        self._subject_regions = other._subject_regions
+
     def __copy__(self) -> "HitChain":
-        return self.__class__(self.hits, self.chain_penalty)
+        cpy = object.__new__(type(self))
+        cpy._copy_from_other(self)
+        return cpy
 
     def __hash__(self) -> int:
         if self._hash is None:
@@ -504,15 +517,11 @@ class CoverageHitChain(HitChain):
             for qacc in coverages[self._units[0]]
         }
 
-    def _copy_coverage(self, other):
+    def _copy_from_other(self, other):
+        super()._copy_from_other(other)
         self._coverages = other._coverages
         self._units = other._units
         self._numreads = other._numreads
-
-    def __copy__(self) -> "CoverageHitChain":
-        cpy = self.__class__(self.hits, self.chain_penalty)
-        cpy._copy_coverage(self)
-        return cpy
 
     @property
     def numreads(self) -> int:
