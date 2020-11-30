@@ -109,3 +109,7 @@ class RegionList:
             self._region_starts = [self._region_starts[i]
                                    for i in range(len(self._region_starts))
                                    if i not in dups]
+
+    def end_pos(self) -> int:
+        """Retrieve last position covered by a region"""
+        return self._region_starts[-1] - 1

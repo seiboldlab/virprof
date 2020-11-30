@@ -308,8 +308,7 @@ class HitChain:
         """
         if not self.hits:
             return 0
-        hit = self.hits[-1]
-        return max(hit.send, hit.sstart)
+        return self._subject_regions.end_pos()
 
     def sranges(self) -> List[Tuple[int, int]]:
         """Ranges of subject sequence covered by the hits in this HitChain
