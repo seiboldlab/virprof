@@ -12,6 +12,7 @@ subject sequences.
 
 import csv
 import os
+import sys
 import logging
 import gzip
 
@@ -24,7 +25,7 @@ import ymp.blast  # type: ignore
 from .blastbin import BlastHit, HitChain, CoverageHitChain, greedy_select_chains
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
-from .fasta import get_accs_from_fasta, filter_fasta, read_from_command
+from .fasta import get_accs_from_fasta, filter_fasta, read_from_command, FastaFile
 
 
 LOG = logging.getLogger(__name__)
@@ -399,6 +400,102 @@ def filter_blast(in_blast7: click.utils.LazyFile,
     LOG.info("Filtering FASTA")
     filter_fasta(in_fasta, outfile, toremove, remove=True)
     LOG.info("Done")
+
+
+@cli.command()
+@click.option("--in-bins",
+              type=click.File('r'), required=True,
+              help='CSV from blastbin command')
+@click.option("--in-fasta",
+              type=click.File('r'), required=True,
+              help='FASTA file containing contigs')
+@click.option("--out",
+              type=str, default="out%s.fasta.gz",
+              help='FASTA output containing bins')
+@click.option("--bin-by",
+              type=click.Choice(['sacc', 'species', 'taxname']), default='sacc',
+              help='Field to use for binning')
+@click.option("--fasta-id-format",
+              type=str, default="{bin_name}_{qacc}",
+              help='Format for output FASTA header')
+@click.option("--file-per-bin", is_flag=True,
+              help='Create separate file for each bin')
+@click.option("--filter-lineage", type=str,
+              help="Filter by lineage prefix")
+def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, filter_lineage):
+    # file-per-bin
+    # sequence-per-bin
+    # export
+    #   spliced
+    #   contigs
+    #   both
+    # fill type N, Ref
+    # expand num bases
+    # bin level - accession, name, species
+    # lowercase unaligned (external, internal)
+
+    if out.count("%s") > 1:
+        LOG.error("No more than 1 '%s' allowed in --out")
+        sys.exit(1)
+    if file_per_bin:
+        if out.count("%s") != 1:
+            LOG.error("Must have exactly one '%%s' in --out when using --file-per-bin")
+            sys.exit(1)
+        def update_outfile(name = None):
+            outfile = update_outfile.outfile
+            if outfile is not None:
+                outfile.close()
+                outfile.iofile.close()
+            if name is None:
+                outfile = None
+            else:
+                outfile = FastaFile(open(out % name, 'w'), 'w')
+            update_outfile.outfile = outfile
+            return outfile
+        update_outfile.outfile = None
+    else:
+        if out.count("%s"):
+            out = out.replace("%s", "")
+        outfile = FastaFile(open(out, 'w'), 'w')
+        def update_outfile(name = None):
+            if name is None:
+                outfile.close()
+                outfile.iofile.close()
+            return outfile
+
+    ## Load and merge bins
+    LOG.info("Binning by '%s'", bin_by)
+    LOG.info("Loading calls from '%s'", in_bins.name)
+    bins = {}
+    for row in csv.DictReader(in_bins):
+        for col in ('qaccs', 'qranges', 'sranges'):
+            row[col] = row[col].split(';')
+        bins.setdefault(row[bin_by], []).append(row)
+    LOG.info("  found %i bins in %i calls",
+             len(bins), sum(len(bin) for bin in bins.items()))
+
+    ## Filter bins
+    if filter_lineage is not None:
+        LOG.info("Filtering bins")
+        bins = {bin:rows
+                for bin, rows in bins.items()
+                if rows[0]['lineage'].startswith(filter_lineage)}
+        LOG.info("  %i bins matched lineage", len(bins))
+
+    ## Load FASTA
+    LOG.info("Loading FASTA from '%s'", in_fasta.name)
+    contigs = FastaFile(in_fasta)
+    LOG.info("  found %i sequences", len(contigs))
+
+
+    ## Write
+    for bin_name, bin_data in bins.items():
+        outfile = update_outfile(bin_name)
+        for row in bin_data:
+            for acc in row['qaccs']:
+                outacc = fasta_id_format.format(bin_name = bin_name, qacc=acc, **row)
+                outfile.put(outacc, contigs.get(acc))
+    update_outfile()
 
 
 if __name__ == "__main__":

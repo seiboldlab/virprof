@@ -54,26 +54,53 @@ def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
 
 
 class FastaFile:
-    def __init__(self, fname: str) -> None:
-        self.fname = fname
-        self.sequences = dict()
-        self._load_all()
+    def __init__(self, iofile: BinaryIO, mode='r') -> None:
+        self.iofile = iofile
+        self.mode = mode
         
+        if 'r' in mode:
+            self.sequences = self._load_all()
+        else:
+            self.sequences = None
 
-    def _load_all(self) -> None:
-        fastafile = read_from_command(["gunzip", "-dc", self.fname])
+        if 'w' in mode:
+            self.outzip = sp.Popen(["gzip", "-c"], stdout=iofile, stdin=sp.PIPE)
+        else:
+            self.outzip = None
+
+    def close(self) -> None:
+        if self.outzip is not None:
+            self.outzip.stdin.close()
+            self.outzip.wait()
+
+    def __len__(self) -> int:
+        return len(self.sequences)
+
+    def _load_all(self) -> dict:
+        sequences = dict()
+        fastafile = read_from_command(["gunzip", "-dc", self.iofile.name])
         fasta_header = b'>'[0]
         acc = None
         lines = []
         for line in fastafile:
             if line[0] == fasta_header:
                 if acc is not None:
-                    self.sequences[acc] = b''.join(lines)
+                    sequences[acc] = b''.join(lines)
                 acc = line[1:].split(maxsplit=1)[0]
             else:
                 lines.append(line.strip())
-        self.sequences[acc] = b''.join(lines)
+        sequences[acc] = b''.join(lines)
+        return sequences
     
-    def get(self, acc: str, start: int, stop: int) -> str:
+    def get(self, acc: str, start: int = 1, stop: int = None) -> bytes:
         seq = self.sequences[acc.encode('utf-8')]
+        if stop is None:
+            stop = len(seq)
         return seq[start-1:stop]
+
+    def put(self, acc: str, sequence: bytes, comment: str = None):
+        if comment is not None:
+            header = ">{} {}".format(acc, comment).encode('utf-8')
+        else:
+            header = ">{}".format(acc).encode('utf-8')
+        self.outzip.stdin.write(b"\n".join((header, sequence, b"")))
