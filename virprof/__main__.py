@@ -16,7 +16,7 @@ import sys
 import logging
 import gzip
 
-from typing import List, Tuple, Dict, Type, Iterator, Iterable, Callable, Optional
+from typing import List, Tuple, Iterator, Iterable, Callable, Optional
 
 import click
 import tqdm  # type: ignore
@@ -25,7 +25,7 @@ import ymp.blast  # type: ignore
 from .blastbin import BlastHit, HitChain, CoverageHitChain, greedy_select_chains
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
-from .fasta import get_accs_from_fasta, filter_fasta, read_from_command, FastaFile
+from .fasta import filter_fasta, FastaFile
 
 
 LOG = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ def setup_profiling() -> None:
 
     Requires "yappi" to have been installed.
     """
+    # pylint: disable=import-outside-toplevel
     import yappi  # type: ignore
     import atexit
 
@@ -149,6 +150,9 @@ def prefilter_hits_taxonomy(hitgroups: Iterable[List[BlastHit]],
 
 
 def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
+    """Remove hits with significantly lower score than best hit
+
+    """
     n_filtered = 0
     result = []
     for hitgroup in hitgroups:
@@ -367,6 +371,12 @@ def filter_blast(in_blast7: click.utils.LazyFile,
                  in_fasta: click.utils.LazyFile,
                  outfile: click.utils.LazyFile,
                  min_unaligned_bp: int) -> bool:
+    """Filter sequences based on blast hits
+
+    Reads fasta formatted file ``in-fasta`` and removes all sequences for
+    which not at least ``min-unaligned-bp`` basepairs remain uncovered by
+    blast hits.
+    """
     toremove = set()
 
     LOG.info("Loading Blast7")
@@ -423,6 +433,7 @@ def filter_blast(in_blast7: click.utils.LazyFile,
 @click.option("--filter-lineage", type=str,
               help="Filter by lineage prefix")
 def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, filter_lineage):
+    """Exports blastbin hits in FASTA format"""
     # file-per-bin
     # sequence-per-bin
     # export

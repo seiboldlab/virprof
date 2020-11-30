@@ -1,3 +1,11 @@
+"""
+Unit tests for RegionList class
+"""
+# pylint: disable=invalid-name
+# pylint: disable=missing-function-docstring
+# pylint: disable=protected-access
+# pylint: disable=relative-beyond-top-level
+
 import copy
 
 from ..regionlist import RegionList

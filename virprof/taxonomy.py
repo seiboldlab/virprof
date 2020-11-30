@@ -4,11 +4,9 @@ import os
 import csv
 import logging
 from abc import ABC, abstractmethod
-from collections import OrderedDict
 from typing import Set, Sequence, Any, Iterator, Dict, Tuple, Callable, Optional
 
 import graph_tool as gt  # type: ignore
-import graph_tool.topology as gt_topology  # type: ignore
 import graph_tool.search as gt_search  # type: ignore
 import graph_tool.util as gt_util  # type: ignore
 import networkx as nx  # type: ignore
@@ -293,6 +291,7 @@ class TaxonomyGT(Taxonomy):
         return [self.tree.vp.name[node] for node in nodes[1:]]
 
     def get_lineage_ranks(self, tax_id: int) -> Sequence[str]:
+        """Get list of ranks for all names in lineage of ``taxid``"""
         target = self._get_vertex(tax_id)
         if target is None:
             return ['no rank']
@@ -300,6 +299,7 @@ class TaxonomyGT(Taxonomy):
         return [self.tree.vp.rank[node] for node in nodes[1:]]
 
     def get_rank(self, tax_id: int, rank: str) -> str:
+        """Get specific rank ``rank`` from lineage of ``taxid``"""
         target = self._get_vertex(tax_id)
         if target is not None:
             nodes = self._get_path_to_root(target)
@@ -408,7 +408,7 @@ def load_taxonomy(path: Optional[str], library: Optional[str] = None) -> Taxonom
     if library is None:
         if path is None:
             return TaxonomyNull(None)
-        elif path.endswith(".nx"):
+        if path.endswith(".nx"):
             library = "networkx"
         else:
             library = "graph_tool"

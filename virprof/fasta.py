@@ -54,10 +54,13 @@ def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
 
 
 class FastaFile:
+    """Handles access to GZipp'ed FASTA format file
+
+    """
     def __init__(self, iofile: BinaryIO, mode='r') -> None:
         self.iofile = iofile
         self.mode = mode
-        
+
         if 'r' in mode:
             self.sequences = self._load_all()
         else:
@@ -69,6 +72,7 @@ class FastaFile:
             self.outzip = None
 
     def close(self) -> None:
+        """Close potentially open file handles"""
         if self.outzip is not None:
             self.outzip.stdin.close()
             self.outzip.wait()
@@ -91,14 +95,28 @@ class FastaFile:
                 lines.append(line.strip())
         sequences[acc] = b''.join(lines)
         return sequences
-    
+
     def get(self, acc: str, start: int = 1, stop: int = None) -> bytes:
+        """Retrieve a sequence or a part of a sequence
+
+        Params:
+          acc: Unique sequence identifier (first word on header line)
+          start: Start position of subsequence (1 indexed)
+          stop: End position of subsequence (``None`` means until the end)
+        """
         seq = self.sequences[acc.encode('utf-8')]
         if stop is None:
             stop = len(seq)
         return seq[start-1:stop]
 
     def put(self, acc: str, sequence: bytes, comment: str = None):
+        """Write a sequence
+
+        Params:
+          acc: Unique sequence identifier
+          sequence: Sequence data
+          comment: Additional data to add to seuqence header
+        """
         if comment is not None:
             header = ">{} {}".format(acc, comment).encode('utf-8')
         else:

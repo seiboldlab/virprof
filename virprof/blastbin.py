@@ -135,7 +135,10 @@ class HitChain:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self)})"
 
-    def _copy_from_other(self, other):
+    def _copy_from_other(self, other: "HitChain") -> None:
+        if not isinstance(other, self.__class__):
+            raise RuntimeError("Cannot copy from other class than self")
+        # pylint: disable=protected-access
         self.hits = copy.copy(other.hits)
         self.chain_penalty = other.chain_penalty
         self._hash = other._hash
@@ -258,7 +261,7 @@ class HitChain:
     @property
     def qpident(self) -> Optional[float]:
         "Aggregated query percent identity for all items in the HitChain"
-        if not self.alen:
+        if not self.qlen:
             return None
 
         matches = sum(hit.pident * hit.length for hit in self.hits)
@@ -322,6 +325,7 @@ class HitChain:
                 for hit in self.hits]
 
     def range_reversed(self) -> List[bool]:
+        """Return list of bool indicating which hits were reverse hits"""
         return [hit.sstart > hit.send for hit in self.hits]
 
     @property
@@ -399,7 +403,8 @@ class HitChain:
         return list(self.to_dict().keys())
 
 
-class CheckOverlaps:
+class CheckOverlaps(HitChain):
+    """HitChain with checkoverlap code (unused)"""
     def overlaps(self, hit: BlastHit) -> bool:
         """Checks for overlap with ``hit``
 
@@ -472,13 +477,12 @@ class CheckOverlaps:
         )
         self.hits = [
             ohit for ohit in self.hits
-            if ohit not in ohits
+            if ohit not in overlapping
         ]
         if oldlen != len(self.hits):
             self._reset()
 
-    def make_chain_single(self, hitset: List[BlastHit],
-                          check_overlap = True) -> List["HitChain"]:
+    def make_chain_single(self, hitset: List[BlastHit]) -> List["HitChain"]:
         """Generates hit chains for set of hits with single sacc
 
         Uses the current HitChain as start point.
@@ -515,6 +519,8 @@ class CoverageHitChain(HitChain):
                  chain_penalty: int = 20) -> None:
         super().__init__(hits, chain_penalty)
         self._coverages: Mapping[str, Mapping[str, Mapping[str, str]]] = {}
+        self._units = []
+        self._numreads = {}
 
     def set_coverage(self, coverages: Mapping[str, Mapping[str, Mapping[str, str]]]) -> None:
         """Set coverage data"""
@@ -528,13 +534,14 @@ class CoverageHitChain(HitChain):
 
     def _copy_from_other(self, other):
         super()._copy_from_other(other)
+        # pylint: disable=protected-access
         self._coverages = other._coverages
         self._units = other._units
         self._numreads = other._numreads
 
     @property
     def numreads(self) -> int:
-        """Number of reads"""
+        """Total number of reads"""
         if self._coverages is None:
             return -1
         # Count unique qaccs only
@@ -542,11 +549,12 @@ class CoverageHitChain(HitChain):
         return sum(sum(self._numreads[qacc]) for qacc in qaccs)
 
     def get_numreads(self, qacc) -> List[int]:
+        """Number of reads for query accession ``qacc``"""
         return self._numreads[qacc]
 
     @property
     def numreadss(self) -> str:
-        """Number of reads"""
+        """Number of reads for each qacc"""
         if self._coverages is None:
             return ""
         return ";".join(str(sum(self.get_numreads(qacc))) for qacc in self.qaccs)
@@ -556,6 +564,7 @@ class CoverageHitChain(HitChain):
             hitgroups: Iterable[List[BlastHit]],
             min_read_count: int
     ) -> Iterable[List[BlastHit]]:
+        """Filter out hitgroups with less than ``min_read_count`` reads"""
         filtered = 0
         for hitgroup in hitgroups:
             qacc = hitgroup[0].qacc
@@ -566,6 +575,7 @@ class CoverageHitChain(HitChain):
         LOG.info(f"Removed {filtered} contigs having < {min_read_count} reads")
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert chain to dictionary for writing to CSV"""
         res = super().to_dict()
         res.update({
             'numreads': self.numreads,

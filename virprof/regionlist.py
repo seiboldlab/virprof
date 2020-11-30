@@ -1,13 +1,23 @@
-from typing import List, Any, Tuple
+"""Implements RegionList"""
+
+from typing import List, Any, Tuple, Generator
 
 class RegionList:
+    """A container of ranges with associated data
+
+    >>> rl = RegionList()
+    >>> rl.add(10, 20, "ten-to-twenty")
+    >>> rl.get(15)
+    ['ten-to-twenty']
+    """
+
     def __init__(self) -> None:
         self._region_starts: List[int] = []
         self._region_data: List[List] = []
 
     def __len__(self) -> int:
         return len(self._region_starts)
-        
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}: starts={self._region_starts} data={self._region_data}"
 
@@ -15,9 +25,12 @@ class RegionList:
         return str(self)
 
     def __eq__(self, other) -> bool:
-        return self._region_starts == other._region_starts and self._region_data == other._region_data
+        return (
+            self._region_starts == other._region_starts
+            and self._region_data == other._region_data
+        )
 
-    def __iter__(self) -> Tuple[int, int, Any]:
+    def __iter__(self) -> Generator[Tuple[int, int, Any], None, None]:
         zipped = zip(self._region_starts, self._region_data)
         try:
             start, data = next(zipped)
@@ -36,7 +49,7 @@ class RegionList:
 
     def _find(self, start: int) -> int:
         """Find index of region containing start
-        
+
         Returns -1 if before any region
         """
         if not self._region_starts:
@@ -56,7 +69,7 @@ class RegionList:
 
     def _ensure_region(self, start: int) -> int:
         """Finds or creates region for ``start``"""
-        
+
         index = self._find(start)
         try:
             oldstart = self._region_starts[index]
@@ -69,9 +82,9 @@ class RegionList:
             # Initialize with empty list
             self._region_data.insert(index, [])
             return index
-        
+
         if oldstart != start:
-            # We are in the middle of a region, copy it and return the 
+            # We are in the middle of a region, copy it and return the
             data = list(self._region_data[index])
             index += 1
             self._region_starts.insert(index, start)
