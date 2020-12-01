@@ -400,7 +400,7 @@ def filter_blast(in_blast7: click.utils.LazyFile,
         best_chains = greedy_select_chains(all_chains)
         for chains in best_chains:
             chain = chains[0]
-            remain = chain.qlen - chain.alen
+            remain = chain.qlen - chain.slen
             if remain < min_unaligned_bp:
                 toremove.add(hitgroup[0].qacc)
     LOG.info("%i query sequences had less than %i bp unaligned and will be removed",
