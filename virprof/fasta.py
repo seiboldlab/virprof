@@ -2,12 +2,13 @@
 
 import subprocess as sp
 
-from typing import Iterator, Sequence, Collection, BinaryIO
+from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict
 
 
-def read_from_command(args: Sequence[str]) -> Iterator[str]:
+def read_from_command(args: Sequence[str]) -> Iterator[bytes]:
     """Runs external command yielding output lines"""
     proc = sp.Popen(args, stdout=sp.PIPE)
+    assert proc.stdout is not None
     while True:
         line = proc.stdout.readline()
         if not line:
@@ -17,7 +18,7 @@ def read_from_command(args: Sequence[str]) -> Iterator[str]:
     proc.wait()
 
 
-def get_accs_from_fasta(fileobj: BinaryIO) -> Iterator[str]:
+def get_accs_from_fasta(fileobj: BinaryIO) -> Iterator[bytes]:
     """Reads accession numbers from (gzipped) FASTA file"""
     for line in read_from_command(["zgrep", "^>", fileobj.name]):
         if line:
@@ -37,6 +38,7 @@ def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
     """
     unzip = read_from_command(["gzip", "-dc", filein.name])
     outzip = sp.Popen(["gzip", "-c"], stdout=fileout, stdin=sp.PIPE)
+    assert outzip.stdin is not None
     skip = True
     fasta_header = b'>'[0]
     accs_b = set(acc.encode('ascii') for acc in accs)
@@ -60,28 +62,26 @@ class FastaFile:
     def __init__(self, iofile: BinaryIO, mode='r') -> None:
         self.iofile = iofile
         self.mode = mode
-
-        if 'r' in mode:
-            self.sequences = self._load_all()
-        else:
-            self.sequences = None
+        self.sequences = self._try_load_all()
 
         if 'w' in mode:
-            self.outzip = sp.Popen(["gzip", "-c"], stdout=iofile, stdin=sp.PIPE)
+            self.outzip: Optional[sp.Popen[bytes]] = sp.Popen(["gzip", "-c"], stdout=iofile, stdin=sp.PIPE)
         else:
             self.outzip = None
 
     def close(self) -> None:
         """Close potentially open file handles"""
-        if self.outzip is not None:
+        if self.outzip is not None and self.outzip.stdin is not None:
             self.outzip.stdin.close()
             self.outzip.wait()
 
     def __len__(self) -> int:
-        return len(self.sequences)
+        return len(self.sequences) if self.sequences else -1
 
-    def _load_all(self) -> dict:
-        sequences = dict()
+    def _try_load_all(self) -> Optional[Dict[bytes, bytes]]:
+        if 'r' not in self.mode:
+            return None
+        sequences = {}
         fastafile = read_from_command(["gunzip", "-dc", self.iofile.name])
         fasta_header = b'>'[0]
         acc = None
@@ -93,7 +93,8 @@ class FastaFile:
                 acc = line[1:].split(maxsplit=1)[0]
             else:
                 lines.append(line.strip())
-        sequences[acc] = b''.join(lines)
+        if acc is not None:
+            sequences[acc] = b''.join(lines)
         return sequences
 
     def get(self, acc: str, start: int = 1, stop: int = None) -> bytes:
@@ -104,6 +105,8 @@ class FastaFile:
           start: Start position of subsequence (1 indexed)
           stop: End position of subsequence (``None`` means until the end)
         """
+        if not self.sequences:
+            raise IndexError("Empty or write only FASTA")
         seq = self.sequences[acc.encode('utf-8')]
         if stop is None:
             stop = len(seq)
@@ -117,6 +120,8 @@ class FastaFile:
           sequence: Sequence data
           comment: Additional data to add to seuqence header
         """
+        if not self.outzip or not self.outzip.stdin:
+            raise IOError("FastaFile not writeable")
         if comment is not None:
             header = ">{} {}".format(acc, comment).encode('utf-8')
         else:

@@ -4,7 +4,7 @@ import copy
 import logging
 import math
 from collections import defaultdict
-from typing import NamedTuple, List, Set, Iterator, Optional, Tuple, Iterable, Dict, Any, Mapping
+from typing import NamedTuple, List, Sequence, Set, Iterator, Optional, Tuple, Iterable, Dict, Any, Mapping
 
 import tqdm  # type: ignore
 
@@ -110,8 +110,8 @@ class HitChain:
         #: List of hits sorted by subject start
         self.hits: List[BlastHit] = []
         self.chain_penalty = chain_penalty
-        self._hash = None
-        self._score = None
+        self._hash: Optional[int] = None
+        self._score: Optional[float] = None
         self._subject_regions = RegionList()
 
         if hits:
@@ -351,7 +351,7 @@ class HitChain:
         return [(hit.qstart, hit.qend) for hit in self.hits
                 if hit.qacc == qacc]
 
-    def make_chain_single(self, hitset: List[BlastHit]) -> List["HitChain"]:
+    def make_chain_single(self, hitset: List[BlastHit]) -> Sequence["HitChain"]:
         """Generates hit chain for set of hits with single sacc
 
         Uses the current HitChain as start point.
@@ -362,7 +362,7 @@ class HitChain:
             chain.add(hit)
         return [chain]
 
-    def make_chains(self, hits: Iterable[BlastHit], **args) -> List["HitChain"]:
+    def make_chains(self, hits: Iterable[BlastHit]) -> List["HitChain"]:
         """Generates hit chains for set of hits
 
         Uses the current HitChain as start point
@@ -373,7 +373,7 @@ class HitChain:
         return [
             chain
             for hitset in hitsets.values()
-            for chain in self.make_chain_single(hitset, **args)
+            for chain in self.make_chain_single(hitset)
         ]
 
     def to_dict(self) -> Dict[str, Any]:
@@ -482,13 +482,13 @@ class CheckOverlaps(HitChain):
         if oldlen != len(self.hits):
             self._reset()
 
-    def make_chain_single(self, hitset: List[BlastHit]) -> List["HitChain"]:
+    def make_chain_single(self, hitset: List[BlastHit]) -> Sequence["HitChain"]:
         """Generates hit chains for set of hits with single sacc
 
         Uses the current HitChain as start point.
         """
         # start with empty chain
-        chains = [copy.copy(self)]
+        chains: List[CheckOverlaps] = [copy.copy(self)]
         hitset.sort(key=lambda h: min(h.sstart, h.send))
         if len(hitset) > 50:
             hitset = tqdm.tqdm(hitset, desc=hitset[0].sacc)
@@ -519,8 +519,8 @@ class CoverageHitChain(HitChain):
                  chain_penalty: int = 20) -> None:
         super().__init__(hits, chain_penalty)
         self._coverages: Mapping[str, Mapping[str, Mapping[str, str]]] = {}
-        self._units = []
-        self._numreads = {}
+        self._units: List[str] = []
+        self._numreads: Dict[str, List[int]] = {}
 
     def set_coverage(self, coverages: Mapping[str, Mapping[str, Mapping[str, str]]]) -> None:
         """Set coverage data"""

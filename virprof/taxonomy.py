@@ -144,7 +144,7 @@ class Taxonomy(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_lineage(self, tax_id: int) -> str:
+    def get_lineage(self, tax_id: int) -> Sequence[str]:
         """Get the lineage for a node
 
         Args:
@@ -158,6 +158,15 @@ class Taxonomy(ABC):
           in the linage string.
         """
         raise NotImplementedError()
+
+    def get_lineage_ranks(self, tax_id: int) -> Sequence[str]:
+        """Get list of ranks for all names in lineage of ``taxid``"""
+        raise NotImplementedError()
+
+    def get_rank(self, tax_id: int, rank: str) -> str:
+        """Get specific rank ``rank`` from lineage of ``taxid``"""
+        raise NotImplementedError()
+
 
     @abstractmethod
     def get_subtree_ids(self, name: str) -> Set[int]:

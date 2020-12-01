@@ -109,7 +109,7 @@ def group_hits_by_qacc(hits: List[BlastHit]) -> Iterator[List[BlastHit]]:
 
 
 def prefilter_hits_taxonomy(hitgroups: Iterable[List[BlastHit]],
-                            prefilter: Callable[[int], bool]) -> List[BlastHit]:
+                            prefilter: Callable[[int], bool]) -> List[List[BlastHit]]:
     """Filter ``hitgroups`` using ``prefilter`` function.
 
     The input hitgroups are expected to each comprise HSPs from the
@@ -235,7 +235,9 @@ def blastbin(in_blast7: click.utils.LazyFile,
     if profile:
         setup_profiling()
 
-    if in_coverage:
+    if not in_coverage:
+        chain_tpl = HitChain(chain_penalty=chain_penalty)
+    else:
         chain_tpl = CoverageHitChain(chain_penalty=chain_penalty)
         cov = {}
         for cov_fd in in_coverage:
@@ -250,8 +252,6 @@ def blastbin(in_blast7: click.utils.LazyFile,
             cov[cov_sample] = cov_data
             cov_fd.close()
         chain_tpl.set_coverage(cov)
-    else:
-        chain_tpl = HitChain(chain_penalty=chain_penalty)
 
     fname = os.path.basename(in_blast7.name)
     if fname.endswith(".gz"):
@@ -311,6 +311,7 @@ def blastbin(in_blast7: click.utils.LazyFile,
 
     # Filter
     if in_coverage:
+        assert isinstance(chain_tpl, CoverageHitChain)
         hitgroups = list(chain_tpl.filter_hitgroups(hitgroups, min_read_count))
     filtered_hits = prefilter_hits_taxonomy(hitgroups, taxfilter_pre)
     filtered_hits = prefilter_hits_score(filtered_hits)
@@ -410,6 +411,7 @@ def filter_blast(in_blast7: click.utils.LazyFile,
     LOG.info("Filtering FASTA")
     filter_fasta(in_fasta, outfile, toremove, remove=True)
     LOG.info("Done")
+    return True
 
 
 @cli.command()
