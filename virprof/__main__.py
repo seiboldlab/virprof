@@ -20,8 +20,8 @@ from typing import List, Tuple, Iterator, Iterable, Callable, Optional
 
 import click
 import tqdm  # type: ignore
-import ymp.blast  # type: ignore
 
+from . import blast  # type: ignore
 from .blastbin import BlastHit, HitChain, CoverageHitChain, greedy_select_chains
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
@@ -265,12 +265,12 @@ def blastbin(in_blast7: click.utils.LazyFile,
             reader = []
         else:
             unzip.seek(0)
-            reader = ymp.blast.reader(unzip)
+            reader = blast.reader(unzip)
     else:
         sample, _, ext = fname.rpartition(".")
         if ext != "blast7":
             LOG.warning("Parsing of filename '%s' failed. Should end in .blast7")
-        reader = ymp.blast.reader(in_blast7)
+        reader = blast.reader(in_blast7)
     LOG.info("Using sample=%s", sample)
 
     wordscorer = WordScorer(keepwords=num_words)
@@ -388,9 +388,9 @@ def filter_blast(in_blast7: click.utils.LazyFile,
             reader = []
         else:
             unzip.seek(0)
-            reader = ymp.blast.reader(unzip)
+            reader = blast.reader(unzip)
     else:
-        reader = ymp.blast.reader(in_blast7)
+        reader = blast.reader(in_blast7)
     hitgroups = list(group_hits_by_qacc(reader))
     LOG.info("%i distinct query sequences had matches", len(hitgroups))
 
