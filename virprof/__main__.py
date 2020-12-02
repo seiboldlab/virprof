@@ -522,13 +522,21 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
     contigs = FastaFile(in_fasta)
     LOG.info("  found %i sequences", len(contigs))
 
-    ## Write
+    ## Set up sequence processing
+    def write_full_contigs(name, data):
+        for row in data:
+            for qacc in row['qaccs']:
+                header = fasta_id_format.format(bin_name = name, qacc=qacc, **row)
+                sequence = contigs.get(qacc)
+                yield header, sequence
+
+    write_contigs = write_full_contigs
+
+    ## Write FASTA
     for bin_name, bin_data in bins.items():
         outfile = update_outfile(bin_name)
-        for row in bin_data:
-            for acc in row['qaccs']:
-                outacc = fasta_id_format.format(bin_name = bin_name, qacc=acc, **row)
-                outfile.put(outacc, contigs.get(acc))
+        for header, sequence in write_contigs(bin_name, bin_data):
+            outfile.put(header, sequence)
     update_outfile()
 
 
