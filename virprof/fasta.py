@@ -2,7 +2,7 @@
 
 import subprocess as sp
 
-from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict
+from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict, Tuple
 
 
 def read_from_command(args: Sequence[str]) -> Iterator[bytes]:
@@ -26,7 +26,7 @@ def get_accs_from_fasta(fileobj: BinaryIO) -> Iterator[bytes]:
 
 
 def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
-                 accs: Collection[str], remove: bool) -> None:
+                 accs: Collection[str], remove: bool) -> Tuple[int, int]:
     """Creates filtered copy of gzipped FASTA file
 
     Args:
@@ -42,17 +42,22 @@ def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
     skip = True
     fasta_header = b'>'[0]
     accs_b = set(acc.encode('ascii') for acc in accs)
+    n_seqs_in = n_seqs_out = 0
     for line in unzip:
         if line[0] == fasta_header:
+            n_seqs_in += 1
             acc = line[1:].split(maxsplit=1)[0]
             if remove:
                 skip = acc in accs_b
             else:
                 skip = acc not in accs_b
+            if not skip:
+                n_seqs_out += 1
         if not skip:
             outzip.stdin.write(line)
     outzip.stdin.close()
     outzip.wait()
+    return n_seqs_in, n_seqs_out
 
 
 class FastaFile:
