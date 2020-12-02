@@ -15,6 +15,7 @@ import os
 import sys
 import logging
 import gzip
+import re
 
 from typing import List, Tuple, Iterator, Iterable, Callable, Optional
 
@@ -464,6 +465,7 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
     if out.count("%s") > 1:
         LOG.error("No more than 1 '%s' allowed in --out")
         sys.exit(1)
+
     if file_per_bin:
         if out.count("%s") != 1:
             LOG.error("Must have exactly one '%%s' in --out when using --file-per-bin")
@@ -476,7 +478,9 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
             if name is None:
                 outfile = None
             else:
-                outfile = FastaFile(open(out % name, 'w'), 'w')
+                outfile = FastaFile(open(out % name.replace(" ", "_"), 'w'), 'w')
+                LOG.info("Writing to '%s'", outfile.name)
+
             update_outfile.outfile = outfile
             return outfile
         update_outfile.outfile = None
@@ -484,6 +488,7 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
         if out.count("%s"):
             out = out.replace("%s", "")
         outfile = FastaFile(open(out, 'w'), 'w')
+        LOG.info("Writing to '%s'", outfile.name)
         def update_outfile(name = None):
             if name is None:
                 outfile.close()
@@ -503,17 +508,19 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
 
     ## Filter bins
     if filter_lineage is not None:
+        regex = re.compile(filter_lineage)
         LOG.info("Filtering bins")
-        bins = {bin:rows
-                for bin, rows in bins.items()
-                if rows[0]['lineage'].startswith(filter_lineage)}
+        bins = {
+            bin:rows
+            for bin, rows in bins.items()
+            if regex.match(rows[0]['lineage'])
+        }
         LOG.info("  %i bins matched lineage", len(bins))
 
     ## Load FASTA
     LOG.info("Loading FASTA from '%s'", in_fasta.name)
     contigs = FastaFile(in_fasta)
     LOG.info("  found %i sequences", len(contigs))
-
 
     ## Write
     for bin_name, bin_data in bins.items():

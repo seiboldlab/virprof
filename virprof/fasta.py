@@ -74,6 +74,13 @@ class FastaFile:
         else:
             self.outzip = None
 
+    @property
+    def name(self) -> str:
+        return self.iofile.name
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__} {self.name}"
+
     def close(self) -> None:
         """Close potentially open file handles"""
         if self.outzip is not None and self.outzip.stdin is not None:
