@@ -1,5 +1,5 @@
 requireNamespace("IRanges", quietly = TRUE)
-
+requireNamespace("rentrez", quietly = TRUE)
 
 #' Generates a "compressed" axis
 #'
@@ -155,4 +155,43 @@ place_contigs <- function(alignments, merge_dist = 50, spacing = 10) {
         group_modify(~ center_spread_ranges(., spacing))
 
     contigs
+}
+
+#' Fetches and parses feature table for ``accs`` from Entrez
+#'
+#' @param accs List of accession numbers
+#' @return Data frame with columns start, end, type, key and value
+load_feature_table <- function(accs) {
+    feature_tables <-
+        rentrez::entrez_fetch(db = "nucleotide", id=accs, rettype = 'ft') %>%
+        gsub("\n$", "", .) %>%
+        str_split("(^|\n)>") %>%
+        unlist() %>%
+        str_split("\n", n = 2)
+    feature_tables <- feature_tables[-1]
+    tables <- vector("list", length(feature_tables))
+    for (i in seq_along(feature_tables)) {
+        acc <- sub("Feature gb\\|([^.]*)\\..*", "\\1", feature_tables[[i]][1])
+        text <- feature_tables[[i]][2] %>%
+            gsub("(^|[\n\t])[<>]", "\\1", .)  # remove <1, >123 from incomplete
+        df <- read.csv(
+            textConnection(text),
+            col.names = c('start', 'end', 'type', 'key', 'value'),
+            colClasses = c('numeric', 'numeric', 'character', 'character', 'character'),
+            header = FALSE,
+            sep = "\t"
+        )
+        if (nrow(df) > 0) {
+            df$acc = acc
+            tables[[i]] <- df
+        }
+    }
+    df <- do.call("bind_rows", tables) %>% as_tibble()
+    if (nrow(df) > 0) {
+        df$type[df$type == ""] <- NA
+        df <- df %>%
+            fill(c(start, end, type), .direction = 'down') %>%
+            filter(key!="")
+    }
+    df
 }

@@ -15,12 +15,12 @@ Env(name="virprof_r", base="bioconda",
         "r-ggrepel",
         "r-here",
         "bioconductor-iranges",
-        "bedtools"
+        "bedtools",
+        "r-rentrez"
     ])
 
 Env(name="virprof_py", base="bioconda",
     packages=[
-        "ymp=0.2.1",
         "graph-tool",
     ])
 

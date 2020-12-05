@@ -408,6 +408,9 @@ run <- function() {
 
     }
 
+    message("Loading Feature Tables from Entrez...")
+    ft <- load_feature_table(saccs)
+
     message("Writing output to ", opt$options$output, " ...")
     pdf(
         file = opt$options$output,
