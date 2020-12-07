@@ -57,6 +57,9 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "PATH",
                     help = "Data fetched from Entrez will be cached in this location",
                     default = "/tmp/entrez_cache"),
+        make_option(c("--no-annotate"),
+                    dest = "do_annotate", action = "store_false", default = TRUE,
+                    help = "Disable annotation layer")
     )
     usage <- "usage: %prog [options]"
     description <- paste(c(
@@ -173,14 +176,15 @@ break_lineage <- function(lineage, maxlen=200, insert="\n") {
 }
 
 #' The actual plot function
-plot_ranges <- function(reference, hits, depths) {
+plot_ranges <- function(reference, hits, depths, feature_tables) {
     heights <- c(
         labels = 1.5,
         coverage = 4,
         contigs = 1,
         contig_hits = .5,
         alignments = 4,
-        subject = 1
+        subject = 1,
+        annotations = 1
     )
     ymax <- cumsum(rev(heights))
     ymin <- ymax - rev(heights)
@@ -191,7 +195,8 @@ plot_ranges <- function(reference, hits, depths) {
         contigs     = "darkblue",
         contig_hits = "darkgreen",
         alignments  = "green",
-        subject     = "darkred"
+        subject     = "darkred",
+        annotations = "orange"
     )
 
     label_tpl <- paste0(
@@ -333,6 +338,30 @@ plot_ranges <- function(reference, hits, depths) {
             )
     }
 
+    if (!is.null(feature_tables)) {
+        ## Annotate subject sequences
+        subject_annotations <- annotate_subjects(
+            hits$sstart, hits$sstop,
+            reference$sacc,
+            feature_tables
+        )
+        ## Plot annotations
+        p <- p +
+            geom_rect(
+                data = subject_annotations,
+                aes(xmin=start, xmax=stop),
+                ymin=ymin$annotations, ymax=ymax$annotations, fill=fill$annotations
+            ) +
+            geom_text(
+                data = subject_annotations,
+                aes(x = (start+stop)/2, label = name),
+                y = (ymin$annotations + ymax$annotations)/2,
+                hjust = .5,
+                vjust = .5,
+                size=3
+            )
+    }
+
     ## Add labels
     p <- p +
         xlab(str_glue(label_tpl)) +
@@ -406,8 +435,12 @@ run <- function() {
 
     }
 
-    message("Loading Feature Tables from Entrez...")
-    ft <- load_feature_table(saccs)
+    if (opt$options$do_annotate) {
+        message("Loading ", length(saccs), " Feature Tables from Entrez...")
+        feature_tables <- load_feature_table(saccs, opt$options$cache_path)
+    } else {
+        feature_tables <- NULL
+    }
 
     message("Writing output to ", opt$options$output, " ...")
     pdf(
@@ -419,7 +452,7 @@ run <- function() {
     plot_pages(opt$options$plots_per_page, saccs, function(acc) {
         reference <- data %>% filter(sacc == acc)
         df <- ranges %>% filter(sacc == acc)
-        plot_ranges(reference, df, depths)
+        plot_ranges(reference, df, depths, feature_tables)
     })
 
     dev.off()
