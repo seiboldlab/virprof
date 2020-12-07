@@ -52,7 +52,11 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
         make_option(c("--warn-level"),
                     metavar = "0|1|2",
                     help = "Set level reporting warnings: 0=collected, 1=immediate, 2=exit (default: %default)",
-                    default = 1)
+                    default = 1),
+        make_option(c("--cache-path"),
+                    metavar = "PATH",
+                    help = "Data fetched from Entrez will be cached in this location",
+                    default = "/tmp/entrez_cache"),
     )
     usage <- "usage: %prog [options]"
     description <- paste(c(

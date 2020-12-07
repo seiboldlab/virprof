@@ -183,13 +183,42 @@ place_contigs <- function(alignments, merge_dist = 50, spacing = 10) {
     contigs
 }
 
+
+#' Caching wrapper around \code{rentrez::entrez_fetch}
+#'
+#' @path Path to cache directory. Set to \code{""} to disable cache use.
+cached_entrez_fetch <- function(db, id, rettype, path, retmode = "") {
+    if (!nzchar(path)) {
+        return(
+            rentrez_entrez_fetch(
+                db = db, id = id,
+                rettype = rettype, retmode = retmode
+            )
+        )
+    }
+    dir.create(path, showWarnings = FALSE)
+    result <- vector("list", length(id))
+    for (i in seq_along(id)) {
+        fname <- paste0(paste(sep="__", db, id[[i]], rettype, retmode), ".dat")
+        if (file.exists(file.path(path, fname))) {
+            result[[i]] <- read_file(file.path(path, fname))
+        } else {
+            result[[i]] <- rentrez::entrez_fetch(db=db, id=id[[i]], rettype=rettype, retmode=retmode)
+            tmpname <- tempfile(fname, path, '.tmp')
+            write_file(result[[i]], tmpname)
+            file.rename(tmpname, file.path(path, fname))
+        }
+    }
+    paste(collapse="\n", result)
+}
+
 #' Fetches and parses feature table for ``accs`` from Entrez
 #'
 #' @param accs List of accession numbers
 #' @return Data frame with columns start, end, type, key and value
-load_feature_table <- function(accs) {
+load_feature_table <- function(accs, cache_path) {
     feature_tables <-
-        rentrez::entrez_fetch(db = "nucleotide", id=accs, rettype = 'ft') %>%
+        cached_entrez_fetch(db = "nucleotide", id=accs, rettype = 'ft', path = cache_path) %>%
         gsub("\n$", "", .) %>%
         str_split("(^|\n)>") %>%
         unlist() %>%
