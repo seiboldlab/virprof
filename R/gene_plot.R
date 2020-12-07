@@ -1,5 +1,31 @@
 requireNamespace("IRanges", quietly = TRUE)
 requireNamespace("rentrez", quietly = TRUE)
+requireNamespace("rlang", quietly = TRUE)
+
+#' Conditionally swap contents of columns
+#'
+#' For use with \code{mutate}
+#'
+#' @param cond If true, column contents will be swapped
+#' @param x first column
+#' @param y second column
+#' @return [Tibble] Tibble with first and second column swapped where ``cond`` is TRUE.
+#' @examples
+#' data.frame(a=c(1,4,8), b=c(2,3,4)) %>%
+#'   mutate(
+#'     swapped = a<b,
+#'     swap_if(swapped, a, b)
+#'   )
+#' @export
+swap_if <- function(cond, x, y) {
+    out_x <- if_else(cond, y, x)
+    out_y <- if_else(!cond, y, x)
+    setNames(
+        tibble::tibble(out_x, out_y),
+        c(substitute(x), substitute(y))
+    )
+}
+
 
 #' Generates a "compressed" axis
 #'

@@ -109,11 +109,8 @@ parse_blastbins <- function(data) {
         separate(sranges, c("sstart", "sstop"), convert = TRUE) %>%
         # Restore qstart/qstop order
         mutate(
-            qstart.tmp = if_else(reversed, qstop, qstart),
-            qstop = if_else(reversed, qstart, qstop),
-            qstart = qstart.tmp
+            swap_if(reversed, qstart, qstop)
         ) %>%
-        select(-qstart.tmp) %>%
         ## Flip entire contig if majority of alignments are reversed
         group_by(qaccs) %>%
         mutate(
@@ -121,11 +118,9 @@ parse_blastbins <- function(data) {
         ) %>%
         ungroup() %>%
         mutate(
-            qstart.tmp = if_else(flip, as.integer(qlen - qstart + 1), qstart),
-            qstop  = if_else(flip, as.integer(qlen - qstop  + 1), qstop),
-            qstart = qstart.tmp
+            qstart = if_else(flip, as.integer(qlen - qstart + 1), qstart),
+            qstop  = if_else(flip, as.integer(qlen - qstop  + 1), qstop)
         ) %>%
-        select(-qstart.tmp) %>%
         arrange(-log_evalue, sacc, sstart) %>%
         ungroup()
 }
@@ -309,11 +304,10 @@ plot_ranges <- function(reference, hits, depths) {
             mutate(
                 x = if_else(flip, cstop - pos, cstart + pos),
                 fplus = if_else(total == 0, 0.5, if_else(flip, minus, plus) / total),
-                plus.tmp = if_else(flip, minus, plus) / norm_depth,
-                minus.tmp = if_else(flip, plus, minus) / norm_depth,
-                plus = plus.tmp,
-                minus = minus.tmp,
-                total = total / norm_depth
+                total = total / norm_depth,
+                plus = plus / norm_depth,
+                minus = minus / norm_depth,
+                swap_if(flip, minus, plus),
             ) %>%
             gather(
                 total, plus, minus, fplus, key="sense", value="y"
