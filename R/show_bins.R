@@ -471,4 +471,3 @@ if (!interactive()) {
     run()
 }
 
-#opt <- parse_options(args=c("--input", "inspire.qc.ref_hg38.deplete.assemble_meta.coverage.ref_hg38.annotate_blastE2MegaBest.blastfilter_vpU200.ref_NT.annotate_blastE10Best.ref_NcbiTaxonomy.blastbin_vp/C5042X4_120617_L007.virus.csv", "--output", "out.pdf"))
