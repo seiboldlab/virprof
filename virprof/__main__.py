@@ -462,10 +462,12 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
     # bin level - accession, name, species
     # lowercase unaligned (external, internal)
 
+    # Check arguments
     if out.count("%s") > 1:
         LOG.error("No more than 1 '%s' allowed in --out")
         sys.exit(1)
 
+    # Handle multi-file output options
     if file_per_bin:
         if out.count("%s") != 1:
             LOG.error("Must have exactly one '%%s' in --out when using --file-per-bin")
@@ -495,18 +497,18 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
                 outfile.iofile.close()
             return outfile
 
-    ## Load and merge bins
+    ## Handle binning options
     LOG.info("Binning by '%s'", bin_by)
     LOG.info("Loading calls from '%s'", in_bins.name)
     bins = {}
     for row in csv.DictReader(in_bins):
-        for col in ('qaccs', 'qranges', 'sranges'):
+        for col in ('qaccs', 'qranges', 'sranges', 'reversed'):
             row[col] = row[col].split(';')
         bins.setdefault(row[bin_by], []).append(row)
     LOG.info("  found %i bins in %i calls",
              len(bins), sum(len(bin) for bin in bins.items()))
 
-    ## Filter bins
+    ## Handle filtering options
     if filter_lineage is not None:
         regex = re.compile(filter_lineage)
         LOG.info("Filtering bins")
@@ -518,7 +520,7 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
         LOG.info("  %i bins matched lineage", len(bins))
 
     ## Load FASTA
-    LOG.info("Loading FASTA from '%s'", in_fasta.name)
+    LOG.info("Loading FASTA from '%s'...", in_fasta.name)
     contigs = FastaFile(in_fasta)
     LOG.info("  found %i sequences", len(contigs))
 
