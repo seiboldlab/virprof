@@ -1,8 +1,13 @@
 """Helper methods for fasta"""
 
+import logging
 import subprocess as sp
-
+from collections import Counter
 from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict, Tuple
+
+import Bio.Seq
+
+LOG = logging.getLogger(__name__)
 
 
 def read_from_command(args: Sequence[str]) -> Iterator[bytes]:
@@ -140,3 +145,52 @@ class FastaFile:
         else:
             header = ">{}".format(acc).encode('utf-8')
         self.outzip.stdin.write(b"\n".join((header, sequence, b"")))
+def merge_contigs(regs, contigs):
+    sequence = []
+    # Iterate over each disjoined piece
+    for sstart, send, data in regs:
+        section_len = send - sstart
+        section_data = []
+        # Iterate over each hit overlapping piece
+        for qacc, s2start, s2end, qstart, qend, revers in data:
+            match_offset = sstart - s2start
+            if revers:
+                section_start = qend - match_offset - section_len
+                seq = contigs.get(qacc, section_start, section_start + section_len)
+                seq_ = Bio.Seq.Seq(seq.decode('ASCII'))
+                seq = str(seq_.reverse_complement()).encode('ASCII')
+            else:
+                section_start = qstart + match_offset
+                seq = contigs.get(qacc, section_start, section_start + section_len)
+
+            if len(seq) != section_len + 1:
+                ## FIXME
+                LOG.error("section sizes differ!")
+                LOG.error((sstart, send, section_len, qacc, revers))
+                LOG.error((s2start, s2end, s2end - s2start))
+                LOG.error((qstart, qend, qend - qstart))
+
+            section_data.append(seq)
+
+        if len(section_data) == 0:
+            ## Empty piece - fill with N's
+            sequence.append(b"n" * (section_len+1))
+        elif len(section_data) == 1:
+            ## Singleton piece - fill with sequence
+            sequence.append(section_data[0])
+        else:
+            ## Overlapping piece - fill with consensus
+            section_consensus = []
+            for base_counts in map(Counter,zip(*section_data)):
+                if len(base_counts) == 1:
+                    best, best_count = next(iter(base_counts.items()))
+                    second_count = 0
+                else:
+                    (best, best_count), (_, second_count) = base_counts.most_common(2)
+
+                if best_count == second_count:
+                    section_consensus.append(110)
+                else:
+                    section_consensus.append(best)
+            sequence.append(bytes(section_consensus))
+    return b"".join(sequence)

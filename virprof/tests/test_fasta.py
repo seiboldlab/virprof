@@ -35,3 +35,39 @@ def test_FastaFile():
     for acc, seq in contigs.sequences.items():
         seq2 = fa.get(acc.decode('ASCII'))
         assert seq == seq2
+
+
+def test_merge_contigs_simple():
+    rl = RegionList()
+    rl.add(1, 10, ('acc1', 1, 10, 1, 10, False))
+    id_format = ""
+    sequence = merge_contigs(rl, contigs)
+    assert sequence == contigs.get('acc1')
+
+
+def test_merge_contigs_simple_reversed():
+    rl = RegionList()
+    rl.add(1, 10, ('acc1r', 1, 10, 1, 10, True))
+    id_format = ""
+    sequence = merge_contigs(rl, contigs)
+    assert sequence == contigs.get('acc1')
+
+
+def test_merge_contigs_split():
+    rl = RegionList()
+    rl.add(1, 10, ('acc1', 1, 10, 1, 10, False))
+    rl.add(11, 20, ('acc2', 11, 20, 1, 10, False))
+    id_format = ""
+    sequence = merge_contigs(rl, contigs)
+    assert sequence == subject
+
+
+def test_merge_contigs_overlap():
+    rl = RegionList()
+    rl.add(1, 10, ('acc1', 1, 10, 1, 10, False))
+    rl.add(11, 20, ('acc2', 11, 20, 1, 10, False))
+    rl.add(6, 15, ('acc3', 6, 15, 1, 10, False))
+    id_format = ""
+    sequence = merge_contigs(rl, contigs)
+    assert sequence == subject
+
