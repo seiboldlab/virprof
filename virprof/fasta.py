@@ -102,6 +102,7 @@ class FastaFile:
             if line[0] == fasta_header:
                 if acc is not None:
                     sequences[acc] = b''.join(lines)
+                    lines = []
                 acc = line[1:].split(maxsplit=1)[0]
             else:
                 lines.append(line.strip())
