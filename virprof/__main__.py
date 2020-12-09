@@ -27,6 +27,8 @@ from .blastbin import BlastHit, HitChain, CoverageHitChain, greedy_select_chains
 from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
 from .fasta import filter_fasta, FastaFile
+from .regionlist import RegionList
+from .fasta import merge_contigs
 
 
 LOG = logging.getLogger(__name__)
@@ -449,17 +451,17 @@ def filter_blast(in_blast7: click.utils.LazyFile,
               help='Create separate file for each bin')
 @click.option("--filter-lineage", type=str,
               help="Filter by lineage prefix")
-def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, filter_lineage):
+@click.option("--no_merge-overlapping", is_flag=True,
+              help="Do not merge overlapping regions")
+def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, filter_lineage,
+                 no_merge_overlapping):
     """Exports blastbin hits in FASTA format"""
-    # file-per-bin
-    # sequence-per-bin
     # export
     #   spliced
     #   contigs
     #   both
     # fill type N, Ref
     # expand num bases
-    # bin level - accession, name, species
     # lowercase unaligned (external, internal)
 
     # Check arguments
@@ -524,21 +526,33 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
     contigs = FastaFile(in_fasta)
     LOG.info("  found %i sequences", len(contigs))
 
-    ## Set up sequence processing
-    def write_full_contigs(name, data):
-        for row in data:
-            for qacc in row['qaccs']:
-                header = fasta_id_format.format(bin_name = name, qacc=qacc, **row)
-                sequence = contigs.get(qacc)
-                yield header, sequence
-
-    write_contigs = write_full_contigs
-
     ## Write FASTA
     for bin_name, bin_data in bins.items():
         outfile = update_outfile(bin_name)
-        for header, sequence in write_contigs(bin_name, bin_data):
-            outfile.put(header, sequence)
+        for call in bin_data:
+            # Load sequences
+            sequences = {acc: contigs.get(acc) for acc in call['qaccs']}
+
+            # Convert call to region list
+            regs = RegionList()
+            for qacc, qrange, srange, revers in zip(
+                    call['qaccs'], call['qranges'],
+                    call['sranges'], call['reversed']):
+                sstart, send = map(int, srange.split('-'))
+                qstart, qend = map(int, qrange.split('-'))
+                revers = revers == 'T'
+                regs.add(sstart, send, (qacc, sstart, send, qstart, qend, revers))
+
+            if not no_merge_overlapping:
+                sequences = merge_contigs(regs, sequences)
+
+            for acc, sequence in sequences.items():
+                header = fasta_id_format.format(
+                    bin_name = bin_name,
+                    acc = acc,
+                    **call
+                )
+                outfile.put(header, sequence)
     update_outfile()
 
 
