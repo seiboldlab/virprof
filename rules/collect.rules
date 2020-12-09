@@ -167,9 +167,37 @@ with Stage("blastbin_vp"):
             " --min-reads {params.min_reads}"
             " >{log} 2>&1"
 
+    rule vp_export_fasta:
+        message: "Exporting recovered genomes into bins"
+        input:
+            bins  = "{:this:}/{target}.virus.csv",
+            fasta = "{:prev:}/{target}.fasta.gz"
+        output:
+            bins =  "{:this:}/{target}.bin.filelist.txt"
+        log:
+            "{:this:}/{target}.bin.log"
+        threads: 1
+        conda:
+            "virprof_py"
+        params:
+            out_bins = "{:this:}/{target}.bin.%s.fasta.gz",
+            bin_by = "species",
+            filter_lineage = "^Virus",
+            fasta_id_format = "{target}.{{bin_name}} | {{sacc}} | {{acc}}"
+        shell:
+            "python -m virprof export-fasta"
+            " --in-bins {input.bins}"
+            " --in-fasta {input.fasta}"
+            " --out {params.out_bins}"
+            " --bin-by {params.bin_by}"
+            " --filter-lineage {params.filter_lineage}"
+            " --fasta-id-format '{params.fasta_id_format}'"
+            " --file-per-bin"
+
     rule vp_classify_all:
         input:
             summary = "{:this:}/virus_summary.xlsx",
-            plots = "{:this:}/{:targets:}.virus.pdf"
+            plots = "{:this:}/{:targets:}.virus.pdf",
+            bins = "{:this:}/{:targets:}.bin.filelist.txt"
         output:
             touch("{:this:}/all_targets.stamp")

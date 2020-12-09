@@ -441,6 +441,9 @@ def filter_blast(in_blast7: click.utils.LazyFile,
 @click.option("--out",
               type=str, default="out%s.fasta.gz",
               help='FASTA output containing bins')
+@click.option("--out-bins",
+              type =click.File('w'),
+              help='Output list of created bins')
 @click.option("--bin-by",
               type=click.Choice(['sacc', 'species', 'taxname']), default='sacc',
               help='Field to use for binning')
@@ -453,7 +456,7 @@ def filter_blast(in_blast7: click.utils.LazyFile,
               help="Filter by lineage prefix")
 @click.option("--no_merge-overlapping", is_flag=True,
               help="Do not merge overlapping regions")
-def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, filter_lineage,
+def export_fasta(in_bins, in_fasta, out, out_bins, bin_by, fasta_id_format, file_per_bin, filter_lineage,
                  no_merge_overlapping):
     """Exports blastbin hits in FASTA format"""
     # export
@@ -483,6 +486,8 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
                 outfile = None
             else:
                 outfile = FastaFile(open(out % name.replace(" ", "_"), 'w'), 'w')
+                if out_bins:
+                    out_bins.write(outfile.name + "\n")
                 LOG.info("Writing to '%s'", outfile.name)
 
             update_outfile.outfile = outfile
@@ -492,6 +497,8 @@ def export_fasta(in_bins, in_fasta, out, bin_by, fasta_id_format, file_per_bin, 
         if out.count("%s"):
             out = out.replace("%s", "")
         outfile = FastaFile(open(out, 'w'), 'w')
+        if out_bins:
+            out_bins.write(outfile.name + "\n")
         LOG.info("Writing to '%s'", outfile.name)
         def update_outfile(name = None):
             if name is None:
