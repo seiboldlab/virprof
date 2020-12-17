@@ -24,7 +24,7 @@ def test_nonoverlapping():
     rl = RegionList()
     rl.add(10, 20, "10-20")
     rl.add(30, 40, "30-40")
-    assert rl.get(0)  == []
+    assert rl.get(0) == []
     assert rl.get(10) == ["10-20"]
     assert rl.get(20) == ["10-20"]
     assert rl.get(21) == []
@@ -220,7 +220,7 @@ def test_iter():
         (15, 20, ["10-20", "15-35"]),
         (21, 29, ["15-35"]),
         (30, 35, ["30-40", "15-35"]),
-        (36, 40, ["30-40"])
+        (36, 40, ["30-40"]),
     ]
 
     assert expected == list(rl)

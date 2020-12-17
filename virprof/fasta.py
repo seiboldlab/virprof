@@ -30,8 +30,9 @@ def get_accs_from_fasta(fileobj: BinaryIO) -> Iterator[bytes]:
             yield line[1:].split(maxsplit=1)[0]
 
 
-def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
-                 accs: Collection[str], remove: bool) -> Tuple[int, int]:
+def filter_fasta(
+    filein: BinaryIO, fileout: BinaryIO, accs: Collection[str], remove: bool
+) -> Tuple[int, int]:
     """Creates filtered copy of gzipped FASTA file
 
     Args:
@@ -45,8 +46,8 @@ def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
     outzip = sp.Popen(["gzip", "-c"], stdout=fileout, stdin=sp.PIPE)
     assert outzip.stdin is not None
     skip = True
-    fasta_header = b'>'[0]
-    accs_b = set(acc.encode('ascii') for acc in accs)
+    fasta_header = b">"[0]
+    accs_b = set(acc.encode("ascii") for acc in accs)
     n_seqs_in = n_seqs_out = 0
     for line in unzip:
         if line[0] == fasta_header:
@@ -66,16 +67,17 @@ def filter_fasta(filein: BinaryIO, fileout: BinaryIO,
 
 
 class FastaFile:
-    """Handles access to GZipp'ed FASTA format file
+    """Handles access to GZipp'ed FASTA format file"""
 
-    """
-    def __init__(self, iofile: BinaryIO, mode='r') -> None:
+    def __init__(self, iofile: BinaryIO, mode="r") -> None:
         self.iofile = iofile
         self.mode = mode
         self.sequences = self._try_load_all()
 
-        if 'w' in mode:
-            self.outzip: Optional[sp.Popen[bytes]] = sp.Popen(["gzip", "-c"], stdout=iofile, stdin=sp.PIPE)
+        if "w" in mode:
+            self.outzip: Optional[sp.Popen[bytes]] = sp.Popen(
+                ["gzip", "-c"], stdout=iofile, stdin=sp.PIPE
+            )
         else:
             self.outzip = None
 
@@ -96,23 +98,23 @@ class FastaFile:
         return len(self.sequences) if self.sequences else -1
 
     def _try_load_all(self) -> Optional[Dict[bytes, bytes]]:
-        if 'r' not in self.mode:
+        if "r" not in self.mode:
             return None
         sequences = {}
         fastafile = read_from_command(["gunzip", "-dc", self.iofile.name])
-        fasta_header = b'>'[0]
+        fasta_header = b">"[0]
         acc = None
         lines = []
         for line in fastafile:
             if line[0] == fasta_header:
                 if acc is not None:
-                    sequences[acc] = b''.join(lines)
+                    sequences[acc] = b"".join(lines)
                     lines = []
                 acc = line[1:].split(maxsplit=1)[0]
             else:
                 lines.append(line.strip())
         if acc is not None:
-            sequences[acc] = b''.join(lines)
+            sequences[acc] = b"".join(lines)
         return sequences
 
     def get(self, acc: str, start: int = 1, stop: int = None) -> bytes:
@@ -125,10 +127,10 @@ class FastaFile:
         """
         if not self.sequences:
             raise IndexError("Empty or write only FASTA")
-        seq = self.sequences[acc.encode('utf-8')]
+        seq = self.sequences[acc.encode("utf-8")]
         if stop is None:
             stop = len(seq)
-        return seq[start-1:stop]
+        return seq[start - 1 : stop]
 
     def put(self, acc: str, sequence: bytes, comment: str = None):
         """Write a sequence
@@ -141,15 +143,15 @@ class FastaFile:
         if not self.outzip or not self.outzip.stdin:
             raise IOError("FastaFile not writeable")
         if comment is not None:
-            header = ">{} {}".format(acc, comment).encode('utf-8')
+            header = ">{} {}".format(acc, comment).encode("utf-8")
         else:
-            header = ">{}".format(acc).encode('utf-8')
+            header = ">{}".format(acc).encode("utf-8")
         self.outzip.stdin.write(b"\n".join((header, sequence, b"")))
 
 
 def revcomp(sequence: bytes) -> bytes:
-    seq = Bio.Seq.Seq(sequence.decode('ASCII'))
-    return str(seq.reverse_complement()).encode('ASCII')
+    seq = Bio.Seq.Seq(sequence.decode("ASCII"))
+    return str(seq.reverse_complement()).encode("ASCII")
 
 
 def merge_contigs(regs, sequences):
@@ -181,7 +183,7 @@ def merge_contigs(regs, sequences):
 
         if len(section_data) == 0:
             ## Empty piece - fill with N's
-            sequence.append(b"n" * (section_len+1))
+            sequence.append(b"n" * (section_len + 1))
         elif len(section_data) == 1:
             ## Singleton piece - fill with sequence
             sequence.append(section_data[0])
@@ -196,8 +198,8 @@ def merge_contigs(regs, sequences):
                     (best, best_count), (_, second_count) = base_counts.most_common(2)
 
                 if best_count == second_count:
-                    section_consensus.append(110) # 110 == 'n'
+                    section_consensus.append(110)  # 110 == 'n'
                 else:
                     section_consensus.append(best)
             sequence.append(bytes(section_consensus))
-    return {'+'.join(qaccs): b"".join(sequence)}
+    return {"+".join(qaccs): b"".join(sequence)}

@@ -4,7 +4,19 @@ import copy
 import logging
 import math
 from collections import defaultdict
-from typing import NamedTuple, List, Sequence, Set, Iterator, Optional, Tuple, Iterable, Dict, Any, Mapping
+from typing import (
+    NamedTuple,
+    List,
+    Sequence,
+    Set,
+    Iterator,
+    Optional,
+    Tuple,
+    Iterable,
+    Dict,
+    Any,
+    Mapping,
+)
 
 import tqdm  # type: ignore
 
@@ -19,13 +31,14 @@ LOG = logging.getLogger(__name__)
 BLAST_CONSTANTS = {
     # 'megablast': (1., 0.41),... unclear
     # word size 28, gap open 0, gap_extend 0, score 1/-2
-    'blastn': (0.625, 0.41),
+    "blastn": (0.625, 0.41),
     # word size 11, gap open 5, gap_extend 2, score 2/-3
 }
 
-def calc_log10_evalue(score: float, query_len: int,
-                      database_len: int = 1004024614,
-                      blast: str = "blastn") -> float:
+
+def calc_log10_evalue(
+    score: float, query_len: int, database_len: int = 1004024614, blast: str = "blastn"
+) -> float:
     """Compute BLAST evalue
 
     Args:
@@ -38,13 +51,16 @@ def calc_log10_evalue(score: float, query_len: int,
         Exponent of E-Value
     """
     blast_l, blast_k = BLAST_CONSTANTS[blast]
-    return round((- blast_l * score
-                  + math.log(blast_k)
-                  + math.log(database_len)
-                  + math.log(query_len))
-                 /
-                 math.log(10),
-                 2)
+    return round(
+        (
+            -blast_l * score
+            + math.log(blast_k)
+            + math.log(database_len)
+            + math.log(query_len)
+        )
+        / math.log(10),
+        2,
+    )
 
 
 def bitscore(score: float, blast: str = "blastn") -> float:
@@ -55,11 +71,7 @@ def bitscore(score: float, blast: str = "blastn") -> float:
         blast: blast setting (only ``blastn`` for now)
     """
     blast_l, blast_k = BLAST_CONSTANTS[blast]
-    return - round((- blast_l * score
-                    + math.log(blast_k))
-                   /
-                   math.log(2),
-                   2)
+    return -round((-blast_l * score + math.log(blast_k)) / math.log(2), 2)
 
 
 class BlastHit(NamedTuple):
@@ -102,11 +114,12 @@ class HitChain:
         chain_penalty: Penalty added to score for each item in the
             list beyond the first.
     """
+
     __slots__ = ("hits", "chain_penalty", "_hash", "_score", "_subject_regions")
 
-    def __init__(self,
-                 hits: Optional[List[BlastHit]] = None,
-                 chain_penalty: int = 20) -> None:
+    def __init__(
+        self, hits: Optional[List[BlastHit]] = None, chain_penalty: int = 20
+    ) -> None:
         #: List of hits sorted by subject start
         self.hits: List[BlastHit] = []
         self.chain_penalty = chain_penalty
@@ -181,10 +194,7 @@ class HitChain:
         """
         oldlen = len(self.hits)
         oldhits = self.hits
-        self.hits = [
-            hit for hit in oldhits
-            if hit.qacc not in accs
-        ]
+        self.hits = [hit for hit in oldhits if hit.qacc not in accs]
         if oldlen != len(self.hits):
             if not self.hits:
                 self._subject_regions = RegionList()
@@ -234,14 +244,15 @@ class HitChain:
         Note that ``len(hitChain)`` returns the number of items, not
         the length in basepairs.
         """
-        return sum(stop - start + 1 for start, stop, data in self._subject_regions if data)
+        return sum(
+            stop - start + 1 for start, stop, data in self._subject_regions if data
+        )
 
     @property
     def blast_score(self) -> float:
         "Aggegated BLAST score for all items in the HitChain"
-        return (
-            sum(hit.score for hit in self.hits)
-            - self.chain_penalty * (len(self) - 1)
+        return sum(hit.score for hit in self.hits) - self.chain_penalty * (
+            len(self) - 1
         )
 
     @property
@@ -255,8 +266,8 @@ class HitChain:
         for start, stop, data in self._subject_regions:
             if data:
                 matches += (stop - start + 1) * max(hit.pident for hit in data)
-                length += (stop - start + 1)
-        return round(matches/length, 1)
+                length += stop - start + 1
+        return round(matches / length, 1)
 
     @property
     def qpident(self) -> Optional[float]:
@@ -319,10 +330,10 @@ class HitChain:
         Returns:
           List of pairs with start and end positions (start < end).
         """
-        return [(hit.sstart, hit.send)
-                if hit.sstart < hit.send
-                else (hit.send, hit.sstart)
-                for hit in self.hits]
+        return [
+            (hit.sstart, hit.send) if hit.sstart < hit.send else (hit.send, hit.sstart)
+            for hit in self.hits
+        ]
 
     def range_reversed(self) -> List[bool]:
         """Return list of bool indicating which hits were reverse hits"""
@@ -348,8 +359,7 @@ class HitChain:
         # These are always qstart <= qend
         if qacc is None:
             return [(hit.qstart, hit.qend) for hit in self.hits]
-        return [(hit.qstart, hit.qend) for hit in self.hits
-                if hit.qacc == qacc]
+        return [(hit.qstart, hit.qend) for hit in self.hits if hit.qacc == qacc]
 
     def make_chain_single(self, hitset: List[BlastHit]) -> Sequence["HitChain"]:
         """Generates hit chain for set of hits with single sacc
@@ -378,23 +388,24 @@ class HitChain:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert class to dict for writing to CSV"""
+
         def range_str(ranges):
             return ";".join("{}-{}".format(*rang) for rang in ranges)
 
         return {
-            'log_evalue': self.log10_evalue,
-            'qlen': self.qlen,
-            'slen': self.slen,
-            'n_frag': len(self.hits),
-            'sacc': self.sacc,
-            'stitle': self.stitle,
-            'staxids': ";".join((str(i) for i in self.staxids)),
-            'pident': self.pident,
-            'pidents': ";".join((str(pid) for pid in self.pidents)),
-            'qaccs': ";".join(self.qaccs),
-            'qranges': range_str(self.qranges()),
-            'sranges': range_str(self.sranges()),
-            'reversed': ";".join('T' if rev else 'F' for rev in self.range_reversed()),
+            "log_evalue": self.log10_evalue,
+            "qlen": self.qlen,
+            "slen": self.slen,
+            "n_frag": len(self.hits),
+            "sacc": self.sacc,
+            "stitle": self.stitle,
+            "staxids": ";".join((str(i) for i in self.staxids)),
+            "pident": self.pident,
+            "pidents": ";".join((str(pid) for pid in self.pidents)),
+            "qaccs": ";".join(self.qaccs),
+            "qranges": range_str(self.qranges()),
+            "sranges": range_str(self.sranges()),
+            "reversed": ";".join("T" if rev else "F" for rev in self.range_reversed()),
         }
 
     @property
@@ -405,6 +416,7 @@ class HitChain:
 
 class CheckOverlaps(HitChain):
     """HitChain with checkoverlap code (unused)"""
+
     def overlaps(self, hit: BlastHit) -> bool:
         """Checks for overlap with ``hit``
 
@@ -470,15 +482,8 @@ class CheckOverlaps(HitChain):
 
         """
         oldlen = len(self.hits)
-        overlapping = set(
-            ohit
-            for hit in hits
-            for ohit in self.get_query_overlaps(hit)
-        )
-        self.hits = [
-            ohit for ohit in self.hits
-            if ohit not in overlapping
-        ]
+        overlapping = set(ohit for hit in hits for ohit in self.get_query_overlaps(hit))
+        self.hits = [ohit for ohit in self.hits if ohit not in overlapping]
         if oldlen != len(self.hits):
             self._reset()
 
@@ -514,21 +519,23 @@ class CheckOverlaps(HitChain):
 
 class CoverageHitChain(HitChain):
     """HitChain also calculating read counts"""
-    def __init__(self,
-                 hits: Optional[List[BlastHit]] = None,
-                 chain_penalty: int = 20) -> None:
+
+    def __init__(
+        self, hits: Optional[List[BlastHit]] = None, chain_penalty: int = 20
+    ) -> None:
         super().__init__(hits, chain_penalty)
         self._coverages: Mapping[str, Mapping[str, Mapping[str, str]]] = {}
         self._units: List[str] = []
         self._numreads: Dict[str, List[int]] = {}
 
-    def set_coverage(self, coverages: Mapping[str, Mapping[str, Mapping[str, str]]]) -> None:
+    def set_coverage(
+        self, coverages: Mapping[str, Mapping[str, Mapping[str, str]]]
+    ) -> None:
         """Set coverage data"""
         self._coverages = coverages
         self._units = list(coverages.keys())
         self._numreads = {
-            qacc: [int(coverages[unit][qacc]['numreads'])
-                   for unit in self._units]
+            qacc: [int(coverages[unit][qacc]["numreads"]) for unit in self._units]
             for qacc in coverages[self._units[0]]
         }
 
@@ -560,9 +567,7 @@ class CoverageHitChain(HitChain):
         return ";".join(str(sum(self.get_numreads(qacc))) for qacc in self.qaccs)
 
     def filter_hitgroups(
-            self,
-            hitgroups: Iterable[List[BlastHit]],
-            min_read_count: int
+        self, hitgroups: Iterable[List[BlastHit]], min_read_count: int
     ) -> Iterable[List[BlastHit]]:
         """Filter out hitgroups with less than ``min_read_count`` reads"""
         filtered = 0
@@ -577,15 +582,13 @@ class CoverageHitChain(HitChain):
     def to_dict(self) -> Dict[str, Any]:
         """Convert chain to dictionary for writing to CSV"""
         res = super().to_dict()
-        res.update({
-            'numreads': self.numreads,
-            'numreadss': self.numreadss
-        })
+        res.update({"numreads": self.numreads, "numreadss": self.numreadss})
         return res
 
 
-def greedy_select_chains(chains: List["HitChain"],
-                         alt: float = 0.9) -> Iterator[List["HitChain"]]:
+def greedy_select_chains(
+    chains: List["HitChain"], alt: float = 0.9
+) -> Iterator[List["HitChain"]]:
     """Greedily selects hit chains with best e-value score
 
     Iteratively finds and returns the best scoring chain together with
@@ -598,20 +601,20 @@ def greedy_select_chains(chains: List["HitChain"],
 
     """
     while chains:
-        best_chain_idx = max(range(len(chains)),
-                             key=lambda i: chains[i].score)
+        best_chain_idx = max(range(len(chains)), key=lambda i: chains[i].score)
         best_chain = chains.pop(best_chain_idx)
         qaccs = set(best_chain.qaccs)
 
         # find similarly soring chains
         extra_chains = [
-            chain for chain in chains
+            chain
+            for chain in chains
             if chain != best_chain
             and chain.score > alt * best_chain.score
             and chain.log10_evalue < alt * best_chain.log10_evalue
             and chain.slen > alt * best_chain.slen
             and chain.qlen > alt * best_chain.qlen
-            and (len(qaccs.intersection(set(chain.qaccs))) > len(qaccs)/10)
+            and (len(qaccs.intersection(set(chain.qaccs))) > len(qaccs) / 10)
         ]
         extra_chains.sort(key=lambda res: res.log10_evalue)
 

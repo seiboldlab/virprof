@@ -25,6 +25,7 @@ class Taxonomy(ABC):
       path: Either path to directory containing names.dmp and nodes.dmp or
             path to the binary dump of the tree.
     """
+
     #: Name of file containing nodes
     NODES_FN = "nodes.dmp"
     #: Name of file containing names
@@ -51,7 +52,6 @@ class Taxonomy(ABC):
         if os.path.exists(path):
             return path
         raise RuntimeError("Unable to find {filename} with prefix {self.path}")
-
 
     @property
     def names_fn(self) -> Optional[str]:
@@ -100,14 +100,14 @@ class Taxonomy(ABC):
         LOG.info("Reading nodes from '%s'", self.names_fn)
         with open(self.names_fn, "r") as names_fd:
             reader = csv.DictReader(
-                names_fd, delimiter='|',
-                fieldnames=[
-                    'tax_id', 'name', 'unique_name', 'name_class'
-                ])
+                names_fd,
+                delimiter="|",
+                fieldnames=["tax_id", "name", "unique_name", "name_class"],
+            )
             for row in reader:
-                if row['name_class'].strip() == 'scientific name':
-                    tax_id = int(row['tax_id'])
-                    data = dict((('name', row['name'].strip()),))
+                if row["name_class"].strip() == "scientific name":
+                    tax_id = int(row["tax_id"])
+                    data = dict((("name", row["name"].strip()),))
                     yield tax_id, data
 
     def edge_reader(self) -> Iterator[Tuple[int, int, str]]:
@@ -121,15 +121,12 @@ class Taxonomy(ABC):
         LOG.info("Reading edges from '%s'", self.nodes_fn)
         with open(self.nodes_fn, "r") as nodes_fd:
             reader = csv.DictReader(
-                nodes_fd, delimiter='|',
-                fieldnames=[
-                    'tax_id', 'parent_id', 'rank'
-                ]
+                nodes_fd, delimiter="|", fieldnames=["tax_id", "parent_id", "rank"]
             )
             for row in reader:
-                source_node = int(row['parent_id'])
-                target_node = int(row['tax_id'])
-                yield source_node, target_node, row['rank']
+                source_node = int(row["parent_id"])
+                target_node = int(row["tax_id"])
+                yield source_node, target_node, row["rank"]
 
     @abstractmethod
     def get_name(self, tax_id: int) -> str:
@@ -167,7 +164,6 @@ class Taxonomy(ABC):
         """Get specific rank ``rank`` from lineage of ``taxid``"""
         raise NotImplementedError()
 
-
     @abstractmethod
     def get_subtree_ids(self, name: str) -> Set[int]:
         """Get the ``tax_id``s for node ``name`` and all subnodes
@@ -180,9 +176,11 @@ class Taxonomy(ABC):
         """
         raise NotImplementedError()
 
-    def make_filter(self,
-                    include: Optional[Sequence[str]] = None,
-                    exclude: Optional[Sequence[str]] = None) -> Callable[[int], bool]:
+    def make_filter(
+        self,
+        include: Optional[Sequence[str]] = None,
+        exclude: Optional[Sequence[str]] = None,
+    ) -> Callable[[int], bool]:
         """Create a filtering function
 
         Args:
@@ -204,30 +202,28 @@ class Taxonomy(ABC):
             include_ids = set()
         else:
             include_ids = set(
-                tid
-                for name in include
-                for tid in self.get_subtree_ids(name)
+                tid for name in include for tid in self.get_subtree_ids(name)
             )
         if exclude is None:
             exclude_ids = set()
         else:
             exclude_ids = set(
-                tid
-                for name in exclude
-                for tid in self.get_subtree_ids(name)
+                tid for name in exclude for tid in self.get_subtree_ids(name)
             )
         if not include_ids:
             if not exclude_ids:
+
                 def null_filter(_tax_id: int) -> bool:
                     """Always true"""
                     return True
+
                 return null_filter
 
             def exclude_filter(taxid: int) -> bool:
                 """True if taxid not excluded"""
                 return taxid not in exclude_ids
-            LOG.info("Made filter excluding %i tax_ids",
-                     len(exclude_ids))
+
+            LOG.info("Made filter excluding %i tax_ids", len(exclude_ids))
             return exclude_filter
 
         include_ids = include_ids.intersection(exclude_ids)
@@ -235,8 +231,8 @@ class Taxonomy(ABC):
         def include_filter(taxid: int) -> bool:
             """True if ``taxid`` included"""
             return taxid in include_ids
-        LOG.info("Made filter including %i tax_ids",
-                 len(include_ids))
+
+        LOG.info("Made filter including %i tax_ids", len(include_ids))
         return include_filter
 
     @staticmethod
@@ -247,16 +243,20 @@ class Taxonomy(ABC):
 
 class TaxonomyGT(Taxonomy):
     """NCBI Taxonomy class using ``graph-tool`` to manage tree"""
+
     def load_tree(self) -> gt.Graph:
         LOG.info("Loading graph from '%s'", self.nodes_fn)
         tree = gt.load_graph_from_csv(
             self.nodes_fn,
-            directed=True, eprop_types=[], string_vals=False,
+            directed=True,
+            eprop_types=[],
+            string_vals=False,
             ecols=(1, 0),
-            csv_options={'delimiter': '|'})
+            csv_options={"delimiter": "|"},
+        )
         tree.vp.name = tree.new_vertex_property("string")
         for tax_id, data in self.node_reader():
-            tree.vp.name[tree.vertex(tax_id)] = data['name']
+            tree.vp.name[tree.vertex(tax_id)] = data["name"]
         tree.vp.rank = tree.new_vertex_property("string")
         for _, tax_id, rank in self.edge_reader():
             tree.vp.rank[tree.vertex(tax_id)] = rank.strip()
@@ -270,9 +270,9 @@ class TaxonomyGT(Taxonomy):
 
     def get_name(self, tax_id: int) -> str:
         try:
-            return self.tree.vp.name[self.tree.vertex(tax_id)] or 'Unknown'
+            return self.tree.vp.name[self.tree.vertex(tax_id)] or "Unknown"
         except ValueError:
-            return 'Unknown'
+            return "Unknown"
 
     def _get_path_to_root(self, target):
         res = [target]
@@ -295,7 +295,7 @@ class TaxonomyGT(Taxonomy):
     def get_lineage(self, tax_id: int) -> Sequence[str]:
         target = self._get_vertex(tax_id)
         if target is None:
-            return ['Unknown']
+            return ["Unknown"]
         nodes = self._get_path_to_root(target)
         return [self.tree.vp.name[node] for node in nodes[1:]]
 
@@ -303,7 +303,7 @@ class TaxonomyGT(Taxonomy):
         """Get list of ranks for all names in lineage of ``taxid``"""
         target = self._get_vertex(tax_id)
         if target is None:
-            return ['no rank']
+            return ["no rank"]
         nodes = self._get_path_to_root(target)
         return [self.tree.vp.rank[node] for node in nodes[1:]]
 
@@ -315,16 +315,13 @@ class TaxonomyGT(Taxonomy):
             for node in reversed(nodes):
                 if self.tree.vp.rank[node] == rank:
                     return self.tree.vp.name[node]
-        return 'Unknown'
+        return "Unknown"
 
     def get_subtree_ids(self, name: str) -> Set[int]:
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
         if len(vertices) != 1:
             return set()
-        ids = set(
-            int(tgt) for _, tgt in
-            gt_search.dfs_iterator(self.tree, vertices[0])
-        )
+        ids = set(int(tgt) for _, tgt in gt_search.dfs_iterator(self.tree, vertices[0]))
         ids.add(int(vertices[0]))
         return ids
 
@@ -334,6 +331,7 @@ class TaxonomyNX(Taxonomy):
 
     No longer actually used.
     """
+
     def load_tree_binary(self) -> nx.DiGraph:
         return nx.read_gpickle(self.path)
 
@@ -348,7 +346,7 @@ class TaxonomyNX(Taxonomy):
 
     def get_subtree_ids(self, name: str) -> Set[int]:
         for node, data in self.tree.nodes(data=True):
-            if data.get('name') == name:
+            if data.get("name") == name:
                 taxid: int = node
                 break
         else:
@@ -361,13 +359,12 @@ class TaxonomyNX(Taxonomy):
         if tax_id not in self.tree:
             return "Unknown"
         path = nx.shortest_path(self.tree, self.root, tax_id)
-        return '; '.join(self.tree.nodes[node].get('name')
-                         for node in path[1:])
+        return "; ".join(self.tree.nodes[node].get("name") for node in path[1:])
 
     def get_name(self, tax_id: int) -> str:
         if tax_id not in self.tree:
             return "Unknown"
-        name: str = self.tree.nodes[tax_id].get('name')
+        name: str = self.tree.nodes[tax_id].get("name")
         return name
 
 
@@ -376,6 +373,7 @@ class TaxonomyNull(Taxonomy):
 
     Used when no taxonomy data is provided.
     """
+
     def load_tree_binary(self) -> None:
         pass
 
@@ -394,12 +392,15 @@ class TaxonomyNull(Taxonomy):
     def get_subtree_ids(self, name: str) -> Set[int]:
         return set()
 
-    def make_filter(self,
-                    include: Optional[Sequence[str]] = None,
-                    exclude: Optional[Sequence[str]] = None) -> Callable[[int], bool]:
+    def make_filter(
+        self,
+        include: Optional[Sequence[str]] = None,
+        exclude: Optional[Sequence[str]] = None,
+    ) -> Callable[[int], bool]:
         def null_filter(_tax_id: int) -> bool:
             """Always return true"""
             return True
+
         return null_filter
 
     @staticmethod
@@ -422,9 +423,7 @@ def load_taxonomy(path: Optional[str], library: Optional[str] = None) -> Taxonom
         else:
             library = "graph_tool"
     if path is None:
-        raise RuntimeError(
-            "If taxonomy library is specified, path cannot be None"
-        )
+        raise RuntimeError("If taxonomy library is specified, path cannot be None")
     if library == "networkx":
         return TaxonomyNX(path)
     return TaxonomyGT(path)

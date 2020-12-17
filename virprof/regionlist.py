@@ -2,6 +2,7 @@
 
 from typing import List, Any, Tuple, Generator
 
+
 class RegionList:
     """A container of ranges with associated data
 
@@ -37,7 +38,7 @@ class RegionList:
         except StopIteration:
             return
         for nextstart, nextdata in zipped:
-            yield start, nextstart -1, data
+            yield start, nextstart - 1, data
             start = nextstart
             data = nextdata
 
@@ -116,12 +117,16 @@ class RegionList:
         if self._region_data[0] == []:
             dups.add(0)
         if dups:
-            self._region_data = [self._region_data[i]
-                                 for i in range(len(self._region_data))
-                                 if i not in dups]
-            self._region_starts = [self._region_starts[i]
-                                   for i in range(len(self._region_starts))
-                                   if i not in dups]
+            self._region_data = [
+                self._region_data[i]
+                for i in range(len(self._region_data))
+                if i not in dups
+            ]
+            self._region_starts = [
+                self._region_starts[i]
+                for i in range(len(self._region_starts))
+                if i not in dups
+            ]
 
     def end_pos(self) -> int:
         """Retrieve last position covered by a region"""

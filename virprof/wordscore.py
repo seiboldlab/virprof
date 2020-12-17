@@ -21,18 +21,35 @@ class WordScorer:
       keepwords: Maximum number of words to include in output
     """
 
-    def __init__(self,
-                 stopwords: Optional[Set[str]] = None,
-                 maxwordlen: int = 27,
-                 orderweight: int = 2,
-                 keepwords: int = 4) -> None:
+    def __init__(
+        self,
+        stopwords: Optional[Set[str]] = None,
+        maxwordlen: int = 27,
+        orderweight: int = 2,
+        keepwords: int = 4,
+    ) -> None:
         if stopwords is None:
-            self.stopwords = set([
-                'genome', 'complete', 'sequence', 'strain',
-                'isolate', 'and', 'or', 'sapiens', 'genes',
-                'predicted', 'human', 'homo', 'assembly',
-                'mus', 'musculus', 'virus', 'polyprotein'
-            ])
+            self.stopwords = set(
+                [
+                    "genome",
+                    "complete",
+                    "sequence",
+                    "strain",
+                    "isolate",
+                    "and",
+                    "or",
+                    "sapiens",
+                    "genes",
+                    "predicted",
+                    "human",
+                    "homo",
+                    "assembly",
+                    "mus",
+                    "musculus",
+                    "virus",
+                    "polyprotein",
+                ]
+            )
         else:
             self.stopwords = stopwords
         self.maxwordlen = maxwordlen
@@ -87,7 +104,7 @@ class WordScorer:
             return
         for word in words:
             if len(word) <= 2:
-                stack += [' '.join((stack[-1], word))]
+                stack += [" ".join((stack[-1], word))]
             else:
                 yield from reversed(stack)
                 stack = [word]
@@ -133,23 +150,20 @@ class WordScorer:
             words = self.filter_stopwords(words)
 
             for idx, word in enumerate(words):
-                word_scores[word] += (
-                    chain.log10_evalue / self.orderweight ** idx
-                )
+                word_scores[word] += chain.log10_evalue / self.orderweight ** idx
 
         sorted_words = sorted(word_scores.items(), key=lambda k: k[1])
 
         result_words = []
         seen = set()
         for word, _score in sorted_words:
-            parts = [part for part in word.split()
-                     if part not in seen]
+            parts = [part for part in word.split() if part not in seen]
             seen.update(parts)
             for part in parts:
                 result_words.append(part)
             if len(result_words) > self.keepwords:
                 break
-        return " ".join(result_words[:self.keepwords])
+        return " ".join(result_words[: self.keepwords])
 
     @staticmethod
     def score_taxids(chains: List[HitChain]) -> int:
@@ -166,7 +180,6 @@ class WordScorer:
                 taxid_scores[taxid] += chain.log10_evalue
                 # FIXME! This is bad for chains with many hits
         staxids = [
-            taxid for taxid, score
-            in sorted(taxid_scores.items(), key=lambda k: k[1])
+            taxid for taxid, score in sorted(taxid_scores.items(), key=lambda k: k[1])
         ]
         return staxids[0]
