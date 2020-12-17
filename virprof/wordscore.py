@@ -164,6 +164,7 @@ class WordScorer:
         for chain in chains:
             for taxid in chain.staxids:
                 taxid_scores[taxid] += chain.log10_evalue
+                # FIXME! This is bad for chains with many hits
         staxids = [
             taxid for taxid, score
             in sorted(taxid_scores.items(), key=lambda k: k[1])
