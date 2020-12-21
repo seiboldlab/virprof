@@ -3,6 +3,8 @@
 projects:
   covid:
     data: projects/covid.csv
+  copd:
+    data: /Seibold/data2/COPDGene_Unmapped/mapping.csv
   daps:
     data: projects/daps.csv
   enigma:
