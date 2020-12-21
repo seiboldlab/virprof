@@ -165,6 +165,7 @@ with Stage("blastbin_vp"):
             " --plots-per-page {params.plots_per_page}"
             " --min-slen {params.min_slen}"
             " --min-reads {params.min_reads}"
+            " --no-annotate"
             " >{log} 2>&1"
 
     rule vp_export_fasta:
