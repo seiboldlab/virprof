@@ -207,6 +207,7 @@ with Stage("blastbin_vp") as S:
             " --filter-lineage {params.filter_lineage}"
             " --fasta-id-format '{params.fasta_id_format}'"
             " --file-per-bin"
+            " >{log} 2>&1"
 
     rule vp_classify_all:
         input:
