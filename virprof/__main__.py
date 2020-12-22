@@ -566,6 +566,10 @@ def export_fasta(
             LOG.error("Must have exactly one '%%s' in --out when using --file-per-bin")
             sys.exit(1)
 
+        if out_bins:
+            # Make sure the file is written, even if empty.
+            out_bins.write("")
+
         def update_outfile(name=None):
             outfile = update_outfile.outfile
             if outfile is not None:
