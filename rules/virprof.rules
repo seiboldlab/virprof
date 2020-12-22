@@ -31,8 +31,13 @@ Env(name="virprof_py", base="bioconda",
 
 with Stage("blastfilter_vp") as S:
     S.add_param("U", typ="int", name="min_unaligned_bp", default=0)
+    S.doc("""This stage filters input FASTA based on BLAST hits to a
+    contaminant database (e.g. host). Only sequences with at least
+    Unnn basepairs not aligned to any sequence in the reference are
+    passed through.""")
 
     rule vp_filter_blast:
+        """Rule filtering individual FASTA file"""
         message: "Filtering contigs"
         input:
             fasta  = "{:prev:}/{:target:}.fasta.gz",
@@ -54,6 +59,7 @@ with Stage("blastfilter_vp") as S:
             " >{log} 2>&1"
 
     rule vp_filter_blast_all:
+        """Collection target in case this is the end of the pipeline"""
         message:
             "Finished {output}"
         input:
@@ -62,7 +68,10 @@ with Stage("blastfilter_vp") as S:
             touch("{:this:}/all_targets.stamp")
 
 
-with Stage("blastbin_vp"):
+with Stage("blastbin_vp") as S:
+    S.doc("""
+    """)
+
     rule vp_index_tree:
         message: "Creating taxonomy index for virprof bin&classify"
         input:
