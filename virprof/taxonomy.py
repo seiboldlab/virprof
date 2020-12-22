@@ -250,7 +250,7 @@ class TaxonomyGT(Taxonomy):
             self.nodes_fn,
             directed=True,
             eprop_types=[],
-            hashed_vals=False,
+            hashed=False,
             ecols=(1, 0),
             csv_options={"delimiter": "|"},
         )
