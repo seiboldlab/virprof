@@ -26,6 +26,7 @@ Env(name="virprof_py", base="bioconda",
         "click",
         "tqdm",
         "networkx > 2",
+        "requests",
     ])
 
 
