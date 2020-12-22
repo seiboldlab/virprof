@@ -16,10 +16,20 @@ class EntrezAPI:
     """Caller for Entrez API methods
 
     Handles rate limiting by reacting to 429 error
+
+    Args:
+      session: Pre-prepared session. Not that the session object
+         needs to be set up to handle retries internally.
+      defaults: Additional parameters to add to the URL on each
+         API call. This is useful to e.g. set `apikey`.
+      timeout: Maximum time to wait for any ony server response.
     """
 
+    #: Entrez API base URL (with tool name as `{tool}`)
     URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/{tool}.fcgi"
 
+    #: Default codes assumed to be temporary server issues solveable
+    #: by retrying the request.
     default_retry_codes = set(
         (
             500,  # Internal Server Error
@@ -54,6 +64,19 @@ class EntrezAPI:
         The session created has a custom HTTPAdapter attached with a
         Retry object that will handle retries on typical server errors
         and honor the retry-after value returned if we exceed rate limit.
+
+        Args:
+          max_retries: Maximum number of times the request is retried after
+            connection errors, read errors or "other" errors.
+          max_redirects: Maximum number of HTTP redirects
+          max_timeouts: Maximum number of times we will retry after a 429
+            timeout error
+          backoff_factor: Scaling factor for exponential backoff
+          retry_codes: Codes considered a timeout error
+
+        Returns:
+          Session with urllib3 Retry object in HTTPadapter mounted for http(s)
+          protocol.
         """
         if retry_codes is None:
             retry_codes = cls.default_retry_codes
