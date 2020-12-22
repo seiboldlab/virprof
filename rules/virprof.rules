@@ -197,12 +197,13 @@ with Stage("blastbin_vp") as S:
             out_bins = "{:this:}/{target}.bin.%s.fasta.gz",
             bin_by = "species",
             filter_lineage = "^Virus",
-            fasta_id_format = lambda wc: f"{wc.target}.{{bin_name}} | {{sacc}} | {{acc}}"
+            fasta_id_format = lambda wc: f"{wc.target}.{{bin_name}} [accesion={{sacc}}] [contigs={{acc}}] [bp={{bp}}]"
         shell:
             "python -m virprof export-fasta"
             " --in-bins {input.bins}"
             " --in-fasta {input.fasta}"
             " --out {params.out_bins}"
+            " --out-bins {output.bins}"
             " --bin-by {params.bin_by}"
             " --filter-lineage {params.filter_lineage}"
             " --fasta-id-format '{params.fasta_id_format}'"

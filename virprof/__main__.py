@@ -527,7 +527,7 @@ def filter_blast(
 @click.option(
     "--fasta-id-format",
     type=str,
-    default="{bin_name}_{qacc}",
+    default="{bin_name}_{qacc} {bp} bp",
     help="Format for output FASTA header",
 )
 @click.option("--file-per-bin", is_flag=True, help="Create separate file for each bin")
@@ -644,7 +644,10 @@ def export_fasta(
                 sequences = merge_contigs(regs, sequences)
 
             for acc, sequence in sequences.items():
-                header = fasta_id_format.format(bin_name=bin_name, acc=acc, **call)
+                bp = sum(sequence.count(base) for base in (b'A', b'G', b'C', b'T'))
+                header = fasta_id_format.format(
+                    bin_name=bin_name, acc=acc, bp=bp, **call
+                )
                 outfile.put(header, sequence)
     update_outfile()
 
