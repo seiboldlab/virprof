@@ -95,7 +95,7 @@ class FastaFile:
             self.outzip.wait()
 
     def __len__(self) -> int:
-        return len(self.sequences) if self.sequences else -1
+        return len(self.sequences) if self.sequences else 0
 
     def _try_load_all(self) -> Optional[Dict[bytes, bytes]]:
         if "r" not in self.mode:
