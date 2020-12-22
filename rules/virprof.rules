@@ -93,6 +93,7 @@ with Stage("blastbin_vp") as S:
             "  --library graph_tool"
             "  --ncbi-taxonomy {params.taxonomy_prefix}"
             "  --out {output}"
+            " >{log} 2>&1"
 
     rule vp_blastbin:
         message: "Classifying {input.blast7}"
