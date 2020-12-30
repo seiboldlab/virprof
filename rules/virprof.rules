@@ -76,8 +76,8 @@ with Stage("blastbin_vp") as S:
     rule vp_index_tree:
         message: "Creating taxonomy index for virprof bin&classify"
         input:
-            ncbi_nodes = "{:prev:}/{target}.NCBI.nodes.dmp",
-            ncbi_names = "{:prev:}/{target}.NCBI.names.dmp"
+            ncbi_nodes = "{:prev:}/{:target:}.NCBI.nodes.dmp",
+            ncbi_names = "{:prev:}/{:target:}.NCBI.names.dmp"
         output:
             "{:this:}/{target}.taxonomy.gt"
         log:
