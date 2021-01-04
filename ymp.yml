@@ -29,18 +29,22 @@ projects:
     data: projects/test.csv
 
 pipelines:
+  ### Sub-Pipelines ###
+  # Trimming and FastQC
   qc:
     stages:
       - qc_fastqc
       - trim_bbmapAQ10L70
       - qc_fastqc
 
+  # Keep *only* reads matching last *.fasta.gz (from ref)
   enrich:
     stages:
       - map_bbmapS:
           hide: true
       - extract_readsG12
 
+  # Remove reads matching last bowtie2 and hisat2 indicies (from ref)
   deplete:
     stages:
       - map_hisat2:
@@ -51,6 +55,7 @@ pipelines:
           hide: true
       - extract_readsf12
 
+  # Assemble (by sample) using Spades Single Cell mode and remove short contigs
   assemble_single:
     stages:
       - group_sample
@@ -58,6 +63,8 @@ pipelines:
           hide: true
       - format_bbmapL200
 
+  # Assemble (by sample) using Spades Metagenomic mode and remove short contigs
+  # (removes low entropy reads prior to assembly)
   assemble_meta:
     stages:
       - dust_bbmapE60:
@@ -67,6 +74,7 @@ pipelines:
           hide: true
       - format_bbmapL200
 
+  # Compute coverage and sorted bam file using bowtie2
   coverage:
     stages:
       - index_bowtie2:
@@ -76,6 +84,7 @@ pipelines:
       - sort_bam
       - coverage_samtools
 
+  # Remove human contigs and create classified bins using BLAST
   blastbin:
     stages:
       - ref_hg38:
@@ -94,6 +103,16 @@ pipelines:
           hide: true
       - blastbin_vp
 
+  # Re-Assemble created bins
+  reassemble:
+    stages:
+      - enrich:
+          hide: true
+      - assemble_spadesSc:
+          hide: true
+      - group_sample
+      - format_bbmapL200
+
   # Reference guidedworkflow
   targeted:
     stages:
@@ -109,6 +128,9 @@ pipelines:
       - ref_hg38
       - deplete
       - assemble_meta
+      - coverage
+      - blastbin
+      - reassemble
       - coverage
       - blastbin
 

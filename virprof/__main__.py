@@ -578,9 +578,10 @@ def export_fasta(
             if name is None:
                 outfile = None
             else:
-                outfile = FastaFile(open(out % name.replace(" ", "_"), "w"), "w")
+                outname = name.replace(" ", "_")
+                outfile = FastaFile(open(out % outname, "w"), "w")
                 if out_bins:
-                    out_bins.write(outfile.name + "\n")
+                    out_bins.write(outname + "\n")
                 LOG.info("Writing to '%s'", outfile.name)
 
             update_outfile.outfile = outfile
