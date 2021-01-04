@@ -209,8 +209,7 @@ references:
   NT:
     - url: /data/reference/NCBI_nt/NCBI_NT_2020-05-01/
       type: path
-      group:
-        - nt
+      id: nt
       match:
         - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
   # NCBI Taxonomy dump for classification
