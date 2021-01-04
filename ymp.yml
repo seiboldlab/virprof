@@ -37,20 +37,25 @@ pipelines:
 
   enrich:
     stages:
-      - map_bbmapS
+      - map_bbmapS:
+          hide: true
       - extract_readsG12
 
   deplete:
     stages:
-      - map_hisat2
-      - extract_readsf12
-      - map_bowtie2
+      - map_hisat2:
+          hide: true
+      - extract_readsf12:
+          hide: true
+      - map_bowtie2:
+          hide: true
       - extract_readsf12
 
   assemble_single:
     stages:
       - group_sample
-      - assemble_spadesSc
+      - assemble_spadesSc:
+          hide: true
       - format_bbmapL200
 
   assemble_meta:
@@ -58,24 +63,35 @@ pipelines:
       - dust_bbmapE60:
           hide: true
       - group_sample
-      - assemble_spadesMeta
+      - assemble_spadesMeta:
+          hide: true
       - format_bbmapL200
 
   coverage:
     stages:
-      - index_bowtie2
-      - map_bowtie2S
+      - index_bowtie2:
+          hide: true
+      - map_bowtie2S:
+          hide: true
       - sort_bam
       - coverage_samtools
 
   blastbin:
     stages:
-      - ref_hg38
-      - annotate_blastE2MegaBest
-      - blastfilter_vpU200
-      - ref_NT
-      - annotate_blastE10Best
-      - ref_NcbiTaxonomy
+      - ref_hg38:
+          hide: true
+      - annotate_blastE2MegaBest:
+          hide: true
+      - blastfilter_vpU200:
+          hide: true
+      - ref_NT:
+          hide: true
+      - annotate_blastE10Best:
+          hide: true
+      - ref_NcbiTaxonomy:
+          hide: true
+      - group_sample:
+          hide: true
       - blastbin_vp
 
   # Reference guidedworkflow

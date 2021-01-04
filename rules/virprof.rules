@@ -117,6 +117,7 @@ with Stage("blastbin_vp") as S:
             " --in-blast7 {input.blast7}"
             " --in-coverage {input.coverage}"
             " --in-fasta {input.fasta}"
+            " --no-annotate"
             " >{log} 2>&1"
 
     rule vp_aggregate_classifiations:
