@@ -396,6 +396,9 @@ run <- function() {
             slen >= opt$options$min_slen,
             numreads >= opt$options$min_reads
         )
+    if (nrow(data) == 0) {
+        return(NULL)
+    }
 
     message("Parsing input data ...")
     alignments <- parse_blastbins(data)
@@ -442,20 +445,11 @@ run <- function() {
         feature_tables <- NULL
     }
 
-    message("Writing output to ", opt$options$output, " ...")
-    pdf(
-        file = opt$options$output,
-        width = opt$options$page_width,
-        height = opt$options$page_height
-    )
-
     plot_pages(opt$options$plots_per_page, saccs, function(acc) {
         reference <- data %>% filter(sacc == acc)
         df <- ranges %>% filter(sacc == acc)
         plot_ranges(reference, df, depths, feature_tables)
     })
-
-    dev.off()
 }
 
 if (!interactive()) {
@@ -468,6 +462,16 @@ if (!interactive()) {
         opt <- parse_options(args=c("--input", "out.csv", "--input-bam", "out.bam", "--output", "out.pdf",
                                     "--max-plots", "5"))
     }
+
+    message("Writing output to ", opt$options$output, " ...")
+    pdf(
+        file = opt$options$output,
+        width = opt$options$page_width,
+        height = opt$options$page_height
+    )
+
     run()
+
+    dev.off()
 }
 
