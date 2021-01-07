@@ -185,23 +185,24 @@ with Stage("blastbin_vp") as S:
             " --no-annotate"
             " >{log} 2>&1"
 
-    rule vp_export_fasta:
+    checkpoint vp_export_fasta:
         message: "Exporting recovered genomes into bins"
         input:
             bins  = "{:this:}/{target}.virus.csv",
-            fasta = "{:prev:}/{target}.fasta.gz"
+            fasta = "{:prev:}/{:target:}.fasta.gz"
         output:
-            bins =  "{:this:}/{target}.bin.filelist.txt"
+            bins =  "{:this:}/{target}.filelist.txt",
+            fasta =  "{:this:}/{target}.{:bin:}.fasta.gz"
         log:
             "{:this:}/{target}.bin.log"
         threads: 1
         conda:
             "virprof_py"
         params:
-            out_bins = "{:this:}/{target}.bin.%s.fasta.gz",
+            out_bins = "{:this:}/{target}__%s.fasta.gz",
             bin_by = "species",
             filter_lineage = "^Virus",
-            fasta_id_format = lambda wc: f"{wc.target}.{{bin_name}} [accesion={{sacc}}] [contigs={{acc}}] [bp={{bp}}]"
+            fasta_id_format = lambda wc: f"{wc.target}.{{bin_name}} [accession={{sacc}}] [contigs={{acc}}] [bp={{bp}}]"
         shell:
             "python -m virprof export-fasta"
             " --in-bins {input.bins}"
@@ -218,6 +219,6 @@ with Stage("blastbin_vp") as S:
         input:
             summary = "{:this:}/virus_summary.xlsx",
             plots = "{:this:}/{:targets:}.virus.pdf",
-            bins = "{:this:}/{:targets:}.bin.filelist.txt"
+            bins = "{:this:}/{:targets:}.filelist.txt"
         output:
             touch("{:this:}/all_targets.stamp")
