@@ -130,7 +130,11 @@ pipelines:
       - assemble_meta
       - coverage
       - blastbin
-      - reassemble
+
+  virus:
+    stages:
+      - generic
+      - reassemble2
       - coverage
       - blastbin
 
