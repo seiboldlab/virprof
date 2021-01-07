@@ -106,6 +106,8 @@ with Stage("blastbin_vp") as S:
             result   = "{:this:}/{target}.virus.csv"
         log:
                        "{:this:}/{target}.log"
+        params:
+            coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage))
         threads:
             1
         conda:
@@ -115,7 +117,7 @@ with Stage("blastbin_vp") as S:
             " --out {output.result}"
             " --ncbi-taxonomy {input.taxonomy}"
             " --in-blast7 {input.blast7}"
-            " --in-coverage {input.coverage}"
+            " --in-coverage {params.coverage}"
             " --in-fasta {input.fasta}"
             " --no-annotate"
             " >{log} 2>&1"
