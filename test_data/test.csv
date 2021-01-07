@@ -1,0 +1,4 @@
+unit,sample,fq1,fq2
+A1,A,test_cov.R1.fq.gz,test_cov.R2.fq.gz
+A2,A,test_hku.R1.fq.gz,test_hku.R2.fq.gz
+B1,B,test_cov.R1.fq.gz,test_cov.R1.fq.gz

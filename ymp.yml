@@ -26,7 +26,7 @@ projects:
   sunbeam:
     data: projects/sunbeam.csv
   test:
-    data: projects/test.csv
+    data: test_data/test.csv
 
 pipelines:
   ### Sub-Pipelines ###
