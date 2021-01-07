@@ -613,7 +613,7 @@ def export_fasta(
     for row in csv.DictReader(in_bins):
         for col in ("qaccs", "qranges", "sranges", "reversed"):
             row[col] = row[col].split(";")
-        bins.setdefault(row[bin_by], []).append(row)
+        bins.setdefault(row[bin_by].replace(" ", "_"), []).append(row)
     LOG.info(
         "  found %i bins in %i calls", len(bins), sum(len(bin) for bin in bins.items())
     )
@@ -654,11 +654,13 @@ def export_fasta(
 
             for acc, sequence in sequences.items():
                 bp = sum(sequence.count(base) for base in (b'A', b'G', b'C', b'T'))
-                header = fasta_id_format.format(
+                acc, _, comment = fasta_id_format.format(
                     bin_name=bin_name, acc=acc, bp=bp, **call
-                )
-                outfile.put(header, sequence)
+                ).partition(" ")
+                outfile.put(acc, sequence, comment)
     update_outfile()
+    LOG.info("done")
+    return True
 
 
 if __name__ == "__main__":
