@@ -73,6 +73,7 @@ class FastaFile:
         self.iofile = iofile
         self.mode = mode
         self.sequences = self._try_load_all()
+        self._written = set()
 
         if "w" in mode:
             self.outzip: Optional[sp.Popen[bytes]] = sp.Popen(
@@ -142,6 +143,15 @@ class FastaFile:
         """
         if not self.outzip or not self.outzip.stdin:
             raise IOError("FastaFile not writeable")
+
+        # Make sure we have unique id
+        if acc in self._written:
+            n = 1
+            while f'{acc}_{n}' in self._written:
+                n = n + 1
+            acc = f'{acc}_{n}'
+        self._written.add(acc)
+
         if comment is not None:
             header = ">{} {}".format(acc, comment).encode("utf-8")
         else:
