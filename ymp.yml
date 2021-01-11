@@ -108,6 +108,8 @@ pipelines:
     stages:
       - enrich:
           hide: true
+      - group_sample
+      - group_BIN
       - assemble_spadesSc:
           hide: true
       - group_sample
@@ -134,7 +136,7 @@ pipelines:
   virus:
     stages:
       - generic
-      - reassemble2
+      - reassemble
       - coverage
       - blastbin
 
