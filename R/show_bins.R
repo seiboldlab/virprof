@@ -403,8 +403,11 @@ run <- function() {
     message("Parsing input data ...")
     alignments <- parse_blastbins(data)
     message("Placing contigs ...")
-    contigs <- place_contigs(alignments)
-    ranges <- merge(contigs, alignments)
+    contigs <- alignments %>%
+        select(qaccs, qstart, qstop, qlen, sacc, sstart, sstop) %>%
+        place_contigs %>%
+        select(qaccs, sacc, cstart, cstop)
+    ranges <- inner_join(contigs, alignments, by=c("sacc", "qaccs"))
 
     message("Ordering results ...")
     saccs <- ranges %>%
@@ -438,7 +441,6 @@ run <- function() {
             map_dfr(coverage_depth) %>%
             group_by(contig, pos) %>%
             summarize_all(sum)
-        str(depths)
     } else {
         depths <- NULL
 

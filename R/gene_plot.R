@@ -173,12 +173,12 @@ place_contigs <- function(alignments, merge_dist = 50, spacing = 10) {
         group_by(sacc, qaccs) %>%
         slice_min(qstart, n = 1, with_ties = FALSE) %>%
         mutate(
-            ##cstart = sstart - qstart + 1,
             cstart = (sstart+sstop)/2 - (qstart+qstop)/2 + 1,
             cstop = cstart + qlen
         )  %>%
         group_by(sacc) %>%
-        group_modify(~ center_spread_ranges(., spacing))
+        group_modify(~ center_spread_ranges(., spacing)) %>%
+        ungroup()
 
     contigs
 }
