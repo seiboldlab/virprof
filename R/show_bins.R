@@ -14,8 +14,8 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
                     help = "Result file from blastbin [REQUIRED]"
                     ),
         make_option(c("--input-bam"),
-                    metavar = "FILE",
-                    help = "Sorted BAM mapping reads to contigs (enabled coverage plot)"
+                    metavar = "FILELIST",
+                    help = "Comma separated list of sorted BAMs mapping reads to contigs (enables coverage plot)"
                     ),
         make_option(c("--output"),
                     metavar = "FILE",
@@ -432,7 +432,13 @@ run <- function() {
     }
 
     if (!is.null(opt$options$input_bam)) {
-        depths <- coverage_depth(opt$options$input_bam)
+        depths <- opt$options$input_bam %>%
+            strsplit(",") %>%
+            unlist() %>%
+            map_dfr(coverage_depth) %>%
+            group_by(contig, pos) %>%
+            summarize_all(sum)
+        str(depths)
     } else {
         depths <- NULL
 

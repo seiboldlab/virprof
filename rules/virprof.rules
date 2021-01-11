@@ -171,11 +171,12 @@ with Stage("blastbin_vp") as S:
             page_height = 18,
             plots_per_page = 5,
             min_slen = 200,
-            min_reads = 3
+            min_reads = 3,
+            bamlist = lambda wc, input: input.bam if isinstance(input.bam, str) else ",".join(input.bam),
         shell:
             "./R/show_bins.R"
             " --input {input.calls}"
-            " --input-bam {input.bam}"
+            " --input-bam {params.bamlist}"
             " --output {output.plot}"
             " --page-width {params.page_width}"
             " --page-height {params.page_height}"
