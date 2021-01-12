@@ -115,6 +115,27 @@ pipelines:
       - group_sample
       - format_bbmapL200
 
+  reassemble2:
+    stages:
+      - enrich:
+          hide: true
+      - group_sample
+      - group_BIN
+      - assemble_spadesIsolate:
+          hide: true
+      - group_sample
+      - format_bbmapL200
+  reassemble3:
+    stages:
+      - enrich:
+          hide: true
+      - group_sample
+      - group_BIN
+      - assemble_spadesMeta:
+          hide: true
+      - group_sample
+      - format_bbmapL200
+
   # Reference guidedworkflow
   targeted:
     stages:
@@ -137,6 +158,18 @@ pipelines:
     stages:
       - generic
       - reassemble
+      - coverage
+      - blastbin
+  virus2:
+    stages:
+      - generic
+      - reassemble2
+      - coverage
+      - blastbin
+  virus3:
+    stages:
+      - generic
+      - reassemble3
       - coverage
       - blastbin
 
