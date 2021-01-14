@@ -201,6 +201,7 @@ with Stage("blastbin_vp") as S:
             "virprof_py"
         params:
             out_bins = "{:this:}/{target}__%s.fasta.gz",
+            out_bins_unmerged = "{:this:}/{target}__%s.unmerged.fasta.gz",
             bin_by = "species",
             filter_lineage = "^Virus",
             fasta_id_format = lambda wc: f"{wc.target}.{{bin_name}} [accession={{sacc}}] [contigs={{acc}}] [bp={{bp}}]"
@@ -214,7 +215,19 @@ with Stage("blastbin_vp") as S:
             " --filter-lineage {params.filter_lineage}"
             " --fasta-id-format '{params.fasta_id_format}'"
             " --file-per-bin"
-            " >{log} 2>&1"
+            " --merge-overlapping"
+            " >{log} 2>&1;"
+            ""
+            "python -m virprof export-fasta"
+            " --in-bins {input.bins}"
+            " --in-fasta {input.fasta}"
+            " --out {params.out_bins_unmerged}"
+            " --bin-by {params.bin_by}"
+            " --filter-lineage {params.filter_lineage}"
+            " --fasta-id-format '{params.fasta_id_format}'"
+            " --file-per-bin"
+            " --no-merge-overlapping"
+            " >>{log} 2>&1;"
 
     rule vp_classify_all:
         input:

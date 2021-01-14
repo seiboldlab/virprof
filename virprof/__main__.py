@@ -537,7 +537,7 @@ def filter_blast(
 @click.option("--file-per-bin", is_flag=True, help="Create separate file for each bin")
 @click.option("--filter-lineage", type=str, help="Filter by lineage prefix")
 @click.option(
-    "--no_merge-overlapping", is_flag=True, help="Do not merge overlapping regions"
+    "--merge-overlapping/--no-merge-overlapping", is_flag=True, default=True, help="Do not merge overlapping regions"
 )
 def export_fasta(
     in_bins,
@@ -548,7 +548,7 @@ def export_fasta(
     fasta_id_format,
     file_per_bin,
     filter_lineage,
-    no_merge_overlapping,
+    merge_overlapping,
 ):
     """Exports blastbin hits in FASTA format"""
     # export
@@ -634,6 +634,7 @@ def export_fasta(
 
     ## Write FASTA
     for bin_name, bin_data in bins.items():
+        LOG.info("writing bin %s", bin_name)
         outfile = update_outfile(bin_name)
         for call in bin_data:
             # Load sequences
@@ -649,7 +650,7 @@ def export_fasta(
                 revers = revers == "T"
                 regs.add(sstart, send, (qacc, sstart, send, qstart, qend, revers))
 
-            if not no_merge_overlapping:
+            if merge_overlapping:
                 sequences = merge_contigs(regs, sequences)
 
             for acc, sequence in sequences.items():
@@ -657,6 +658,7 @@ def export_fasta(
                 acc, _, comment = fasta_id_format.format(
                     bin_name=bin_name, acc=acc, bp=bp, **call
                 ).partition(" ")
+                LOG.info("writing sequence %s %s", acc, comment)
                 outfile.put(acc, sequence, comment)
     update_outfile()
     LOG.info("done")
