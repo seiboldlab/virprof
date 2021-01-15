@@ -395,6 +395,7 @@ class HitChain:
         return {
             "log_evalue": self.log10_evalue,
             "qlen": self.qlen,
+            "qlens": ";".join(str(hit.qlen) for hit in self.hits),
             "slen": self.slen,
             "n_frag": len(self.hits),
             "sacc": self.sacc,

@@ -98,19 +98,18 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
 #'   sacc  Subject accession
 #'   pidents Percent Identity
 #'   numreadss Count of reads mapped to contig
-#'   qlen Length of query/contig
+#'   qlens Length of query/contig
 #'
 parse_blastbins <- function(data) {
     data %>%
         # Split alignments from row-per-bin data
-        separate_rows(qranges, sranges, reversed, qaccs, pidents, numreadss, sep=";") %>%
+        separate_rows(qranges, sranges, reversed, qaccs, pidents, numreadss, qlens, sep=";") %>%
         mutate(
             pidents=as.numeric(pidents),
             numreadss=as.numeric(numreadss),
             reversed=as.logical(reversed=="T"),
-            ## FIXME: The contig length should come from python
-            qlen=as.integer(sub("NODE_.*_length_([0-9]*)_.*", "\\1", qaccs)),
-            contig=as.integer(sub("NODE_(.*)_length_([0-9]*)_.*", "\\1", qaccs))
+            qlens=as.numeric(qlens),
+            contig=qaccs
         ) %>%
         separate(qranges, c("qstart", "qstop"), convert = TRUE) %>%
         separate(sranges, c("sstart", "sstop"), convert = TRUE) %>%
@@ -125,8 +124,8 @@ parse_blastbins <- function(data) {
         ) %>%
         ungroup() %>%
         mutate(
-            qstart = if_else(flip, as.integer(qlen - qstart + 1), qstart),
-            qstop  = if_else(flip, as.integer(qlen - qstop  + 1), qstop)
+            qstart = if_else(flip, as.integer(qlens - qstart + 1), qstart),
+            qstop  = if_else(flip, as.integer(qlens - qstop  + 1), qstop)
         ) %>%
         arrange(-log_evalue, sacc, sstart) %>%
         ungroup()
@@ -404,7 +403,7 @@ run <- function() {
     alignments <- parse_blastbins(data)
     message("Placing contigs ...")
     contigs <- alignments %>%
-        select(qaccs, qstart, qstop, qlen, sacc, sstart, sstop) %>%
+        select(qaccs, qstart, qstop, qlens, sacc, sstart, sstop) %>%
         place_contigs %>%
         select(qaccs, sacc, cstart, cstop)
     ranges <- inner_join(contigs, alignments, by=c("sacc", "qaccs"))
