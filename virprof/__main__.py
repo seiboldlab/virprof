@@ -34,6 +34,10 @@ from .fasta import merge_contigs
 LOG = logging.getLogger(__name__)
 
 
+# Increase CSV field size limit to 2GB
+csv.field_size_limit(2**31)
+
+
 class TqdmHandler(logging.Handler):
     """Logging handler passing writes through tqdm
 
