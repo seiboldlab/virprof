@@ -512,6 +512,9 @@ def filter_blast(
     return True
 
 
+def as_file_name(name):
+    return name.replace(" ", "_").replace("/", "_")
+
 @cli.command()
 @click.option(
     "--in-bins", type=click.File("r"), required=True, help="CSV from blastbin command"
@@ -555,14 +558,6 @@ def export_fasta(
     merge_overlapping,
 ):
     """Exports blastbin hits in FASTA format"""
-    # export
-    #   spliced
-    #   contigs
-    #   both
-    # fill type N, Ref
-    # expand num bases
-    # lowercase unaligned (external, internal)
-
     # Check arguments
     if out.count("%s") > 1:
         LOG.error("No more than 1 '%s' allowed in --out")
@@ -586,7 +581,7 @@ def export_fasta(
             if name is None:
                 outfile = None
             else:
-                outname = name.replace(" ", "_")
+                outname = as_file_name(name)
                 outfile = FastaFile(open(out % outname, "w"), "w")
                 if out_bins:
                     out_bins.write(outname + "\n")
@@ -617,7 +612,7 @@ def export_fasta(
     for row in csv.DictReader(in_bins):
         for col in ("qaccs", "qranges", "sranges", "reversed"):
             row[col] = row[col].split(";")
-        bins.setdefault(row[bin_by].replace(" ", "_"), []).append(row)
+        bins.setdefault(as_file_name(row[bin_by]), []).append(row)
     LOG.info(
         "  found %i bins in %i calls", len(bins), sum(len(bin) for bin in bins.items())
     )
