@@ -126,7 +126,11 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
         make_option(c("--merge-samples"),
                     metavar = "REGEX",
                     default = "(.*)",
-                    help = "Merge units assembled as distinct samples (default: '%default')")
+                    help = "Merge units assembled as distinct samples (default: '%default')"),
+        make_option(c("--in-list"),
+                    metavar = "FILE",
+                    help = "File with list of input files (alternative specification)"
+                    )
     )
 
     usage <- "usage: %prog [options] [samples]"
@@ -145,7 +149,7 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
         args = args
     )
 
-    if (length(opt$args) == 0) {
+    if (length(opt$args) == 0 && is.null(opt$options$in_list)) {
         stop("Need at least one sample argument")
     }
 
@@ -175,6 +179,14 @@ locate_files <- function(opt) {
     } else {
         ## Individually listed arguments
         samples <- tibble(path=opt$args)
+    }
+    if (!is.null(opt$options$in_list)) {
+        samples <- bind_rows(
+            samples,
+            read_table(opt$options$in_list,
+                       col_names='path',
+                       col_types=c(col_character()))
+        )
     }
 
     file_ok <- file_test("-f", samples$path) &
@@ -496,6 +508,7 @@ if (!interactive()) {
             Description="Units (files) processed",
             Tab="files"
         )
+    message("Found ", nrow(samples), " files")
 
     message("Loading files")
     results$raw           <- samples %<>% load_files(opt)

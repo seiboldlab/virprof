@@ -136,7 +136,8 @@ with Stage("blastbin_vp") as S:
             calls="{:this:}/{:targets:}.virus.csv"
         output:
             excel="{:this:}/virus_summary.xlsx",
-            csv="{:this:}/result_by_sample.csv"
+            csv="{:this:}/result_by_sample.csv",
+            call_files=temp("{:this:}/all_call_files.txt"),
         log:
             "{:this:}/aggregate.log"
         params:
@@ -144,12 +145,13 @@ with Stage("blastbin_vp") as S:
             filter="^Viruses;",
             filter_host="Homo sapiens",
             min_slen=200,
-            min_reads=3
+            min_reads=3,
         threads:
             1
         conda:
             "virprof_r"
         shell:
+            "echo {input.calls} | tr ' ' '\\n' > {output.call_files};"
             "./R/aggregate_classifications.R"
             "  --filter '{params.filter}'"
             "  --filter-host '{params.filter_host}'"
@@ -157,7 +159,7 @@ with Stage("blastbin_vp") as S:
             "  --min-reads '{params.min_reads}'"
             "  --excel-out '{output.excel}'"
             "  --out '{params.this}/result_%s.csv'"
-            "  {input.calls}"
+            "  --in-list {output.call_files}"
             "  >{log} 2>&1"
 
     rule vp_show_bins:
