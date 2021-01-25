@@ -71,19 +71,17 @@ with Stage("blastfilter_vp") as S:
             touch("{:this:}/all_targets.stamp")
 
 
-with Stage("blastbin_vp") as S:
-    S.doc("""
-    """)
-
-    rule vp_index_tree:
-        message: "Creating taxonomy index for virprof bin&classify"
+with icfg.references.NcbiTaxonomy:
+    rule vp_index_ncbi_taxonomy:
+        message:
+            "Creating taxonomy index for virprof bin&classify"
         input:
-            ncbi_nodes = "{:prev:}/{:target:}.NCBI.nodes.dmp",
-            ncbi_names = "{:prev:}/{:target:}.NCBI.names.dmp"
+            ncbi_nodes = "{:prev:}/ALL.NCBI.nodes.dmp",
+            ncbi_names = "{:prev:}/ALL.NCBI.names.dmp"
         output:
-            "{:this:}/{target}.taxonomy.gt"
+            "{:this:}/ALL.taxonomy.gt"
         log:
-            "{:this:}/{target}.taxonomy.gt.log"
+            "{:this:}/ALL.taxonomy.gt.log"
         threads:
             1
         params:
@@ -97,6 +95,11 @@ with Stage("blastbin_vp") as S:
             "  --out {output}"
             " >{log} 2>&1"
 
+with Stage("blastbin_vp") as S:
+    S.doc("""
+    Creates bins
+    """)
+
     rule vp_blastbin:
         message:
             "Classifying {input.blast7}"
@@ -104,7 +107,7 @@ with Stage("blastbin_vp") as S:
             coverage = "{:prev:}/{:target:}.coverage",
             fasta    = "{:prev:}/{:target:}.fasta.gz",
             blast7   = "{:prev:}/{:target:}.blast7.gz",
-            taxonomy = "{:this:}/ALL.taxonomy.gt"
+            taxonomy = "{:prev:}/{:target:}.taxonomy.gt"
         output:
             result   = "{:this:}/{target}.virus.csv"
         log:
@@ -192,7 +195,8 @@ with Stage("blastbin_vp") as S:
             " >{log} 2>&1"
 
     checkpoint vp_export_fasta:
-        message: "Exporting recovered genomes into bins"
+        message:
+            "Exporting recovered genomes into bins"
         input:
             bins  = "{:this:}/{target}.virus.csv",
             fasta = "{:prev:}/{:target:}.fasta.gz"
