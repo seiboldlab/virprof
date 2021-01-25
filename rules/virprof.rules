@@ -39,7 +39,8 @@ with Stage("blastfilter_vp") as S:
 
     rule vp_filter_blast:
         """Rule filtering individual FASTA file"""
-        message: "Filtering contigs"
+        message:
+            "Filtering contigs {output}"
         input:
             fasta  = "{:prev:}/{:target:}.fasta.gz",
             blast7 = "{:prev:}/{:target:}.blast7.gz"
@@ -51,18 +52,19 @@ with Stage("blastfilter_vp") as S:
             1
         conda:
             "virprof_py"
-        shell:
-            "python -m virprof filter-blast"
-            " --min-unaligned-bp {params.min_unaligned_bp}"
-            " --out {output.fasta}"
-            " --in-fasta {input.fasta}"
-            " --in-blast7 {input.blast7}"
-            " >{log} 2>&1"
+        shell:"""
+        exec >{log} 2>&1
+        python -m virprof filter-blast \
+         --min-unaligned-bp {params.min_unaligned_bp} \
+         --out {output.fasta} \
+         --in-fasta {input.fasta} \
+         --in-blast7 {input.blast7}
+        """
 
     rule vp_filter_blast_all:
         """Collection target in case this is the end of the pipeline"""
         message:
-            "Finished {output}"
+            "Completed {:this:}"
         input:
             "{:this:}/{:targets:}.fasta.gz"
         output:
@@ -96,7 +98,8 @@ with Stage("blastbin_vp") as S:
             " >{log} 2>&1"
 
     rule vp_blastbin:
-        message: "Classifying {input.blast7}"
+        message:
+            "Classifying {input.blast7}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
             fasta    = "{:prev:}/{:target:}.fasta.gz",
@@ -123,7 +126,8 @@ with Stage("blastbin_vp") as S:
             " >{log} 2>&1"
 
     rule vp_aggregate_classifiations:
-        message: "Creating virus summary"
+        message:
+            "Creating virus summary"
         input:
             #virushostdb="{:prev:}/virushostdb.csv",
             calls="{:this:}/{:targets:}.virus.csv"
@@ -154,7 +158,8 @@ with Stage("blastbin_vp") as S:
             "  >{log} 2>&1"
 
     rule vp_show_bins:
-        message: "Visualizing binning"
+        message:
+            "Visualizing binning"
         input:
             calls = "{:this:}/{target}.virus.csv",
             bam    = "{:prev:}/{:target:}.sorted.bam"
@@ -230,6 +235,8 @@ with Stage("blastbin_vp") as S:
             " >>{log} 2>&1;"
 
     rule vp_classify_all:
+        message:
+            "Completed {:this:}"
         input:
             summary = "{:this:}/virus_summary.xlsx",
             plots = "{:this:}/{:targets:}.virus.pdf",
