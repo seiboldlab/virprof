@@ -102,6 +102,14 @@ pipelines:
       - group_sample:
           hide: true
       - blastbin_vp
+      - scaffold_vp
+
+  summarize:
+    stages:
+      - group_BIN
+      - format_bbmapL200
+      - group_ALL
+      - summarize_vp
 
   # Re-Assemble created bins
   reassemble:
@@ -153,6 +161,7 @@ pipelines:
       - assemble_meta
       - coverage
       - blastbin
+      - summarize
 
   virus:
     stages:

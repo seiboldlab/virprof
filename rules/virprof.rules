@@ -89,11 +89,11 @@ with icfg.references.NcbiTaxonomy:
         conda:
             "virprof_py"
         shell:
+            "exec >{log} 2>&1;"
             "python -m virprof index-tree"
             "  --library graph_tool"
             "  --ncbi-taxonomy {params.taxonomy_prefix}"
             "  --out {output}"
-            " >{log} 2>&1"
 
 with Stage("blastbin_vp") as S:
     S.doc("""
@@ -101,8 +101,10 @@ with Stage("blastbin_vp") as S:
     """)
 
     rule vp_blastbin:
+        version:
+            1
         message:
-            "Classifying {input.blast7}"
+            "Classifying - {output.result}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
             fasta    = "{:prev:}/{:target:}.fasta.gz",
@@ -119,6 +121,7 @@ with Stage("blastbin_vp") as S:
         conda:
             "virprof_py"
         shell:
+            "exec >{log} 2>&1;"
             "python -m virprof blastbin"
             " --out {output.result}"
             " --ncbi-taxonomy {input.taxonomy}"
@@ -126,43 +129,10 @@ with Stage("blastbin_vp") as S:
             " --in-coverage {params.coverage}"
             " --in-fasta {input.fasta}"
             " --no-annotate"
-            " >{log} 2>&1"
-
-    rule vp_aggregate_classifiations:
-        message:
-            "Creating virus summary"
-        input:
-            #virushostdb="{:prev:}/virushostdb.csv",
-            calls="{:this:}/{:targets:}.virus.csv"
-        output:
-            excel="{:this:}/virus_summary.xlsx",
-            csv="{:this:}/result_by_sample.csv",
-            call_files=temp("{:this:}/all_call_files.txt"),
-        log:
-            "{:this:}/aggregate.log"
-        params:
-            this="{:this:}",
-            filter="^Viruses;",
-            filter_host="Homo sapiens",
-            min_slen=200,
-            min_reads=3,
-        threads:
-            1
-        conda:
-            "virprof_r"
-        shell:
-            "echo {input.calls} | tr ' ' '\\n' > {output.call_files};"
-            "./R/aggregate_classifications.R"
-            "  --filter '{params.filter}'"
-            "  --filter-host '{params.filter_host}'"
-            "  --min-slen '{params.min_slen}'"
-            "  --min-reads '{params.min_reads}'"
-            "  --excel-out '{output.excel}'"
-            "  --out '{params.this}/result_%s.csv'"
-            "  --in-list {output.call_files}"
-            "  >{log} 2>&1"
 
     rule vp_show_bins:
+        version:
+            1
         message:
             "Visualizing binning"
         input:
@@ -184,6 +154,7 @@ with Stage("blastbin_vp") as S:
             min_reads = 3,
             bamlist = lambda wc, input: input.bam if isinstance(input.bam, str) else ",".join(input.bam),
         shell:
+            "exec >{log} 2>&1;"
             "./R/show_bins.R"
             " --input {input.calls}"
             " --input-bam {params.bamlist}"
@@ -194,13 +165,27 @@ with Stage("blastbin_vp") as S:
             " --min-slen {params.min_slen}"
             " --min-reads {params.min_reads}"
             " --no-annotate"
-            " >{log} 2>&1"
 
+    rule vp_classify_all:
+        message:
+            "Completed {:this:}"
+        input:
+            plots = "{:this:}/{:targets:}.virus.pdf",
+        output:
+            touch("{:this:}/all_targets.stamp")
+
+
+with Stage("scaffold_vp") as S:
+    S.doc("""
+    Creates genomes
+    """)
     checkpoint vp_export_fasta:
+        version:
+            1
         message:
             "Exporting recovered genomes into bins"
         input:
-            bins  = "{:this:}/{target}.virus.csv",
+            bins  = "{:prev:}/{target}.virus.csv",
             fasta = "{:prev:}/{:target:}.fasta.gz"
         output:
             bins =  "{:this:}/{target}.filelist.txt",
@@ -217,6 +202,7 @@ with Stage("blastbin_vp") as S:
             filter_lineage = "^Virus",
             fasta_id_format = lambda wc: f"{wc.target}.{{bin_name}} [accession={{sacc}}] [contigs={{acc}}] [bp={{bp}}]"
         shell:
+            "exec >{log} 2>&1;"
             "python -m virprof export-fasta"
             " --in-bins {input.bins}"
             " --in-fasta {input.fasta}"
@@ -227,8 +213,7 @@ with Stage("blastbin_vp") as S:
             " --fasta-id-format '{params.fasta_id_format}'"
             " --file-per-bin"
             " --merge-overlapping"
-            " >{log} 2>&1;"
-            ""
+            ";"
             "python -m virprof export-fasta"
             " --in-bins {input.bins}"
             " --in-fasta {input.fasta}"
@@ -238,14 +223,92 @@ with Stage("blastbin_vp") as S:
             " --fasta-id-format '{params.fasta_id_format}'"
             " --file-per-bin"
             " --no-merge-overlapping"
-            " >>{log} 2>&1;"
 
-    rule vp_classify_all:
+    rule vp_scaffold_all:
         message:
             "Completed {:this:}"
         input:
-            summary = "{:this:}/virus_summary.xlsx",
-            plots = "{:this:}/{:targets:}.virus.pdf",
             bins = "{:this:}/{:targets:}.filelist.txt"
+        output:
+            touch("{:this:}/all_targets.stamp")
+
+
+with Stage("summarize_vp") as S:
+    localrules: vp_call_files
+    rule vp_call_files:
+        message:
+            "Creating list of calls"
+        input:
+            calls="{:prev:}/{:target:}.virus.csv"
+        output:
+            call_files=temp("{:this:}/{target}.call_files.txt")
+        threads:
+            1
+        run:
+            with open(output.call_files, "w") as outfile:
+                for fname in input.calls:
+                    outfile.write(fname)
+                    outfile.write('\n')
+
+    rule vp_aggregate_classifiations:
+        version:
+            1
+        message:
+            "Creating virus summary"
+        input:
+            #virushostdb="{:prev:}/virushostdb.csv",
+            calls="{:prev:}/{:target:}.virus.csv",
+            call_files="{:this:}/{target}.call_files.txt",
+        output:
+            excel="{:this:}/{target}.summary.xlsx"
+        log:
+            "{:this:}/{target}.summary.log"
+        params:
+            csv_out="{:this:}/{target}.summary_%s.csv",
+            filter="^Viruses;",
+            filter_host="Homo sapiens",
+            min_slen=200,
+            min_reads=3,
+        threads:
+            1
+        conda:
+            "virprof_r"
+        shell:
+            "exec >{log} 2>&1;"
+            "./R/aggregate_classifications.R"
+            "  --filter '{params.filter}'"
+            "  --filter-host '{params.filter_host}'"
+            "  --min-slen '{params.min_slen}'"
+            "  --min-reads '{params.min_reads}'"
+            "  --excel-out '{output.excel}'"
+            "  --out '{params.csv_out}'"
+            "  --in-list {input.call_files}"
+
+    rule vp_aggregate_genomes:
+        message:
+            "Copying genome files to {:this:}"
+        input:
+            fasta = "{:prev:}/{:target:}.fasta.gz"
+        output:
+            fasta_list = "{:this:}/{target}.genomes.txt"
+        log:
+            "{:this:}/{target}.genomes.log"
+        params:
+            this = "{:this:}"
+        shell:
+            "exec >{log} 2>&1;"
+            "echo > {output.fasta_list};"
+            "for path in {input.fasta}; do"
+            "  name=$(basename $path);"
+            "  echo $name >> {output.fasta_list};"
+            "  cp -v $path {params.this}/{wildcards.target}.$name;"
+            "done;"
+
+    rule vp_summarize_all:
+        message:
+            "Completed {:this:}"
+        input:
+            summary = "{:this:}/{:targets:}.summary.xlsx",
+            fasta = "{:this:}/{:targets:}.genomes.txt"
         output:
             touch("{:this:}/all_targets.stamp")
