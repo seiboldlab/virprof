@@ -513,7 +513,8 @@ def filter_blast(
 
 
 def as_file_name(name):
-    return name.replace(" ", "_").replace("/", "_")
+    return name.replace(" ", "_").replace("/", "_").replace(".", "_").replace("__", "_").strip("_")
+
 
 @cli.command()
 @click.option(
