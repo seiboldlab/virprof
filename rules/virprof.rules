@@ -73,6 +73,13 @@ with Stage("blastfilter_vp") as S:
 
 with icfg.references.NcbiTaxonomy:
     rule vp_index_ncbi_taxonomy:
+        """This rule loads the NCBI taxonomy, compiles it into a graph_tool
+        tree and stores that tree in binary format. Loading the binary
+        format tree is much faster than parsing the entire NCBI
+        taxonomy from text files.
+
+        The output file is added to the reference "NcbiTaxonomy".
+        """
         message:
             "Creating taxonomy index for virprof bin&classify"
         input:
@@ -95,9 +102,10 @@ with icfg.references.NcbiTaxonomy:
             "  --ncbi-taxonomy {params.taxonomy_prefix}"
             "  --out {output}"
 
+
 with Stage("blastbin_vp") as S:
     S.doc("""
-    Creates bins
+    Creates bins from blast hits
     """)
 
     rule vp_blastbin:
@@ -177,7 +185,7 @@ with Stage("blastbin_vp") as S:
 
 with Stage("scaffold_vp") as S:
     S.doc("""
-    Creates genomes
+    Creates genomes from blast bins and contigs
     """)
     checkpoint vp_export_fasta:
         version:
@@ -237,7 +245,7 @@ with Stage("summarize_vp") as S:
     localrules: vp_call_files
     rule vp_call_files:
         message:
-            "Creating list of calls"
+            "Creating list of calls for {wildcards.target} in {:this:}"
         input:
             calls="{:prev:}/{:target:}.virus.csv"
         output:
@@ -254,7 +262,7 @@ with Stage("summarize_vp") as S:
         version:
             1
         message:
-            "Creating virus summary"
+            "Creating virus summary for {wildcards.target} in {:this:}"
         input:
             #virushostdb="{:prev:}/virushostdb.csv",
             calls="{:prev:}/{:target:}.virus.csv",
