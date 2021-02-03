@@ -29,7 +29,7 @@ from .taxonomy import load_taxonomy
 from .fasta import filter_fasta, FastaFile
 from .regionlist import RegionList
 from .fasta import merge_contigs
-
+from .entrez import FeatureTables
 
 LOG = logging.getLogger(__name__)
 
@@ -260,7 +260,13 @@ def cli() -> None:
 @click.option(
     "--num-words", type=int, default=4, help="Number of words to add to 'words' field"
 )
-@click.option("--profile", is_flag=True)
+@click.option("--profile", is_flag=True, help="Enable performance profiling. Requires YAPPI to be installed.")
+@click.option(
+    "--cache-path",
+    type=click.Path(),
+    help="Location for caching of remote data",
+    default="entrez_cache"
+)
 @click.option(
     "--annotate/--no-annotate", default=True, help="Enable/Disable feature annotation"
 )
@@ -278,12 +284,15 @@ def blastbin(
     chain_penalty: int = 20,
     num_words: int = 4,
     profile: bool = False,
+    cache_path: str = "entrez_cache",
     annotate = True,
 ) -> bool:
     # pylint: disable=too-many-arguments
     """Merge and classify contigs based on BLAST search results"""
     if profile:
         setup_profiling()
+
+    features = FeatureTables(cache_path=cache_path) if annotate else None
 
     if not in_coverage:
         chain_tpl = HitChain(chain_penalty=chain_penalty)
@@ -379,13 +388,19 @@ def blastbin(
     )
     best_chains = greedy_select_chains(all_chains)
 
+    accs = set()
+
     for chains in best_chains:
+        saccs = [chain.sacc for chain in chains]
+        if features is not None:
+            ftable = features.get(saccs)
+
         taxid = wordscorer.score_taxids(chains)
         row = chains[0].to_dict()
         row["sample"] = sample
         row["taxid"] = taxid
         row["words"] = wordscorer.score(chains)
-        row["saccs"] = " ".join(chain.sacc for chain in chains)
+        row["saccs"] = " ".join(saccs)
         if not taxonomy.is_null():
             row["lineage"] = "; ".join(taxonomy.get_lineage(taxid))
             row["lineage_ranks"] = "; ".join(taxonomy.get_lineage_ranks(taxid))
