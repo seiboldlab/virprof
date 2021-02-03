@@ -1,8 +1,10 @@
 """Fetching Feature Table from Entrez"""
 
+import csv
 import logging
+import os
 
-from typing import Optional, Set, Dict, Iterator
+from typing import Optional, Set, Dict, Iterator, Union, List
 
 from requests import Session
 from requests.adapters import HTTPAdapter
@@ -39,15 +41,14 @@ class EntrezAPI:
         )
     )
 
-    def __init__(self, session=None, defaults=None, timeout=300) -> None:
-        if session is None:
-            session = self.make_session()
-        self._session = session
-
-        if defaults is None:
-            defaults = {}
-        self._defaults = defaults
-
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        defaults: Optional[Dict[str, str]] = None,
+        timeout: int = 300,
+    ) -> None:
+        self._session = self.make_session() if session is None else session
+        self._defaults = {} if defaults is None else defaults
         self.timeout = timeout
 
     @classmethod
@@ -98,16 +99,52 @@ class EntrezAPI:
         session.mount("https://", adapter)
         return session
 
-    def _get(self, tool: str, params: Dict[str, str]):
+    def _get(self, tool: str, params: Dict[str, str]) -> str:
+        """Executes remote API call"""
+        LOG.info("Calling Entrez API for %s...", tool)
         url = self.URL.format(tool=tool)
         all_params = self._defaults.copy()
         all_params.update(params)
-        return self._session.get(url, params=all_params, timeout=self.timeout)
+        request = self._session.get(url, params=all_params,
+                                    timeout=self.timeout)
+        LOG.info("Calling Entrez API for %s: DONE.", tool)
+        return request.text
 
-    def fetch(self, database: str, ids, rettype: str, retmode: str = ""):
-        """Calls Entrez Fetch API"""
-        params = {"db": database, "id": ids, "rettype": rettype, "retmode": retmode}
-        return self._get("efetch", params).text
+    def fetch(
+        self,
+        database: str,
+        ids: Union[List[str], str],
+        rettype: str,
+        retmode: str = "",
+        batch_size: int = 50,
+    ) -> str:
+        """Calls Entrez Fetch (efetch) API
+
+        See Entrez Docs for detauls on parameters.
+
+        Args:
+           database: The database to query. E.g. "nucleotide"
+           ids: Entrez ID or accession or list thereof
+           rettype: Type of data to return
+           retmode: Format of data to return
+           batch_size: Number of ids to query in one call
+        Returns:
+           The raw text returned by the Entrez API.
+        """
+        if isinstance(ids, str):
+            ids = [ids]
+        return "\n".join(
+            self._get(
+                "efetch",
+                {
+                    "db": database,
+                    "id": ids[start:start+batch_size],
+                    "rettype": rettype,
+                    "retmode": retmode,
+                },
+            )
+            for start in range(0, len(ids), batch_size)
+        )
 
     @staticmethod
     def enable_debug():
@@ -254,3 +291,75 @@ class FeatureTableParser:
             annotation[key] = value
             self.next_line()
         return annotation
+
+
+class FeatureTables:
+    """Access Entrez Feature Tables"""
+    def __init__(
+        self, entrez: EntrezAPI = None,
+        parser: FeatureTableParser = None,
+        cache_path: str = None,
+    ) -> None:
+        self.entrez = entrez if entrez is not None else EntrezAPI()
+        self.parser = parser if parser is not None else FeatureTableParser()
+        self.cache = Cache(cache_path)
+
+    def get(
+        self,
+        accessions: Union[str, List[str]],
+        fields: Optional[List[str]] = None
+    ):
+        if isinstance(accessions, str):
+            accessions = [accessions]
+        LOG.info("Fetching feature tables for %i accessions", len(accessions))
+        text = self.entrez.fetch("nucleotide", accessions, rettype="ft")
+        parsed = self.parser.parse(text)
+        return self.to_table(parsed, fields)
+
+    @staticmethod
+    def to_table(parsed, fields):
+        select = {}
+        for field in fields:
+            typ, _, key = field.partition("/")
+            select.setdefault(typ, set()).add(key)
+
+        result = []
+        for acc, annotation in parsed.items():
+            for start, stop, typ, data in annotation:
+                if not (typ in select or '*' in select):
+                    continue
+                select2 = select.get(typ, set()) | select.get('*', set())
+                for key, value in data.items():
+                    if not (key in select2 or '*' in select2):
+                        continue
+                    result.append({
+                        'acc': acc,
+                        'start': start,
+                        'stop': stop,
+                        'typ': typ,
+                        'key': key,
+                        'value': value,
+                    })
+        return result
+
+    @staticmethod
+    def write_table(table, out):
+        writer = csv.DictWriter(out, fieldnames=table[0].keys())
+        for row in table:
+            writer.writerow(row)
+
+
+def main():
+    """test main"""
+    logging.basicConfig()
+    import sys
+    features = FeatureTables(cache_path="cache_path")
+    #features.entrez.enable_debug()
+    table = features.get("NC_045512", ["gene/gene", "CDS/product"])
+    features.write_table(table, sys.stdout)
+    table = features.get("X64011.1", ["*/*"])
+    features.write_table(table, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()
