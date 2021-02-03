@@ -123,7 +123,8 @@ with Stage("blastbin_vp") as S:
         log:
                        "{:this:}/{target}.log"
         params:
-            coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage))
+            coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage)),
+            cache_path = "feature_table_cache",
         threads:
             1
         conda:
@@ -137,6 +138,7 @@ with Stage("blastbin_vp") as S:
             " --in-coverage {params.coverage}"
             " --in-fasta {input.fasta}"
             " --no-annotate"
+            " --cache-path {params.cache_path}"
 
     rule vp_show_bins:
         version:
