@@ -51,11 +51,9 @@ class EntrezAPI:
         session: Optional[Session] = None,
         defaults: Optional[Dict[str, str]] = None,
         timeout: int = 300,
-        retry_unexpected = 10,
     ) -> None:
         self._session = self.make_session() if session is None else session
         self._defaults = {} if defaults is None else defaults
-        self._retry_unexpected = retry_unexpected
         self.timeout = timeout
         self._old_loglevel: Optional[int] = None
 
@@ -109,31 +107,15 @@ class EntrezAPI:
 
     def _get(self, tool: str, params: Dict[str, str]) -> str:
         """Executes remote API call"""
-        LOG.info("Calling Entrez API for %s...", tool)
         url = self.URL.format(tool=tool)
         all_params = self._defaults.copy()
         all_params.update(params)
-        for n in range(self._retry_unexpected):
-            try:
-                request = self._session.get(url, params=all_params,
+        request = self._session.get(url, params=all_params,
                                             timeout=self.timeout)
-                text = request.text.strip()
-                break
-            except RequestException as exc:
-                LOG.error("Unexpected exception %s from requests module: '%s'",
-                          type(exc), str(exc))
-                LOG.error("Retrying ... (attempt %i/%i)",
-                          n+1, self._retry_unexpected)
-                time.sleep(5)
-                self.enable_debug()
-        else:
-            LOG.error("Entrez request failed after %i retries (see above).")
-            raise exc
-        self.disable_debug()
+        text = request.text.strip()
         if text.startswith("Error:"):
             LOG.info("Entrez request failed with '%s'. Returning empty string instead.", text)
             text = ""
-        LOG.info("Calling Entrez API for %s: DONE.", tool)
         return text
 
     def fetch(
@@ -160,19 +142,30 @@ class EntrezAPI:
         if isinstance(ids, str):
             ids = [ids]
         result = []
-        for start in range(0, len(ids), batch_size):
-            idparm = ids[start:start+batch_size]
-            LOG.info("Calling Entrez efetch (%i..%i of %i) ...",
-                     start+1, start+len(idparm), len(ids))
-            result.append(self._get(
-                "efetch",
-                {
-                    "db": database,
-                    "id": ",".join(idparm),
-                    "rettype": rettype,
-                    "retmode": retmode,
-                },
-            ))
+        done = 0
+        while done < len(ids):
+            to_get = ids[done:done + batch_size]
+            LOG.info("Calling Entrez efetch (%i of %i done, fetching %i)",
+                     done, len(ids), len(to_get))
+            try:
+                data = self._get(
+                    "efetch",
+                    {
+                        "db": database,
+                        "id": ",".join(to_get),
+                        "rettype": rettype,
+                        "retmode": retmode,
+                    },
+                )
+            except RequestException:
+                if len(to_get) == 1:
+                    raise
+                batch_size = int(batch_size/2)
+            else:
+                result.append(data)
+                done += len(to_get)
+
+        LOG.info("Calling Entrez efetch: DONE")
         return "\n".join(result)
 
     def enable_debug(self):
