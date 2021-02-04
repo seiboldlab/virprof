@@ -264,10 +264,16 @@ class FeatureTableParser:
                 if fields[0][0] in "<>":
                     fields[0] = fields[0][1:]
                     start_open = True
+                # Lines like "19^\t20\tintron" appear, not clear what this means,
+                # perhaps removed sequence?
+                if fields[0][-1] == "^":
+                    fields[0] = fields[0][:-1]
                 start = int(fields[0])
                 if fields[1][0] in "<>":
                     fields[1] = fields[1][1:]
                     end_open = True
+                if fields[1][-1] == "^":
+                    fields[1] = fields[1][:-1]
                 end = int(fields[1])
                 if start > end:
                     start, end = end, start
@@ -436,7 +442,13 @@ def main():
     import sys
     features = FeatureTables(cache_path="cache_path")
     features.entrez.enable_debug()
-    table = features.get(["NC_045512", "X64011", "4A1D_1"], ["gene/gene", "CDS/product"])
+    accs = [
+        "NC_045512",
+        "X64011",
+        "4A1D_1",
+        "AJ309573",
+    ]
+    table = features.get(accs, ["gene/gene", "CDS/product"])
     features.write_table(table, sys.stdout)
 
 
