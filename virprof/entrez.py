@@ -57,9 +57,9 @@ class EntrezAPI:
     @classmethod
     def make_session(
         cls,
-        max_retries: int = 10,
+        max_retries: int = 100,
         max_redirects: int = 20,
-        max_timeouts: int = 10,
+        max_timeouts: int = 100,
         backoff_factor: float = 0.2,
         retry_codes: Optional[Set[int]] = None,
     ) -> Session:
