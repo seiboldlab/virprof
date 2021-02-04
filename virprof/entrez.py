@@ -314,6 +314,8 @@ class Cache:
         self._path = path
 
     def _make_path(self, cache: str, entry: str):
+        if len(entry) < 6:
+            entry += "x" * (6 - len(entry))
         path = os.path.join(
             self._path, cache, entry[0:2], entry[2:5]
         )
@@ -416,9 +418,7 @@ def main():
     import sys
     features = FeatureTables(cache_path="cache_path")
     features.entrez.enable_debug()
-    table = features.get("NC_045512", ["gene/gene", "CDS/product"])
-    features.write_table(table, sys.stdout)
-    table = features.get("X64011", ["*/*"])
+    table = features.get(["NC_045512", "X64011", "4A1D_1"], ["gene/gene", "CDS/product"])
     features.write_table(table, sys.stdout)
 
 
