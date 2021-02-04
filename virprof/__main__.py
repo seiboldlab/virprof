@@ -99,6 +99,17 @@ def setup_profiling() -> None:
     yappi.start()
 
 
+def setup_debug() -> None:
+    import signal
+    import traceback
+    def handlesigusr1(sig, frame):
+        print("------------------")
+        print("Dumping stack (caught signal %i)" % sig)
+        traceback.print_stack(f=frame, limit=5)
+        print("------------------")
+    signal.signal(signal.SIGUSR1, handlesigusr1)
+
+
 def group_hits_by_qacc(hits: List[BlastHit]) -> Iterator[List[BlastHit]]:
     """Groups input hits into lists with same query accession
 
@@ -261,6 +272,7 @@ def cli() -> None:
     "--num-words", type=int, default=4, help="Number of words to add to 'words' field"
 )
 @click.option("--profile", is_flag=True, help="Enable performance profiling. Requires YAPPI to be installed.")
+@click.option("--debug", is_flag=True, help="Dump stack on receipt of SIGUSR1")
 @click.option(
     "--cache-path",
     type=click.Path(),
@@ -285,6 +297,7 @@ def blastbin(
     chain_penalty: int = 20,
     num_words: int = 4,
     profile: bool = False,
+    debug: bool = False,
     cache_path: str = "entrez_cache",
     annotate = True,
     ncbi_api_key = None,
@@ -293,6 +306,8 @@ def blastbin(
     """Merge and classify contigs based on BLAST search results"""
     if profile:
         setup_profiling()
+    if debug:
+        setup_debug()
 
     if annotate:
         if not ncbi_api_key:
