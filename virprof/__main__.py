@@ -415,10 +415,17 @@ def blastbin(
 
     for chains in best_chains:
         saccs = [chain.sacc for chain in chains]
+
+        taxid = wordscorer.score_taxids(chains)
+        if not taxfilter(taxid):
+            taxname = taxonomy.get_name(taxid)
+            words = wordscorer.score(chains)
+            LOG.info("Excluding %s -- %s", taxname, words)
+            continue
+
         if features is not None:
             ftable = features.get(saccs)
 
-        taxid = wordscorer.score_taxids(chains)
         row = chains[0].to_dict()
         row["sample"] = sample
         row["taxid"] = taxid
@@ -430,9 +437,6 @@ def blastbin(
             row["taxname"] = taxonomy.get_name(taxid)
             row["species"] = taxonomy.get_rank(taxid, "species")
 
-        if not taxfilter(taxid):
-            LOG.info("Excluding %s -- %s", row["taxname"], row["words"])
-            continue
         LOG.info("Found     %s -- %s", row["taxname"], row["words"])
         writer.writerow(row)
     return True
