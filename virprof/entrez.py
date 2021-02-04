@@ -164,12 +164,19 @@ class EntrezAPI:
 class FeatureTableParsingError(Exception):
     "failed to parse"
 
-    def __init__(self, msg, lineno, line):
-        super().__init__(self)
+    def __init__(self, msg: str, lineno: int, line: str):
+        super().__init__()
         self.msg = msg
         self.lineno = lineno
         self.line = line
 
+    def __str__(self):
+        return (
+            f"\n"
+            f"   Parser error in line {self.lineno}:\n"
+            f"   {self.msg}\n"
+            f"   Line: '{self.line}'\n"
+        )
 
 class FeatureTableParser:
     """Parses Entrez feature table format"""
