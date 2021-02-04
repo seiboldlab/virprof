@@ -119,7 +119,7 @@ class EntrezAPI:
         ids: Union[List[str], str],
         rettype: str,
         retmode: str = "",
-        batch_size: int = 50,
+        batch_size: int = 100,
     ) -> str:
         """Calls Entrez Fetch (efetch) API
 
