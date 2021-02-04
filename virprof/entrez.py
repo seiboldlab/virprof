@@ -6,12 +6,14 @@ import json
 import os
 import shutil
 import tempfile
+import time
 
 from typing import Optional, Set, Dict, Iterator, Union, List, Any
 
 from requests import Session
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from requests.exceptions import RequestException
 
 
 LOG = logging.getLogger(__name__)
@@ -49,10 +51,13 @@ class EntrezAPI:
         session: Optional[Session] = None,
         defaults: Optional[Dict[str, str]] = None,
         timeout: int = 300,
+        retry_unexpected = 10,
     ) -> None:
         self._session = self.make_session() if session is None else session
         self._defaults = {} if defaults is None else defaults
+        self._retry_unexpected = retry_unexpected
         self.timeout = timeout
+        self._old_loglevel: Optional[int] = None
 
     @classmethod
     def make_session(
@@ -108,14 +113,28 @@ class EntrezAPI:
         url = self.URL.format(tool=tool)
         all_params = self._defaults.copy()
         all_params.update(params)
-        request = self._session.get(url, params=all_params,
-                                    timeout=self.timeout)
-        LOG.info("Calling Entrez API for %s: DONE.", tool)
-        text = request.text.strip()
+        for n in range(self._retry_unexpected):
+            try:
+                request = self._session.get(url, params=all_params,
+                                            timeout=self.timeout)
+                text = request.text.strip()
+                break
+            except RequestException as exc:
+                LOG.error("Unexpected exception %s from requests module: '%s'",
+                          type(exc), str(exc))
+                LOG.error("Retrying ... (attempt %i/%i)",
+                          n+1, self._retry_unexpected)
+                time.sleep(5)
+                self.enable_debug()
+        else:
+            LOG.error("Entrez request failed after %i retries (see above).")
+            raise exc
+        self.disable_debug()
         if text.startswith("Error:"):
             LOG.info("Entrez request failed with '%s'. Returning empty string instead.", text)
-            return ""
-        return request.text
+            text = ""
+        LOG.info("Calling Entrez API for %s: DONE.", tool)
+        return text
 
     def fetch(
         self,
@@ -156,16 +175,34 @@ class EntrezAPI:
             ))
         return "\n".join(result)
 
-    @staticmethod
-    def enable_debug():
+    def enable_debug(self):
         """Enables debug logging from urllib3 library
 
         Requires logging to be setup (e.g. via logging.basicConfig())
         """
-        logging.getLogger().setLevel(logging.DEBUG)
+        if self._old_loglevel is not None:
+            return
+        LOG.error("Configuring 'urllib3' logging: ON")
+
+        logger = logging.getLogger()
+        self._old_loglevel = logger.getEffectiveLevel()
+        logger.setLevel(logging.DEBUG)
+
         requests_log = logging.getLogger("urllib3")
         requests_log.setLevel(logging.DEBUG)
         requests_log.propagate = True
+
+    def disable_debug(self):
+        """Disables debug logging from urllib3 library"""
+        if self._old_loglevel is None:
+            return
+        LOG.error("Configuring 'urllib3' logging: OFF")
+
+        logging.getLogger().setLevel(self._old_loglevel)
+        self._old_loglevel = None
+
+        requests_log = logging.getLogger("urllib3")
+        requests_log.propagate = False
 
 
 class FeatureTableParsingError(Exception):
