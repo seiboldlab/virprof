@@ -164,18 +164,20 @@ class EntrezAPI:
 class FeatureTableParsingError(Exception):
     "failed to parse"
 
-    def __init__(self, msg: str, lineno: int, line: str):
+    def __init__(self, msg: str, lineno: int, line: str, lastok: str):
         super().__init__()
         self.msg = msg
         self.lineno = lineno
         self.line = line
+        self.lastok = lastok
 
     def __str__(self):
         return (
             f"\n"
-            f"   Parser error in line {self.lineno}:\n"
-            f"   {self.msg}\n"
-            f"   Line: '{self.line}'\n"
+            f"  Parser error in line {self.lineno}:\n"
+            f"    {self.msg}\n"
+            f"  Line: '{self.line}'\n"
+            f"  Last OK: '{self.lastok}'\n"
         )
 
 class FeatureTableParser:
@@ -188,10 +190,12 @@ class FeatureTableParser:
         self.cur_line: str = ""
         #: Current line number
         self.lineno: int = 0
+        #: Last OK accession
+        self.lastok: str = ""
 
     def parser_error(self, msg: str) -> FeatureTableParsingError:
         """Constructs parsing exception"""
-        return FeatureTableParsingError(msg, self.lineno, self.cur_line)
+        return FeatureTableParsingError(msg, self.lineno, self.cur_line, self.lastok)
 
     def next_line(self) -> str:
         """Fetches next line from line buffer"""
@@ -214,12 +218,14 @@ class FeatureTableParser:
         """Parse a set of feature tables"""
         self.lines = iter(txt.splitlines())
         self.lineno = 0
+        self.lastok = ""
         self.next_line()
         result = {}
         while self.cur_line:
             acc = self.parse_header()
             features = self.parse_features()
             result[acc] = features
+            self.lastok = acc
         return result
 
     def parse_header(self) -> str:
@@ -381,7 +387,12 @@ class FeatureTables:
             accessions = [acc for acc in accessions if acc not in result]
         if accessions:
             text = self.entrez.fetch("nucleotide", accessions, rettype="ft")
-            parsed = self.parser.parse(text)
+            try:
+                parsed = self.parser.parse(text)
+            except FeatureTableParsingError as exc:
+                exc.msg += "\n  Accessions: "
+                exc.msg += " ".join(accessions)
+                raise
             self.cache.put("features", parsed)
             result.update(parsed)
         return self.to_table(result, fields)
