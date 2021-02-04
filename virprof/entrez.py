@@ -111,6 +111,10 @@ class EntrezAPI:
         request = self._session.get(url, params=all_params,
                                     timeout=self.timeout)
         LOG.info("Calling Entrez API for %s: DONE.", tool)
+        text = request.text.strip()
+        if text.startswith("Error:"):
+            LOG.info("Entrez request failed with '%s'. Returning empty string instead.", text)
+            return ""
         return request.text
 
     def fetch(
@@ -136,18 +140,21 @@ class EntrezAPI:
         """
         if isinstance(ids, str):
             ids = [ids]
-        return "\n".join(
-            self._get(
+        result = []
+        for start in range(0, len(ids), batch_size):
+            idparm = ids[start:start+batch_size]
+            LOG.info("Calling Entrez efetch (%i..%i of %i) ...",
+                     start+1, start+len(idparm), len(ids))
+            result.append(self._get(
                 "efetch",
                 {
                     "db": database,
-                    "id": ids[start:start+batch_size],
+                    "id": ",".join(idparm),
                     "rettype": rettype,
                     "retmode": retmode,
                 },
-            )
-            for start in range(0, len(ids), batch_size)
-        )
+            ))
+        return "\n".join(result)
 
     @staticmethod
     def enable_debug():
@@ -234,7 +241,7 @@ class FeatureTableParser:
         if len(fields) != 3:
             raise self.parser_error(
                 "Expected header in format '>Feature {src}|{acc}|{comment}'"
-            ) from None
+            )
         acc, _, _version = fields[1].partition(".")
         self.next_line()
         return acc
@@ -392,7 +399,7 @@ class FeatureTables:
             LOG.info("Retrieved %i accessions from disk cache", len(result))
             accessions = [acc for acc in accessions if acc not in result]
         if accessions:
-            text = self.entrez.fetch("nucleotide", accessions, rettype="ft")
+            text = self.entrez.fetch("nucleotide", accessions, rettype="ft", retmode="text")
             try:
                 parsed = self.parser.parse(text)
             except FeatureTableParsingError as exc:
@@ -431,6 +438,8 @@ class FeatureTables:
 
     @staticmethod
     def write_table(table, out):
+        if not table:
+            return
         writer = csv.DictWriter(out, fieldnames=table[0].keys())
         for row in table:
             writer.writerow(row)
@@ -447,6 +456,12 @@ def main():
         "X64011",
         "4A1D_1",
         "AJ309573",
+        "3J62_AA",
+    ]
+    table = features.get(accs, ["gene/gene", "CDS/product"])
+    features.write_table(table, sys.stdout)
+    accs = [
+        "3J62_AA",
     ]
     table = features.get(accs, ["gene/gene", "CDS/product"])
     features.write_table(table, sys.stdout)
