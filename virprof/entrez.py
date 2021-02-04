@@ -2,9 +2,10 @@
 
 import csv
 import logging
+import json
 import os
 
-from typing import Optional, Set, Dict, Iterator, Union, List
+from typing import Optional, Set, Dict, Iterator, Union, List, Any
 
 from requests import Session
 from requests.adapters import HTTPAdapter
@@ -219,8 +220,9 @@ class FeatureTableParser:
             raise self.parser_error(
                 "Expected header in format '>Feature {src}|{acc}|{comment}'"
             ) from None
+        acc, _, _version = fields[1].partition(".")
         self.next_line()
-        return fields[1]
+        return acc
 
     def parse_features(self):
         """Parse individual feature table"""
@@ -293,6 +295,48 @@ class FeatureTableParser:
         return annotation
 
 
+class Cache:
+    "Disk Cache"
+
+    #: Default location of cache
+    DEFAULT_PATH = "~/.cache/virprof/entrez"
+
+    def __init__(
+        self,
+        path: str = None,
+    ) -> None:
+        if path is None:
+            path = self.DEFAULT_PATH
+        path = os.path.expanduser(path)
+        os.makedirs(path, exist_ok=True)
+        self._path = path
+
+    def _make_path(self, cache: str, entry: str):
+        path = os.path.join(
+            self._path, cache, entry[0:2], entry[2:5]
+        )
+        os.makedirs(path, exist_ok=True)
+        return os.path.join(path, entry[5:])
+
+    def get(self, cache: str, ids: List[str]) -> Dict[str, Any]:
+        """Retrieve from cache"""
+        result = {}
+        for entry in ids:
+            path = self._make_path(cache, entry)
+            if os.path.exists(path):
+                with open(path, "r") as cachefd:
+                    result[entry] = json.load(cachefd)
+        return result
+
+    def put(self, cache: str, data: Dict[str, str]) -> None:
+        """Write to cache"""
+        LOG.info("writing %i entries to cache", len(data))
+        for entry in data:
+            path = self._make_path(cache, entry)
+            with open(path, "w") as cachefd:
+                json.dump(data[entry], cachefd)
+
+
 class FeatureTables:
     """Access Entrez Feature Tables"""
     def __init__(
@@ -307,14 +351,25 @@ class FeatureTables:
     def get(
         self,
         accessions: Union[str, List[str]],
-        fields: Optional[List[str]] = None
+        fields: Optional[List[str]] = None,
+        nocache: bool = False,
     ):
+        if fields is None:
+            fields = ["*/*"]
         if isinstance(accessions, str):
             accessions = [accessions]
         LOG.info("Fetching feature tables for %i accessions", len(accessions))
-        text = self.entrez.fetch("nucleotide", accessions, rettype="ft")
-        parsed = self.parser.parse(text)
-        return self.to_table(parsed, fields)
+        result = {}
+        if not nocache:
+            result.update(self.cache.get("features", accessions))
+            LOG.info("Retrieved %i accessions from disk cache", len(result))
+            accessions = [acc for acc in accessions if acc not in result]
+        if accessions:
+            text = self.entrez.fetch("nucleotide", accessions, rettype="ft")
+            parsed = self.parser.parse(text)
+            self.cache.put("features", parsed)
+            result.update(parsed)
+        return self.to_table(result, fields)
 
     @staticmethod
     def to_table(parsed, fields):
@@ -354,10 +409,10 @@ def main():
     logging.basicConfig()
     import sys
     features = FeatureTables(cache_path="cache_path")
-    #features.entrez.enable_debug()
+    features.entrez.enable_debug()
     table = features.get("NC_045512", ["gene/gene", "CDS/product"])
     features.write_table(table, sys.stdout)
-    table = features.get("X64011.1", ["*/*"])
+    table = features.get("X64011", ["*/*"])
     features.write_table(table, sys.stdout)
 
 
