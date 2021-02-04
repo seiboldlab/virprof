@@ -4,6 +4,8 @@ import csv
 import logging
 import json
 import os
+import shutil
+import tempfile
 
 from typing import Optional, Set, Dict, Iterator, Union, List, Any
 
@@ -331,10 +333,14 @@ class Cache:
     def put(self, cache: str, data: Dict[str, str]) -> None:
         """Write to cache"""
         LOG.info("writing %i entries to cache", len(data))
+        tmpdir = tempfile.mkdtemp(dir=self._path)
         for entry in data:
             path = self._make_path(cache, entry)
-            with open(path, "w") as cachefd:
+            tmp = os.path.join(tmpdir, entry)
+            with open(tmp, "w") as cachefd:
                 json.dump(data[entry], cachefd)
+            os.rename(tmp, path)
+        shutil.rmtree(tmpdir)
 
 
 class FeatureTables:
