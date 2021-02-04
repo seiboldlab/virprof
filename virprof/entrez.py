@@ -414,8 +414,13 @@ class FeatureTables:
         self, entrez: EntrezAPI = None,
         parser: FeatureTableParser = None,
         cache_path: str = None,
+        api_key = None
     ) -> None:
-        self.entrez = entrez if entrez is not None else EntrezAPI()
+        if api_key is not None:
+            defaults = {'api_key': api_key}
+        else:
+            defaults = None
+        self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
         self.parser = parser if parser is not None else FeatureTableParser()
         self.cache = Cache(cache_path)
 

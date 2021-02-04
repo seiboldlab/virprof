@@ -270,6 +270,7 @@ def cli() -> None:
 @click.option(
     "--annotate/--no-annotate", default=True, help="Enable/Disable feature annotation"
 )
+@click.option("--ncbi-api-key", type=str, help="NCBI API Key")
 def blastbin(
     in_blast7: click.utils.LazyFile,
     in_coverage: click.utils.LazyFile,
@@ -286,13 +287,20 @@ def blastbin(
     profile: bool = False,
     cache_path: str = "entrez_cache",
     annotate = True,
+    ncbi_api_key = None,
 ) -> bool:
     # pylint: disable=too-many-arguments
     """Merge and classify contigs based on BLAST search results"""
     if profile:
         setup_profiling()
 
-    features = FeatureTables(cache_path=cache_path) if annotate else None
+    if annotate:
+        if not ncbi_api_key:
+            # Make it so empty command line parameter equals no api key set
+            ncbi_api_key = None
+        features = FeatureTables(cache_path=cache_path, api_key=ncbi_api_key)
+    else:
+        features = None
 
     if not in_coverage:
         chain_tpl = HitChain(chain_penalty=chain_penalty)

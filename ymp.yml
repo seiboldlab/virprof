@@ -28,6 +28,12 @@ projects:
   test:
     data: test_data/test.csv
 
+overrides:
+  rules:
+    vp_blastbin:
+      params:
+        ncbi_api_key: 
+
 pipelines:
   ### Sub-Pipelines ###
   # Trimming and FastQC

@@ -125,6 +125,7 @@ with Stage("blastbin_vp") as S:
         params:
             coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage)),
             cache_path = "feature_table_cache",
+            ncbi_api_key = ""
         threads:
             1
         conda:
@@ -139,6 +140,7 @@ with Stage("blastbin_vp") as S:
             " --in-fasta {input.fasta}"
             " --annotate"
             " --cache-path {params.cache_path}"
+            " --ncbi-api-key '{params.ncbi_api_key}'"
 
     rule vp_show_bins:
         version:
