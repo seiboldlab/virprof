@@ -50,7 +50,7 @@ class EntrezAPI:
         self,
         session: Optional[Session] = None,
         defaults: Optional[Dict[str, str]] = None,
-        timeout: int = 300,
+        timeout: int = 120,
     ) -> None:
         self._session = self.make_session() if session is None else session
         self._defaults = {} if defaults is None else defaults
@@ -60,9 +60,9 @@ class EntrezAPI:
     @classmethod
     def make_session(
         cls,
-        max_retries: int = 100,
+        max_retries: int = 5,
         max_redirects: int = 20,
-        max_timeouts: int = 100,
+        max_timeouts: int = 5,
         backoff_factor: float = 0.2,
         retry_codes: Optional[Set[int]] = None,
     ) -> Session:
