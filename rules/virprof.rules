@@ -137,7 +137,7 @@ with Stage("blastbin_vp") as S:
             " --in-blast7 {input.blast7}"
             " --in-coverage {params.coverage}"
             " --in-fasta {input.fasta}"
-            " --no-annotate"
+            " --annotate"
             " --cache-path {params.cache_path}"
 
     rule vp_show_bins:
