@@ -39,7 +39,7 @@ class EntrezAPI:
     #: by retrying the request.
     default_retry_codes = set(
         (
-            500,  # Internal Server Error
+#            500,  # Internal Server Error
             502,  # Bad Gateway Error
             504,  # Gateway Timeout
             429,  # Too Many Requests
@@ -112,6 +112,7 @@ class EntrezAPI:
         all_params.update(params)
         request = self._session.get(url, params=all_params,
                                             timeout=self.timeout)
+        request.raise_for_status()
         text = request.text.strip()
         if text.startswith("Error:"):
             LOG.info("Entrez request failed with '%s'. Returning empty string instead.", text)
@@ -143,8 +144,9 @@ class EntrezAPI:
             ids = [ids]
         result = []
         done = 0
+        cur_batch_size = batch_size
         while done < len(ids):
-            to_get = ids[done:done + batch_size]
+            to_get = ids[done:done + cur_batch_size]
             LOG.info("Calling Entrez efetch (%i of %i done, fetching %i)",
                      done, len(ids), len(to_get))
             try:
@@ -160,10 +162,12 @@ class EntrezAPI:
             except RequestException:
                 if len(to_get) == 1:
                     raise
-                batch_size = int(batch_size/2)
+                cur_batch_size = int(cur_batch_size/2)
             else:
                 result.append(data)
                 done += len(to_get)
+                if cur_batch_size == 1:
+                    cur_batch_size = batch_size
 
         LOG.info("Calling Entrez efetch: DONE")
         return "\n".join(result)
