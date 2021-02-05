@@ -60,10 +60,10 @@ class EntrezAPI:
     @classmethod
     def make_session(
         cls,
-        max_retries: int = 5,
+        max_retries: int = 50,
         max_redirects: int = 20,
-        max_timeouts: int = 5,
-        backoff_factor: float = 0.2,
+        max_timeouts: int = 50,
+        backoff_factor: float = 0.5,
         retry_codes: Optional[Set[int]] = None,
     ) -> Session:
         """Makes a persistent requests session
@@ -161,7 +161,7 @@ class EntrezAPI:
                 )
             except RequestException as exc:
                 if len(to_get) == 1:
-                    if exc.response.status_code == 400:
+                    if exc.response and exc.response.status_code == 400:
                         LOG.error("Skipping sequence '%s' due to recurring errors", ",".join(to_get))
                         done += 1
                     else:
