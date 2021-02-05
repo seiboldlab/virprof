@@ -162,12 +162,11 @@ class EntrezAPI:
             except RequestException:
                 if len(to_get) == 1:
                     raise
-                cur_batch_size = int(cur_batch_size/2)
+                cur_batch_size = int(cur_batch_size / 2)
             else:
                 result.append(data)
                 done += len(to_get)
-                if cur_batch_size == 1:
-                    cur_batch_size = batch_size
+                cur_batch_size = min(batch_size, cur_batch_size * 2)
 
         LOG.info("Calling Entrez efetch: DONE")
         return "\n".join(result)
