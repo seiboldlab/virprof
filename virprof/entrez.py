@@ -159,10 +159,15 @@ class EntrezAPI:
                         "retmode": retmode,
                     },
                 )
-            except RequestException:
+            except RequestException as exc:
                 if len(to_get) == 1:
-                    raise
-                cur_batch_size = int(cur_batch_size / 2)
+                    if exc.response.status_code == 400:
+                        LOG.error("Skipping sequence '%s' due to recurring errors", ",".join(to_get))
+                        done += 1
+                    else:
+                        raise
+                else:
+                    cur_batch_size = int(cur_batch_size / 2)
             else:
                 result.append(data)
                 done += len(to_get)
