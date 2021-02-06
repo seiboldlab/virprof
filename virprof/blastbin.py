@@ -270,16 +270,6 @@ class HitChain:
         return round(matches / length, 1)
 
     @property
-    def qpident(self) -> Optional[float]:
-        "Aggregated query percent identity for all items in the HitChain"
-        if not self.qlen:
-            return None
-
-        matches = sum(hit.pident * hit.length for hit in self.hits)
-        qpident = matches / self.qlen
-        return round(qpident, 1)
-
-    @property
     def pidents(self) -> List[float]:
         "Percent identiy for each hit"
         return [hit.pident for hit in self.hits]
