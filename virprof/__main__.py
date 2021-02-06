@@ -219,8 +219,31 @@ def cli() -> None:
     multiple=True,
     help="Samtools coverage result file",
 )
-@click.option("--in-fasta", "-f", type=click.File("r"), help="FASTA file with contigs")
-@click.option("--out", "-o", type=click.File("w"), default="-", help="Output CSV file")
+@click.option(
+    "--in-fasta",
+    "-f",
+    type=click.File("r"),
+    help="FASTA file with sequence data for contigs to be binned",
+)
+@click.option(
+    "--out",
+    "-o",
+    type=click.File("w"),
+    default="-",
+    help="Output CSV file containing final calls (one row per bin)",
+)
+@click.option(
+    "--out-hits",
+    "--oc",
+    type=click.File("w"),
+    help="Output CSV file containining contig details (one row per hit)",
+)
+@click.option(
+    "--out-features",
+    "--of",
+    type=click.File("w"),
+    help="Output CSV file containing reference feature annotation (one row per feature)"
+)
 @click.option(
     "--ncbi-taxonomy",
     "-t",
@@ -279,18 +302,17 @@ def cli() -> None:
     help="Location for caching of remote data",
     default="entrez_cache"
 )
-@click.option(
-    "--annotate/--no-annotate", default=True, help="Enable/Disable feature annotation"
-)
 @click.option("--ncbi-api-key", type=str, help="NCBI API Key")
 def blastbin(
     in_blast7: click.utils.LazyFile,
     in_coverage: click.utils.LazyFile,
     in_fasta: click.utils.LazyFile,
     out: click.utils.LazyFile,
+    out_hits: click.utils.LazyFile,
     include: Tuple[str, ...],
     exclude: Tuple[str, ...],
     prefilter: Tuple[str, ...],
+    out_features: click.utils.LazyFile = None,
     ncbi_taxonomy: Optional[str] = None,
     no_standard_excludes: bool = False,
     min_read_count=2,
@@ -299,17 +321,17 @@ def blastbin(
     profile: bool = False,
     debug: bool = False,
     cache_path: str = "entrez_cache",
-    annotate = True,
     ncbi_api_key = None,
 ) -> bool:
     # pylint: disable=too-many-arguments
     """Merge and classify contigs based on BLAST search results"""
+    LOG.info("Executing blastbin")
     if profile:
         setup_profiling()
     if debug:
         setup_debug()
 
-    if annotate:
+    if out_features is not None:
         if not ncbi_api_key:
             # Make it so empty command line parameter equals no api key set
             ncbi_api_key = None
@@ -376,16 +398,26 @@ def blastbin(
     taxfilter_pre = taxonomy.make_filter(exclude=prefilter)
     taxfilter = taxonomy.make_filter(include, exclude)
 
-    field_list = ["sample", "words"]
-    field_list += chain_tpl.fields
-    field_list += ["taxid", "saccs"]
+    LOG.info("Writing bins to: %s", out.name)
+    fields = ["sample", "words"] + chain_tpl.fields + ["taxid"]
     if not taxonomy.is_null():
-        field_list += ["taxname", "species", "lineage", "lineage_ranks"]
-    LOG.info("Output fields: %s", " ".join(field_list))
+        fields += ["taxname", "species", "lineage", "lineage_ranks"]
+    LOG.info("  output fields: %s", " ".join(fields))
+    bin_writer = csv.DictWriter(out, fields)
+    bin_writer.writeheader()
 
-    writer = csv.DictWriter(out, field_list)
-    writer.writeheader()
-    LOG.info("Writing to: %s", out.name)
+    LOG.info("Writing contig hit details to: %s", out_hits.name)
+    fields = ["sample", "sacc"] + chain_tpl.hit_fields
+    LOG.info("  output fields: %s", " ".join(fields))
+    hits_writer = csv.DictWriter(out_hits, fields)
+    hits_writer.writeheader()
+
+    if features:
+        LOG.info("Writing feature details to: %s", out_features.name)
+        fields = features.fields
+        LOG.info("  output fields: %s", " ".join(fields))
+        feature_writer = csv.DictWriter(out_features, fields)
+        feature_writer.writeheader()
 
     hitgroups = list(group_hits_by_qacc(reader))
     LOG.info(
@@ -411,8 +443,6 @@ def blastbin(
     )
     best_chains = greedy_select_chains(all_chains)
 
-    accs = set()
-
     for chains in best_chains:
         saccs = [chain.sacc for chain in chains]
 
@@ -424,21 +454,38 @@ def blastbin(
             continue
 
         if features is not None:
-            ftable = features.get(saccs)
+            fdata = features.get(saccs, [])
 
-        row = chains[0].to_dict()
-        row["sample"] = sample
-        row["taxid"] = taxid
-        row["words"] = wordscorer.score(chains)
-        row["saccs"] = " ".join(saccs)
+        selected_chain = chains[0]
+
+        row = selected_chain.to_dict()
+        row.update({
+            "sample": sample,
+            "taxid": taxid,
+            "words": wordscorer.score(chains),
+        })
         if not taxonomy.is_null():
-            row["lineage"] = "; ".join(taxonomy.get_lineage(taxid))
-            row["lineage_ranks"] = "; ".join(taxonomy.get_lineage_ranks(taxid))
-            row["taxname"] = taxonomy.get_name(taxid)
-            row["species"] = taxonomy.get_rank(taxid, "species")
+            row.update({
+                "lineage": "; ".join(taxonomy.get_lineage(taxid)),
+                "lineage_ranks": "; ".join(taxonomy.get_lineage_ranks(taxid)),
+                "taxname": taxonomy.get_name(taxid),
+                "species": taxonomy.get_rank(taxid, "species"),
+            })
+        LOG.info("Found     %s -- %s", row.get("taxname", ""), row["words"])
+        bin_writer.writerow(row)
 
-        LOG.info("Found     %s -- %s", row["taxname"], row["words"])
-        writer.writerow(row)
+        for row in selected_chain.hits_to_dict():
+            row.update({
+                "sample": sample,
+                "sacc": selected_chain.sacc,
+            })
+            hits_writer.writerow(row)
+
+        if features is not None:
+            ftable = features.get(selected_chain.sacc, ["gene/gene", "CDS/product"])
+            for row in ftable:
+                feature_writer.writerow(row)
+
     return True
 
 

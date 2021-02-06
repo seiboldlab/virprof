@@ -117,11 +117,13 @@ with Stage("blastbin_vp") as S:
             coverage = "{:prev:}/{:target:}.coverage",
             fasta    = "{:prev:}/{:target:}.fasta.gz",
             blast7   = "{:prev:}/{:target:}.blast7.gz",
-            taxonomy = "{:prev:}/{:target:}.taxonomy.gt"
+            taxonomy = "{:prev:}/{:target:}.taxonomy.gt",
         output:
-            result   = "{:this:}/{target}.virus.csv"
+            result   = "{:this:}/{target}.virus.csv",
+            hits     = "{:this:}/{target}.hits.csv",
+            features = "{:this:}/{target}.features.csv",
         log:
-                       "{:this:}/{target}.log"
+                         "{:this:}/{target}.log"
         params:
             coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage)),
             cache_path = "feature_table_cache",
@@ -134,11 +136,12 @@ with Stage("blastbin_vp") as S:
             "exec >{log} 2>&1;"
             "python -m virprof blastbin"
             " --out {output.result}"
+            " --out-hits {output.hits}"
+            " --out-features {output.features}"
             " --ncbi-taxonomy {input.taxonomy}"
             " --in-blast7 {input.blast7}"
             " --in-coverage {params.coverage}"
             " --in-fasta {input.fasta}"
-            " --annotate"
             " --cache-path {params.cache_path}"
             " --ncbi-api-key '{params.ncbi_api_key}'"
 

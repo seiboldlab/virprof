@@ -488,6 +488,10 @@ class FeatureTables:
                     })
         return result
 
+    @property
+    def fields(_self):
+        return ['acc', 'start', 'stop', 'typ', 'key', 'value']
+
     @staticmethod
     def write_table(table, out):
         if not table:

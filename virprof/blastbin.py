@@ -142,7 +142,7 @@ class HitChain:
     def __str__(self) -> str:
         return (
             f"acc={self.sacc} e={self.log10_evalue} "
-            f"l={self.qlen} r={self.sranges()}"
+            f"l={self.qlen}"
         )
 
     def __repr__(self) -> str:
@@ -270,11 +270,6 @@ class HitChain:
         return round(matches / length, 1)
 
     @property
-    def pidents(self) -> List[float]:
-        "Percent identiy for each hit"
-        return [hit.pident for hit in self.hits]
-
-    @property
     def log10_evalue(self) -> float:
         "Logarithm base 10 of the E-value computed for the combined hits"
         if self.qlen == 0:
@@ -314,21 +309,6 @@ class HitChain:
             return 0
         return self._subject_regions.end_pos()
 
-    def sranges(self) -> List[Tuple[int, int]]:
-        """Ranges of subject sequence covered by the hits in this HitChain
-
-        Returns:
-          List of pairs with start and end positions (start < end).
-        """
-        return [
-            (hit.sstart, hit.send) if hit.sstart < hit.send else (hit.send, hit.sstart)
-            for hit in self.hits
-        ]
-
-    def range_reversed(self) -> List[bool]:
-        """Return list of bool indicating which hits were reverse hits"""
-        return [hit.sstart > hit.send for hit in self.hits]
-
     @property
     def qaccs(self) -> List[str]:
         """The accession numbers for each hit in this HitChain
@@ -336,20 +316,6 @@ class HitChain:
         This list may contain duplicates!
         """
         return [hit.qacc for hit in self.hits]
-
-    def qranges(self, qacc: Optional[str] = None) -> List[Tuple[int, int]]:
-        """Ranges of query sequences covered by the hits in this HitChain
-
-        Args:
-           qacc: Only get ranges for this query accession
-
-        Returns:
-           List of pairs with start and end positions (start < end).
-        """
-        # These are always qstart <= qend
-        if qacc is None:
-            return [(hit.qstart, hit.qend) for hit in self.hits]
-        return [(hit.qstart, hit.qend) for hit in self.hits if hit.qacc == qacc]
 
     def make_chain_single(self, hitset: List[BlastHit]) -> Sequence["HitChain"]:
         """Generates hit chain for set of hits with single sacc
@@ -385,24 +351,37 @@ class HitChain:
         return {
             "log_evalue": self.log10_evalue,
             "qlen": self.qlen,
-            "qlens": ";".join(str(hit.qlen) for hit in self.hits),
             "slen": self.slen,
             "n_frag": len(self.hits),
             "sacc": self.sacc,
             "stitle": self.stitle,
             "staxids": ";".join((str(i) for i in self.staxids)),
             "pident": self.pident,
-            "pidents": ";".join((str(pid) for pid in self.pidents)),
-            "qaccs": ";".join(self.qaccs),
-            "qranges": range_str(self.qranges()),
-            "sranges": range_str(self.sranges()),
-            "reversed": ";".join("T" if rev else "F" for rev in self.range_reversed()),
         }
 
     @property
     def fields(self) -> List[str]:
         """List keys of ``to_dict()``"""
         return list(self.to_dict().keys())
+
+    def hits_to_dict(self) -> Iterator[Dict[str, Any]]:
+        """Dump hits comprising this HitChain"""
+        for hit in self.hits:
+            yield {
+                'qacc': hit.qacc,
+                'qlen': hit.qlen,
+                'pident': hit.pident,
+                'bitscore': hit.bitscore,
+                'qstart': hit.qstart,
+                'qend': hit.qend,
+                'sstart': hit.sstart,
+                'send': hit.send,
+            }
+
+    @property
+    def hit_fields(self) -> List[str]:
+        """List keys of ``hits_to_dict()``"""
+        return ['qacc', 'qlen', 'pident', 'bitscore', 'qstart', 'qend', 'sstart', 'send']
 
 
 class CheckOverlaps(HitChain):
@@ -542,20 +521,12 @@ class CoverageHitChain(HitChain):
         """Total number of reads"""
         if self._coverages is None:
             return -1
-        # Count unique qaccs only
-        qaccs = set(self.qaccs)
-        return sum(sum(self._numreads[qacc]) for qacc in qaccs)
+        unique_qaccs = set(self.qaccs)
+        return sum(sum(self._numreads[qacc]) for qacc in unique_qaccs)
 
     def get_numreads(self, qacc) -> List[int]:
         """Number of reads for query accession ``qacc``"""
         return self._numreads[qacc]
-
-    @property
-    def numreadss(self) -> str:
-        """Number of reads for each qacc"""
-        if self._coverages is None:
-            return ""
-        return ";".join(str(sum(self.get_numreads(qacc))) for qacc in self.qaccs)
 
     def filter_hitgroups(
         self, hitgroups: Iterable[List[BlastHit]], min_read_count: int
@@ -570,11 +541,14 @@ class CoverageHitChain(HitChain):
                 filtered += 1
         LOG.info(f"Removed {filtered} contigs having < {min_read_count} reads")
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert chain to dictionary for writing to CSV"""
-        res = super().to_dict()
-        res.update({"numreads": self.numreads, "numreadss": self.numreadss})
-        return res
+    def hits_to_dict(self) -> Iterator[Dict[str, Any]]:
+        for hit, row in zip(self.hits, super().hits_to_dict()):
+            row['numreads'] = sum(self.get_numreads(hit.qacc))
+            yield row
+
+    @property
+    def hit_fields(self):
+        return super().hit_fields + ['numreads']
 
 
 def greedy_select_chains(
