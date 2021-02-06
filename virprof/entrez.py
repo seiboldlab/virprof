@@ -165,7 +165,7 @@ class EntrezAPI:
                         if exc.response.status_code == 400:
                             LOG.error("Skipping sequence '%s' due to recurring errors", ",".join(to_get))
                             done += 1
-                        elif exc.response.status_code = 429:
+                        elif exc.response.status_code == 429:
                             waitfor = randint(60, 90)
                             LOG.error("Too many retries. Retrying ad infinitum. Waiting %i seconds...", waitfor)
                             time.sleep(waitfor)
