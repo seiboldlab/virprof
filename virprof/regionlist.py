@@ -58,7 +58,7 @@ class RegionList:
         for idx, ostart in enumerate(self._region_starts):
             if start < ostart:
                 return idx - 1
-        return len(self._region_starts)
+        return len(self._region_starts) - 1
 
     def get(self, position) -> List:
         """Access data for ``position``"""
