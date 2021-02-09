@@ -101,7 +101,7 @@ pipelines:
           hide: true
       - ref_NT:
           hide: true
-      - annotate_blastE10Best:
+      - annotate_blastE20MegaBest:
           hide: true
       - ref_NcbiTaxonomy:
           hide: true
@@ -149,6 +149,16 @@ pipelines:
           hide: true
       - group_sample
       - format_bbmapL200
+  reassemble4:
+    stages:
+      - enrich:
+          hide: true
+      - group_sample
+      - group_BIN
+      - assemble_unicycler:
+          hide: true
+      - group_sample
+      - format_bbmapL200
 
   # Reference guidedworkflow
   targeted:
@@ -185,6 +195,12 @@ pipelines:
     stages:
       - generic
       - reassemble3
+      - coverage
+      - blastbin
+  virus4:
+    stages:
+      - generic
+      - reassemble4
       - coverage
       - blastbin
 
@@ -227,7 +243,8 @@ references:
   hg38:
     # The index files for Bowtie2
     - url:
-        /data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
+        #/data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
+        databases/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
       type: dirx
       files:
         ALL.1.bt2: genome.1.bt2
@@ -238,17 +255,23 @@ references:
         ALL.rev.2.bt2: genome.rev.2.bt2
         ALL.fasta: genome.fa
     # The index files for Blast
-    - url: /data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
+    - url:
+        #/data/reference/iGenomes/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
+        databases/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
       type: dirx
       files:
-        ALL.nin: genome_blastn.nin
-        ALL.nhr: genome_blastn.nhr
-        ALL.nsq: genome_blastn.nsq
-        ALL.nsi: genome_blastn.nsi
-        ALL.nsd: genome_blastn.nsd
-        ALL.nog: genome_blastn.nog
+        ALL.nin: genome.fa.nin
+        ALL.nhr: genome.fa.nhr
+        ALL.nhi: genome.fa.nhi
+        ALL.nhd: genome.fa.nhd
+        ALL.nsq: genome.fa.nsq
+        ALL.nsi: genome.fa.nsi
+        ALL.nsd: genome.fa.nsd
+        ALL.nog: genome.fa.nog
     # The index files for Hisat2
-    - url: /Seibold/data/Reference/HISAT/grch38_snp_tran/
+    - url:
+        # /Seibold/data/Reference/HISAT/grch38_snp_tran/
+        databases/grch38_snp_tran/
       type: dirx
       files:
         ALL.1.ht2: genome_snp_tran.1.ht2
@@ -261,14 +284,18 @@ references:
         ALL.8.ht2: genome_snp_tran.8.ht2
   # NCBI Nucleotide database for Blast
   NT:
-    - url: /data/reference/NCBI_nt/NCBI_NT_2020-05-01/
+    - url:
+        # /data/reference/NCBI_nt/NCBI_NT_2020-05-01/
+        databases/nt/
       type: path
       id: nt
       match:
         - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
   # NCBI Taxonomy dump for classification
   NcbiTaxonomy:
-    - url: /data/reference/NCBI/taxonomy/
+    - url:
+        #/data/reference/NCBI/taxonomy/
+        databases/NCBI_taxonomy/
       type: dirx
       files:
         ALL.NCBI.nodes.dmp: nodes.dmp

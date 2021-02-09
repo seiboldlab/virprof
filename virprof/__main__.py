@@ -28,7 +28,7 @@ from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
 from .fasta import filter_fasta, FastaFile
 from .regionlist import RegionList
-from .fasta import merge_contigs
+from .fasta import scaffold_contigs
 from .entrez import FeatureTables
 
 LOG = logging.getLogger(__name__)
@@ -607,7 +607,10 @@ def as_file_name(name):
 
 @cli.command()
 @click.option(
-    "--in-bins", type=click.File("r"), required=True, help="CSV from blastbin command"
+    "--in-bins", type=click.File("r"), required=True, help="Bins CSV from blastbin command"
+)
+@click.option(
+    "--in-hits", type=click.File("r"), required=True, help="Hits CSV from blastbin command"
 )
 @click.option(
     "--in-fasta",
@@ -638,6 +641,7 @@ def as_file_name(name):
 )
 def export_fasta(
     in_bins,
+    in_hits,
     in_fasta,
     out,
     out_bins,
@@ -695,14 +699,29 @@ def export_fasta(
                 outfile.iofile.close()
             return outfile
 
-    ## Handle binning options
+    # Load hits
+    LOG.info("Loading hits from '%s'", in_hits.name)
+    hits = {}
+    for row in csv.DictReader(in_hits):
+        regl = hits.setdefault(row['sacc'], RegionList())
+        regl.add(int(row['sstart']), int(row['send']), (
+            row['qacc'],
+            int(row['sstart']),
+            int(row['send']),
+            int(row['qstart']),
+            int(row['qend'])
+        ))
+    LOG.info("Found %i hits", sum(len(hit) for hit in hits.values()))
+
+    # Load and merge bins
     LOG.info("Binning by '%s'", bin_by)
     LOG.info("Loading calls from '%s'", in_bins.name)
     bins = {}
     for row in csv.DictReader(in_bins):
-        for col in ("qaccs", "qranges", "sranges", "reversed"):
-            row[col] = row[col].split(";")
-        bins.setdefault(as_file_name(row[bin_by]), []).append(row)
+        sacc = row['sacc']
+        bin_name = as_file_name(row[bin_by])
+        row['regionlist'] = hits[sacc]
+        bins.setdefault(bin_name, []).append(row)
     LOG.info(
         "  found %i bins in %i calls", len(bins), sum(len(bin) for bin in bins.items())
     )
@@ -726,21 +745,14 @@ def export_fasta(
         LOG.info("writing bin %s", bin_name)
         outfile = update_outfile(bin_name)
         for call in bin_data:
-            # Load sequences
-            sequences = {acc: contigs.get(acc) for acc in call["qaccs"]}
+            reglist = call['regionlist']
+            accs = set(data[0] for _, _, datas in reglist for data in datas)
 
             # Convert call to region list
-            regs = RegionList()
-            for qacc, qrange, srange, revers in zip(
-                call["qaccs"], call["qranges"], call["sranges"], call["reversed"]
-            ):
-                sstart, send = map(int, srange.split("-"))
-                qstart, qend = map(int, qrange.split("-"))
-                revers = revers == "T"
-                regs.add(sstart, send, (qacc, sstart, send, qstart, qend, revers))
-
             if merge_overlapping:
-                sequences = merge_contigs(regs, sequences)
+                sequences = scaffold_contigs(reglist, contigs)
+            else:
+                sequences = {acc: contigs.get(acc) for acc in accs}
 
             for acc, sequence in sequences.items():
                 bp = sum(sequence.count(base) for base in (b'A', b'G', b'C', b'T'))

@@ -9,18 +9,20 @@ Unit tests for fasta module
 from tempfile import NamedTemporaryFile
 
 from ..regionlist import RegionList
-from ..fasta import FastaFile, merge_contigs
+from ..fasta import FastaFile, scaffold_contigs
 
-subject = b"AAAAAGGGGGCCCCCTTTTT"
-subject_comp = bytes(reversed(subject))
+subject =  b"AAAAATTTTTCCCCCGGGGG"
+subject_comp = b"TTTTTAAAAAGGGGGCCCCC"
+
 contigs = FastaFile(None, mode="")
 contigs.sequences = {
-    b"acc1": subject[0:10],
-    b"acc1r": subject_comp[9::-1],
-    b"acc2": subject[10:20],
-    b"acc2r": subject_comp[19:9:-1],
-    b"acc3": subject[5:15],
-    b"acc3r": subject_comp[14:4:-1],
+    b"first10bp": subject[0:10],
+    # contig matching first 10 bp, but reverse
+    b"first10bp-revcomp": subject_comp[9::-1],
+    b"second10bp": subject[10:20],
+    b"second10bp-revcomp": subject_comp[19:9:-1],
+    b"middle10bp": subject[5:15],
+    b"middle10bp-revcomp": subject_comp[14:4:-1],
 }
 
 
@@ -37,36 +39,34 @@ def test_FastaFile():
         assert seq == seq2
 
 
-def test_merge_contigs_simple():
+def test_scaffold_contigs_simple():
     rl = RegionList()
-    rl.add(1, 10, ("acc1", 1, 10, 1, 10, False))
-    id_format = ""
-    sequence = merge_contigs(rl, contigs)
-    assert sequence == contigs.get("acc1")
+    rl.add(1, 10, ("first10bp", 1, 10, 1, 10))
+    sequence = scaffold_contigs(rl, contigs)
+    assert sequence["first10bp"] == subject[0:10]
 
 
-def test_merge_contigs_simple_reversed():
+def test_scaffold_contigs_simple_reversed():
     rl = RegionList()
-    rl.add(1, 10, ("acc1r", 1, 10, 1, 10, True))
-    id_format = ""
-    sequence = merge_contigs(rl, contigs)
-    assert sequence == contigs.get("acc1")
+    rl.add(10, 1, ("first10bp-revcomp", 10, 1, 1, 10))
+    sequence = scaffold_contigs(rl, contigs)
+    assert sequence["first10bp-revcomp"] == subject[0:10]
 
 
-def test_merge_contigs_split():
+def test_scaffold_contigs_split():
     rl = RegionList()
-    rl.add(1, 10, ("acc1", 1, 10, 1, 10, False))
-    rl.add(11, 20, ("acc2", 11, 20, 1, 10, False))
-    id_format = ""
-    sequence = merge_contigs(rl, contigs)
-    assert sequence == subject
+    rl.add(1, 10, ("first10bp", 1, 10, 1, 10))
+    rl.add(11, 20, ("second10bp", 11, 20, 1, 10))
+    sequence = scaffold_contigs(rl, contigs)
+    assert len(sequence) == 1
+    assert next(iter(sequence.values())) == subject
 
 
-def test_merge_contigs_overlap():
+def test_scaffold_contigs_overlap():
     rl = RegionList()
-    rl.add(1, 10, ("acc1", 1, 10, 1, 10, False))
-    rl.add(11, 20, ("acc2", 11, 20, 1, 10, False))
-    rl.add(6, 15, ("acc3", 6, 15, 1, 10, False))
-    id_format = ""
-    sequence = merge_contigs(rl, contigs)
-    assert sequence == subject
+    rl.add(1, 10, ("first10bp", 1, 10, 1, 10))
+    rl.add(11, 20, ("second10bp", 11, 20, 1, 10))
+    rl.add(6, 15, ("middle10bp", 6, 15, 1, 10))
+    sequence = scaffold_contigs(rl, contigs)
+    assert len(sequence) == 1
+    assert next(iter(sequence.values())) == subject

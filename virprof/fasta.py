@@ -69,7 +69,7 @@ def filter_fasta(
 class FastaFile:
     """Handles access to GZipp'ed FASTA format file"""
 
-    def __init__(self, iofile: BinaryIO, mode="r") -> None:
+    def __init__(self, iofile: Optional[BinaryIO] = None, mode="r") -> None:
         self.iofile = iofile
         self.mode = mode
         self.sequences = self._try_load_all()
@@ -164,43 +164,46 @@ def revcomp(sequence: bytes) -> bytes:
     return str(seq.reverse_complement()).encode("ASCII")
 
 
-def merge_contigs(regs, sequences):
+def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]:
     sequence = []
     qaccs = set()
     # Iterate over each disjoined piece
-    for sstart, send, data in regs:
-        section_len = send - sstart
-        section_data = []
+    for section_start, section_end, hits in regs:
+        section_len = section_end - section_start + 1
+        section_seqs = []
         # Iterate over each hit overlapping piece
-        for qacc, s2start, s2end, qstart, qend, revers in data:
+        for qacc, sstart, send, qstart, qend in hits:
             qaccs.add(qacc)
-            match_offset = sstart - s2start
-            if revers:
-                section_start = qend - match_offset - section_len
+
+            if send > sstart:
+                offset = qstart + section_start - sstart
             else:
-                section_start = qstart + match_offset
-            seq = sequences[qacc][section_start - 1 : section_start + section_len]
-            if revers:
+                offset = qstart + sstart - section_end
+            offset -= 1  # make 0-indexed
+
+            seq = contigs.get(qacc)[offset:offset+section_len]
+            if sstart > send:
                 seq = revcomp(seq)
-            section_data.append(seq)
+            section_seqs.append(seq)
 
-            if len(seq) != section_len + 1:
-                ## FIXME
-                LOG.error("section sizes differ!")
-                LOG.error((sstart, send, section_len, qacc, revers))
-                LOG.error((s2start, s2end, s2end - s2start))
-                LOG.error((qstart, qend, qend - qstart))
-
-        if len(section_data) == 0:
-            ## Empty piece - fill with N's
+        if len(section_seqs) == 0:
+            # No contig covering this piece of reference.
+            # FIXME: Check for deletion!
             sequence.append(b"n" * (section_len + 1))
-        elif len(section_data) == 1:
+        elif len(section_seqs) == 1:
             ## Singleton piece - fill with sequence
-            sequence.append(section_data[0])
+            sequence.append(section_seqs[0])
         else:
+            if any(len(section_seqs[0]) != len(seq) for seq in section_seqs):
+                LOG.error("section sizes differ!")
+                LOG.error(
+                    "section: start=%i end=%i len=%i acc=%s lens=%s",
+                    section_start, section_end, section_len, qacc,
+                    ", ".join(str(len(seq)) for seq in section_seqs)
+                )
             ## Overlapping piece - fill with consensus
             section_consensus = []
-            for base_counts in map(Counter, zip(*section_data)):
+            for base_counts in map(Counter, zip(*section_seqs)):
                 if len(base_counts) == 1:
                     best, best_count = next(iter(base_counts.items()))
                     second_count = 0
