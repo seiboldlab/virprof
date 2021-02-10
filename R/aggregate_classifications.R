@@ -32,13 +32,17 @@ vhdb_blacklist <- tribble(
     "IAS virus", "Homo sapiens"
 )
 
+
 #' Write Excel workbook with column widths adjusted
 write_xlsx <- function(sheets, file,
                        colWidths = "auto", maxWidth = 55, ...) {
+    message("Writing XLSX...")
+    message("... output: ", file)
     mw <- getOption("openxslx.maxWidth")
     options(openxlsx.maxWidth = maxWidth)
     write.xlsx(sheets, file, colWidths = colWidths, ...)
     options(openxlsx.maxWidth = mw)
+    message("... done")
 }
 
 
@@ -125,8 +129,7 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     ),
         make_option(c("--merge-samples"),
                     metavar = "REGEX",
-                    default = "(.*)",
-                    help = "Merge units assembled as distinct samples (default: '%default')"),
+                    help = "Rewrite sample name using this regex to merge units processed as samples"),
         make_option(c("--in-list"),
                     metavar = "FILE",
                     help = "File with list of input files (alternative specification)"
@@ -165,7 +168,10 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
 #' @param opt List with $arg parameter pointing to directory or list
 #'     of files.
 locate_files <- function(opt) {
+    message("Locating files from arguments...")
+
     if (length(opt$args) == 1 && file_test("-d", opt$args[1])) {
+        message("... single directory passed, globbing for ", opt$options$pattern)
         ## Just one directory argument, globbing for files
         samples <- tibble(
             path=list.files(
@@ -177,10 +183,12 @@ locate_files <- function(opt) {
             stop("No samples in directory")
         }
     } else {
+        message("... scanning ", length(opt$args), " files passed as arguments")
         ## Individually listed arguments
         samples <- tibble(path=opt$args)
     }
     if (!is.null(opt$options$in_list)) {
+        message("... loading files from file ", opt$options$in_list)
         samples <- bind_rows(
             samples,
             read_table(opt$options$in_list,
@@ -188,6 +196,7 @@ locate_files <- function(opt) {
                        col_types=c(col_character()))
         )
     }
+    message("... found ", nrow(samples), " sample data files")
 
     file_ok <- file_test("-f", samples$path) &
         file.access(samples$path, 4) == 0
@@ -196,6 +205,8 @@ locate_files <- function(opt) {
         print(samples$path[which(!file_ok)])
         stop("Cannot read file(s). Aborting.")
     }
+    message("... all files readable")
+    message("... done")
     samples %<>%
         mutate(
             unit = sub(paste0(".*/", opt$options$pattern), "\\1", path)
@@ -206,6 +217,7 @@ locate_files <- function(opt) {
 #'
 #'
 load_files <- function(samples, opt) {
+    message("Loading files...")
     cov_cols <- cols(
         sample = col_character(),
         words = col_character(),
@@ -217,38 +229,51 @@ load_files <- function(samples, opt) {
         stitle = col_character(),
         staxids = col_character(),
         pident = col_double(),
-        pidents = col_character(),
-        qaccs = col_character(),
-        qranges = col_character(),
-        sranges = col_character(),
-        reversed = col_character(),
         numreads = col_integer(),
-        numreadss = col_character(),
         taxid = col_integer(),
-        saccs = col_character(),
         taxname = col_character(),
-        lineage = col_character()
+        species = col_character(),
+        lineage = col_character(),
+        lineage_ranks = col_character()
     )
-    samples %>%
+    samples <- samples %>%
         mutate(
             data = map(path, read_csv, col_types=cov_cols)
         ) %>%
         unnest(cols=c(data)) %>%
-        mutate(
-            sample = gsub(paste0(opt$options$merge_samples, ".*"),
-                          "\\1", sample)
-        ) %>%
         select(-path)
+    n_samples = length(unique(samples$sample))
+    message("... found ", n_samples, " unique sample names")
+    if (!is.null(opt$options$merge_samples)) {
+        message("... rewriting sample names using regex ", opt$options$merge_samples)
+        samples <- samples %>%
+            mutate(
+                sample = gsub(paste0(opt$options$merge_samples, ".*"),
+                              "\\1", sample)
+            )
+        n_samples = length(unique(samples$sample))
+        message("... found ", n_samples, "unique sample names after rewrite")
+    }
+    message("... found a total of ", nrow(samples), " detected organisms")
+    message("... done")
+    samples
 }
 
 #' Basic hit filtering
 filter_hits <- function(samples, opt) {
-    samples %>%
+    message("Filtering accession level bins...")
+    message("... minimum `slen`: ", opt$option$min_slen)
+    message("... minimum read count: ", opt$option$min_reads)
+    message("... lineage regex: ", opt$option$filter)
+
+    samples <- samples %>%
         filter(
             grepl(opt$option$filter, lineage),
             slen >= opt$option$min_slen,
             numreads >= opt$option$min_reads
         )
+    message("... remaining detections: ", nrow(samples))
+    samples
 }
 
 
@@ -263,6 +288,7 @@ load_vhdb <- function(url = NULL, reload = FALSE) {
         url <- "ftp://ftp.genome.jp/pub/db/virushostdb/virushostdb.tsv"
     }
 
+    message("Loading VirusHostDB from '", url, "' ...")
     col_spec <- cols(
         `virus tax id` = col_integer(),    # NCBI taxid
         `virus name` = col_character(),
@@ -281,8 +307,8 @@ load_vhdb <- function(url = NULL, reload = FALSE) {
         ## NCBI tax id for env sample (animal, plant, ...)
         `source organism` = col_integer()
     )
-    message("Loading VirusHostDB from ", url)
     vhdb <- read_tsv(url, col_types = col_spec)
+    message("... processing")
     vhdb_filtered <- vhdb %>%
         rename_all(~ gsub(" ", "_", .)) %>%
         rename_all(tolower) %>%
@@ -300,6 +326,7 @@ load_vhdb <- function(url = NULL, reload = FALSE) {
     attr(vhdb_filtered, "spec") <- NULL
 
     assign(".virushostdb", vhdb_filtered, env=globalenv())
+    message("... done")
     vhdb_filtered
 }
 
@@ -307,7 +334,7 @@ load_vhdb <- function(url = NULL, reload = FALSE) {
 #' Compute list of hosts for each virus usign VHDB
 vhdb_get_host <- function(lineages, taxids=NULL, url=NULL,
                           vhdb=load_vhdb(url=url)) {
-    message("Finding hosts using VirusHostDB for ", length(lineages), " hits")
+    message("> Finding hosts using VirusHostDB for ", length(lineages), " hits")
     result <- tibble(
         lineage=lineages,
         host_names=""
@@ -315,7 +342,7 @@ vhdb_get_host <- function(lineages, taxids=NULL, url=NULL,
 
     ## If we have TaxIDs, check those first:
     if (!is.null(taxids)) {
-        message("  matching by NCBI tax ID")
+        message(">  matching by NCBI tax ID")
         result$vhdb_virus_tax_id <- taxids
         result %<>%
             mutate(
@@ -330,7 +357,7 @@ vhdb_get_host <- function(lineages, taxids=NULL, url=NULL,
             ) %>%
             ungroup() %>%
             select(lineage, host_names)
-        message("    found ", length(which(nzchar(result$host_names))))
+        message(">    found ", length(which(nzchar(result$host_names))))
     }
 
 
@@ -418,43 +445,53 @@ vhdb_get_host <- function(lineages, taxids=NULL, url=NULL,
     }
 
     if (nrow(tosearch) > 0) {
-        message("  Failed to find ", nrow(tosearh), " lineages:")
+        message(">  Failed to find ", nrow(tosearh), " lineages:")
         print(data)
     }
 
-    result %>%
+    result <- result %>%
         left_join(matches, by="lineage") %>%
         mutate(
             host_names = ifelse(nzchar(host_names), host_names, res)
         ) %>%
         pull(host_names)
+    message("> ... done")
+    result
 }
 
 #' Load and add virus to host annotation from VirusHostDB (genome.jp)
 filter_vhdb_host <- function(samples, opt) {
-    samples %>%
+    message("Filtering by virual host '", opt$options$filter_host, "' ...")
+    samples <- samples %>%
         mutate(
             host = vhdb_get_host(lineage, taxid, url=opt$options$virushostdb)
         ) %>%
         filter(
             grepl(opt$options$filter_host, host)
         )
+    message("... remaining detections: ", nrow(samples))
+    samples
 }
 
 #' Filter known respiratory viruses
 filter_respiratory_viruses <- function(samples) {
+    message("Filtering with positive list...")
     re <- paste0("(", paste(collapse="|", respiratory_viruses), ")")
-    samples %>%
+    samples <- samples %>%
         filter(
             grepl(re, taxname, ignore.case = TRUE)
         )
+    message("... remaining detections: ", nrow(samples))
+    samples
 }
 
-#' Merge units
-merge_units <- function(samples) {
-    samples %>%
-        group_by(sample, taxid) %>%
+#' Merge species
+merge_species <- function(samples) {
+    message("Merging species...")
+    samples <- samples %>%
+        group_by(sample, species) %>%
         summarize(
+            taxid    = concat(taxid),
             taxname  = concat(taxname),
             numreads = sum(numreads),
             min_log_evalue = min(log_evalue),
@@ -468,9 +505,11 @@ merge_units <- function(samples) {
             .groups="drop"
         ) %>%
         ungroup()
+    message("... remaining detections: ", nrow(samples))
+    samples
 }
 
-merge_samples <- function(sample) {
+merge_samples <- function(samples) {
     samples %>%
         group_by(sample) %>%
         arrange(desc(numreads)) %>%
@@ -500,31 +539,30 @@ if (!interactive()) {
         Tab=character()
     )
 
-    message("Locating files")
-    results$files         <- samples <- locate_files(opt)
+    ## Determine file locations from arguments
+    files <- locate_files(opt)
     summary %<>%
         add_row(
-            Value=as.character(nrow(samples)),
+            Value=as.character(nrow(files)),
             Description="Units (files) processed",
             Tab="files"
         )
-    message("Found ", nrow(samples), " files")
 
-    message("Loading files")
-    results$raw           <- samples %<>% load_files(opt)
-    message("done")
+    ## Load the files
+    calls <- load_files(files, opt)
     summary %<>%
         add_row(
-            Value=as.character(nrow(samples)),
+            Value=as.character(nrow(calls)),
             Description="Total detections",
-            Tab="raw"
+            Tab=""
         )
 
-    message("Performing base filtering")
-    results$filtered      <- samples %<>% filter_hits(opt)
+    ## Filter calls by lineage, length and read count
+    filtered_calls <- filter_hits(calls, opt)
+    results$Detections <- filtered_calls
     summary %<>%
         add_row(
-            Value=as.character(nrow(samples)),
+            Value=as.character(nrow(filtered_calls)),
             Description="Filtered detections",
             Tab="filtered"
         ) %>%
@@ -544,13 +582,15 @@ if (!interactive()) {
             Tab=""
         )
 
-    message("Determining viral host")
-    results$host_filtered <- samples %<>% filter_vhdb_host(opt)
+    ## Filter calls by host
+    load_vhdb(url=opt$options$virushostdb)
+    host_filtered_calls <- filter_vhdb_host(filtered_calls, opt)
+    results$`Host Filtered` = host_filtered_calls
     summary %<>%
         add_row(
-            Value=as.character(nrow(samples)),
+            Value=as.character(nrow(host_filtered_calls)),
             Description="Host filtered detections",
-            Tab="host_filtered"
+            Tab="Host Filtered"
         ) %>%
         add_row(
             Value=opt$options$filter_host,
@@ -558,42 +598,49 @@ if (!interactive()) {
             Tab=""
         )
 
-    results$viruses_found <- results$host_filtered %>%
+    ## Count found viruses
+    viruses_found <- host_filtered_calls %>%
         group_by(taxname) %>%
         summarize(positive_samples=n(), .groups="drop") %>%
         arrange(taxname)
+    results$`Viruses Found` = viruses_found
+    message("Found ", nrow(viruses_found), " distinct viruses across all samples")
     summary %<>%
         add_row(
             Value=as.character(nrow(results$viruses_found)),
             Description="Distinct Viruses Found",
-            Tab="viruses_found"
+            Tab="Viruses Found"
         )
 
-    results$resp_viruses  <- samples %<>% filter_respiratory_viruses()
+    ## Filter respiratory viruses (positive list)
+    resp_viruses <- filter_respiratory_viruses(host_filtered_calls)
+    results$`Respiratory Viruses` <- resp_viruses
     summary %<>%
         add_row(
-            Value=as.character(nrow(samples)),
+            Value=as.character(nrow(resp_viruses)),
             Description="Respiratory Virus detections",
-            Tab="resp_viruses"
+            Tab="Respiratory Viruses"
         )
 
-    results$merged_units  <- samples %<>% merge_units()
+    row_per_species <- merge_species(resp_viruses)
+    results$`Species Level` <-  row_per_species
     summary %<>%
         add_row(
-            Value=as.character(nrow(samples)),
-            Description="Detections after merging sequencing units",
-            Tab="merged_units"
+            Value=as.character(nrow(row_per_species)),
+            Description="Detections after merging multiple calls per species",
+            Tab="Species Level"
         )
 
-    results$by_sample     <- samples %<>% merge_samples()
+    row_per_sample  <- merge_samples(row_per_species)
+    results$`Samples` <- row_per_sample
     summary %<>%
         add_row(
-            Value=as.character(nrow(samples)),
+            Value=as.character(nrow(row_per_sample)),
             Description="Positive Samples",
-            Tab="by_sample"
+            Tab="Samples"
         )
 
-    results$summary <- summary
+    results$Summary <- summary
 
     write_xlsx(rev(results), opt$options$excel)
     for (name in names(results)) {
