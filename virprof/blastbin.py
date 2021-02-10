@@ -142,7 +142,7 @@ class HitChain:
     def __str__(self) -> str:
         return (
             f"acc={self.sacc} e={self.log10_evalue} "
-            f"l={self.qlen}"
+            f"l={self.qlens}"
         )
 
     def __repr__(self) -> str:
@@ -350,7 +350,6 @@ class HitChain:
 
         return {
             "log_evalue": self.log10_evalue,
-            "qlen": self.qlen,
             "slen": self.slen,
             "n_frag": len(self.hits),
             "sacc": self.sacc,

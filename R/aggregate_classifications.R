@@ -222,7 +222,6 @@ load_files <- function(samples, opt) {
         sample = col_character(),
         words = col_character(),
         log_evalue = col_double(),
-        qlen = col_integer(),
         slen = col_integer(),
         n_frag = col_integer(),
         sacc = col_character(),
