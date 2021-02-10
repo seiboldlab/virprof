@@ -541,6 +541,13 @@ class CoverageHitChain(HitChain):
                 filtered += 1
         LOG.info(f"Removed {filtered} contigs having < {min_read_count} reads")
 
+    def to_dict(self) -> Dict[str, Any]:
+        res = super().to_dict()
+        res.update({
+            "numreads": self.numreads,
+        })
+        return res
+
     def hits_to_dict(self) -> Iterator[Dict[str, Any]]:
         for hit, row in zip(self.hits, super().hits_to_dict()):
             row['numreads'] = sum(self.get_numreads(hit.qacc))
