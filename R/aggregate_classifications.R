@@ -35,7 +35,7 @@ vhdb_blacklist <- tribble(
 
 #' Write Excel workbook with column widths adjusted
 write_xlsx <- function(sheets, file,
-                       colWidths = "auto", maxWidth = 55, ...) {
+                       colWidths = "auto", maxWidth = 80, ...) {
     message("Writing XLSX...")
     message("... output: ", file)
     mw <- getOption("openxslx.maxWidth")
@@ -514,15 +514,13 @@ merge_samples <- function(samples) {
         group_by(sample) %>%
         arrange(desc(numreads)) %>%
         summarize(
-            taxnames  = paste(collapse=";", taxname),
-            numreadss = paste(collapse=";", numreads),
-            min_log_evalues = paste(collapse=";", min_log_evalue),
-            pident2   = paste(collapse=";", pident),
-            slens     = paste(collapse=";", slen),
-            qlens     = paste(collapse=";", qlen),
-            n_frags   = paste(collapse=";", n_frag),
-            saccs     = paste(collapse=";", sacc),
-            staxidss  = paste(collapse=";", staxids),
+            "Taxonomic Names"      = paste(collapse=";", taxname),
+            "Read Counts"          = paste(collapse=";", numreads),
+            "Log E-values (min)"   = paste(collapse=";", min_log_evalue),
+            "% Identities"         = paste(collapse=";", pident),
+            "Reference bp covered" = paste(collapse=";", slen),
+            "Contigs"              = paste(collapse=";", n_frag),
+            "Reference Accessions" = paste(collapse=";", sacc),
             .groups="drop"
         ) %>%
         ungroup()
