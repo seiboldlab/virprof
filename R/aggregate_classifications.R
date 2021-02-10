@@ -534,8 +534,8 @@ if (!interactive()) {
 
     results <- list()
     summary <- tibble(
-        Value=character(),
         Description=character(),
+        Value=numeric(),
         Tab=character()
     )
 
@@ -543,16 +543,16 @@ if (!interactive()) {
     files <- locate_files(opt)
     summary %<>%
         add_row(
-            Value=as.character(nrow(files)),
+            Value=nrow(files),
             Description="Units (files) processed",
-            Tab="files"
+            Tab=""
         )
 
     ## Load the files
     calls <- load_files(files, opt)
     summary %<>%
         add_row(
-            Value=as.character(nrow(calls)),
+            Value=nrow(calls),
             Description="Total detections",
             Tab=""
         )
@@ -562,24 +562,18 @@ if (!interactive()) {
     results$Detections <- filtered_calls
     summary %<>%
         add_row(
-            Value=as.character(nrow(filtered_calls)),
+            Value=nrow(filtered_calls),
             Description="Filtered detections",
-            Tab="filtered"
+            Tab="Detections"
         ) %>%
         add_row(
-            Value=as.character(opt$options$min_slen),
-            Description="Minimum slen (subject bases covered)",
-            Tab=""
+            Description=paste("... Minimum subject bases covered:", opt$options$min_slen)
         ) %>%
         add_row(
-            Value=as.character(opt$options$min_reads),
-            Description="Minimum numreads (reads mapped per hit)",
-            Tab=""
+            Description=paste("... Minimum read count:", opt$options$min_reads)
         ) %>%
         add_row(
-            Value=opt$options$filter,
-            Description="Lineage filter regex",
-            Tab=""
+            Description=paste("... Lineage Regex: ", opt$options$filter)
         )
 
     ## Filter calls by host
@@ -588,14 +582,12 @@ if (!interactive()) {
     results$`Host Filtered` = host_filtered_calls
     summary %<>%
         add_row(
-            Value=as.character(nrow(host_filtered_calls)),
+            Value=nrow(host_filtered_calls),
             Description="Host filtered detections",
             Tab="Host Filtered"
         ) %>%
         add_row(
-            Value=opt$options$filter_host,
-            Description="Host filter regex",
-            Tab=""
+            Description=paste("... Host Regex:", opt$options$filter_host)
         )
 
     ## Count found viruses
@@ -607,7 +599,7 @@ if (!interactive()) {
     message("Found ", nrow(viruses_found), " distinct viruses across all samples")
     summary %<>%
         add_row(
-            Value=as.character(nrow(results$viruses_found)),
+            Value=nrow(viruses_found),
             Description="Distinct Viruses Found",
             Tab="Viruses Found"
         )
@@ -617,7 +609,7 @@ if (!interactive()) {
     results$`Respiratory Viruses` <- resp_viruses
     summary %<>%
         add_row(
-            Value=as.character(nrow(resp_viruses)),
+            Value=nrow(resp_viruses),
             Description="Respiratory Virus detections",
             Tab="Respiratory Viruses"
         )
@@ -626,7 +618,7 @@ if (!interactive()) {
     results$`Species Level` <-  row_per_species
     summary %<>%
         add_row(
-            Value=as.character(nrow(row_per_species)),
+            Value=nrow(row_per_species),
             Description="Detections after merging multiple calls per species",
             Tab="Species Level"
         )
@@ -635,7 +627,7 @@ if (!interactive()) {
     results$`Samples` <- row_per_sample
     summary %<>%
         add_row(
-            Value=as.character(nrow(row_per_sample)),
+            Value=nrow(row_per_sample),
             Description="Positive Samples",
             Tab="Samples"
         )
