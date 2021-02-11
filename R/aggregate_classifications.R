@@ -649,12 +649,12 @@ if (!interactive()) {
         )
 
     row_per_species <- merge_species(resp_viruses)
-    results$`Species Level` <-  row_per_species
+    results$`Species` <-  row_per_species
     summary %<>%
         add_row(
             Value=nrow(row_per_species),
             Description="Detections after merging multiple calls per species",
-            Tab="Species Level"
+            Tab="Species"
         )
 
     row_per_sample  <- merge_samples(row_per_species)
