@@ -46,6 +46,44 @@ write_xlsx <- function(sheets, file,
 }
 
 
+field_name_map <- list(
+    "Sample" = "sample",
+    "Frequent Words" = "words",
+    "Log E-Value" = "log_evalue",
+    "Log E-Value (min)" = "min_log_evalue",
+    "Log E-Values (min)" = "min_log_evalues",
+    "# Contigs" = "n_frag",
+    "Reference Accession" = "sacc",
+    "Reference Accessions" = "saccs",
+    "Reference Title" = "stitle",
+    "Reference Taxonomy IDs" = "staxids",
+    "% Identity" = "pident",
+    "% Identities" = "pidents",
+    "# Reads" = "numreads",
+    "Taxonomy ID" = "taxid",
+    "Taxonomic Name" = "taxname",
+    "Taxonomic Names" = "taxnames",
+    "Species" = "species",
+    "Lineage" = "lineage",
+    "Lineage Ranks" = "lineage_ranks",
+    "Reference BP covered" = "slen",
+    "Positive Samples" = "positive_samples"
+)
+
+#' Convert code to natural names
+rename_fields <- function(names) {
+    for (i in seq_along(field_name_map)) {
+        from_name = field_name_map[[i]]
+        to_name = names(field_name_map)[[i]]
+        match = pmatch(from_name, names)
+        if (!is.na(match)) {
+            names[[match]] <- to_name
+        }
+    }
+    names
+}
+
+
 #' Concatenate fields
 #'
 #' Helper for summarize() joining strings
@@ -513,13 +551,13 @@ merge_samples <- function(samples) {
         group_by(sample) %>%
         arrange(desc(numreads)) %>%
         summarize(
-            "Taxonomic Names"      = paste(collapse=";", taxname),
-            "Read Counts"          = paste(collapse=";", numreads),
-            "Log E-values (min)"   = paste(collapse=";", min_log_evalue),
-            "% Identities"         = paste(collapse=";", pident),
-            "Reference bp covered" = paste(collapse=";", slen),
-            "Contigs"              = paste(collapse=";", n_frag),
-            "Reference Accessions" = paste(collapse=";", sacc),
+            taxnames = paste(collapse=";", taxname),
+            numreads = paste(collapse=";", numreads),
+            min_log_evalues = paste(collapse=";", min_log_evalue),
+            pidents = paste(collapse=";", pident),
+            slen = paste(collapse=";", slen),
+            n_frag = paste(collapse=";", n_frag),
+            saccs = paste(collapse=";", sacc),
             .groups="drop"
         ) %>%
         ungroup()
@@ -630,6 +668,10 @@ if (!interactive()) {
         )
 
     results$Summary <- summary
+
+    for (i in seq_along(results)) {
+        results[[i]] %<>% rename_with(rename_fields)
+    }
 
     write_xlsx(rev(results), opt$options$excel)
     for (name in names(results)) {
