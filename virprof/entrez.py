@@ -415,7 +415,8 @@ class Cache:
         os.makedirs(path, exist_ok=True)
         self._path = path
 
-    def _make_path(self, cache: str, entry: str):
+    def _make_path(self, cache: str, entry: any):
+        entry = str(entry)
         if len(entry) < 6:
             entry += "x" * (6 - len(entry))
         path = os.path.join(
@@ -440,7 +441,7 @@ class Cache:
         tmpdir = tempfile.mkdtemp(dir=self._path)
         for entry in data:
             path = self._make_path(cache, entry)
-            tmp = os.path.join(tmpdir, entry)
+            tmp = os.path.join(tmpdir, str(entry))
             with open(tmp, "w") as cachefd:
                 json.dump(data[entry], cachefd)
             os.rename(tmp, path)
@@ -673,10 +674,15 @@ class GenomeSizes:
 
         `avg_sequence`: Using an Entrez search without constraints.
         """
-        return {
+        result = self.cache.get("genome_sizes", taxids)
+        taxids = [taxid for taxid in taxids if taxid not in result]
+        newresult = {
             taxid: self.get_one(taxid)
             for taxid in taxids
         }
+        self.cache.put("genome_sizes", newresult)
+        result.update(newresult)
+        return result
 
 
 def main():
