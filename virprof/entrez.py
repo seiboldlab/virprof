@@ -7,9 +7,11 @@ import os
 import shutil
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 
-from typing import Optional, Set, Dict, Iterator, Union, List, Any
+from typing import Optional, Set, Dict, Iterator, Union, List, Any, Tuple
 
+import requests
 from requests import Session
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -118,6 +120,33 @@ class EntrezAPI:
             LOG.info("Entrez request failed with '%s'. Returning empty string instead.", text)
             text = ""
         return text
+
+    def search(self, database: str, term: str):
+        """Calls Entrez Search (esearch) API"""
+        result = self._get(
+            "esearch",
+            {
+                "db": database,
+                "term": term,
+                "usehistory": "y",
+                "retmode": "json",
+            }
+        )
+        parsed = json.loads(result)
+        return parsed["esearchresult"]
+
+    def summary(self, database: str, query):
+        """Calls Entrez Search (esearch) API"""
+        data = self._get(
+            "esummary",
+            {
+                "db": database,
+                "query_key": query["querykey"],
+                "WebEnv": query["webenv"],
+            }
+        )
+        xml = ET.fromstring(data)
+        return xml
 
     def fetch(
         self,
@@ -499,6 +528,155 @@ class FeatureTables:
         writer = csv.DictWriter(out, fieldnames=table[0].keys())
         for row in table:
             writer.writerow(row)
+
+
+class GenomeSizes:
+    """Determine genome sizes for given NCBI taxonomy IDs"""
+
+    #: API endpoint for NCBI genome size check
+    GENOME_SIZE_URL = "https://api.ncbi.nlm.nih.gov/genome/v0/expected_genome_size"
+
+    def __init__(
+        self, entrez: EntrezAPI = None,
+        cache_path: str = None,
+        api_key = None
+    ) -> None:
+        if api_key is not None:
+            defaults = {'api_key': api_key}
+        else:
+            defaults = None
+        self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
+        self.cache = Cache(cache_path)
+
+    @staticmethod
+    def _trytoint(val: str) -> Union[str, int]:
+        """Tries to convert string to int, returning string on failure"""
+        try:
+            return int(val)
+        except ValueError:
+            return val
+
+    def genome_size_check_query(self, taxid: int) -> Dict[str, str]:
+        """Queries NCBI genome size check API"""
+        response = requests.get(
+            self.GENOME_SIZE_URL,
+            params={"species_taxid": taxid}
+        )
+        response.raise_for_status()
+        genome_size_response = ET.fromstring(response.text)
+        return {node.tag:node.text for node in genome_size_response}
+
+
+    def genome_size_check(self, taxid: int) -> Optional[int]:
+        """Determines the genome size using NCBI genome size check API
+
+        Returns None if the API did not yield a result or if the result was malformed.
+
+        Note: This will return the total genome size, spanning
+          multiple molecules (segments, chromosomes). Where this is
+          the case, no single accession will ever cover the entire
+          genome.
+        """
+        results = self.genome_size_check_query(taxid)
+        exp_len = results.get('expected_ungapped_length')
+        if not exp_len:
+            # No result, usually means that there are fewer than 4 accepted reference
+            # genomes for the taxonomy ID in question
+            return None
+        try:
+            return int(exp_len)
+        except ValueError:
+            # Result, but not an integer. Let's log this, but then
+            # continue with alternate ways of finding the genome size.
+            LOG.error(
+                "NCBI genome size check API returned malformed value '%s'",
+                exp_len
+            )
+            return None
+
+    def entrez_genome_search(
+            self,
+            taxid: int,
+            refseq: bool = False,
+            complete: bool = False,
+    ) -> int:
+        """Determines the genome size using Entrez APIs
+
+        The size is found by querying entrez for all sequences within
+        the taxomony node and taking the average length. The result
+        can be limited to only refseq, and/or only sequences with
+        "complete genome" in their title.
+
+        Returns None if no results were found
+
+        Params:
+          taxid: The NCBI taxid for which a size should be found
+          refseq: Query only refseq sequences
+          complete: Query only sequences marked as "complete genome"
+
+        Note: This will return the average molecule size for taxa
+          whith genomes spanning multiple molecules and therefore
+          multiple accessions. This is different from the result
+          returned by `genome_size_check`.
+
+        """
+        term = f"(txid{taxid}[Organism:exp])"
+        if refseq:
+            term +=  "AND (refseq[filter])"
+        if complete:
+            term +=  "AND (complete genome)"
+        query = self.entrez.search("nucleotide", term)
+        summaries = self.entrez.summary("nucleotide", query)
+        lengths = [
+            int(item.text)
+            for doc in summaries
+            for item in doc
+            if item.attrib.get("Name") == "Length"
+        ]
+        if not lengths:
+            return None
+        return int(sum(lengths) / len(lengths))
+
+    def get_one(self, taxid: int) -> Tuple[str, int]:
+        """Determines genome size for a taxonomy ID using several methods. See `get`"""
+        expected_length = self.genome_size_check(taxid)
+        if expected_length:
+            return "genome_size_check", expected_length
+        expected_length = self.entrez_genome_search(taxid, refseq=True)
+        if expected_length:
+            return "avg_refseq", expected_length
+        expected_length = self.entrez_genome_search(taxid, complete=True)
+        if expected_length:
+            return "avg_genome", expected_length
+        expected_length = self.entrez_genome_search(taxid)
+        if expected_length:
+            return "avg_sequence", expected_length
+        return "failed", 0
+
+    def get(self, taxids: List[int]) -> Dict[int, Tuple[str, int]]:
+        """Fetches the genome sizes for the NCBI taxonomy IDs passed in ``taxids``.
+
+        For each taxonomy ID, four different approaches are tried. The
+        returned dictionary has for each taxonomic ID a tuple listing
+        the source for the genome size and the genome size itself. The
+        four approaches are:
+
+        `genome_size_check`: Using the NCBI "genome size check" API (returns total
+           accross molecules, e.g. segments or chromosomes)
+
+        `avg_refseq`: Using an Entrez search for the taxomic ID, considering only
+           sequences deposited in RefSeq. This will return an average
+           value if the taxon features multi-molecule genomes.
+
+        `avg_genome`: Using an Entrez search considering only sequences with the
+           string "complete genome" in the title.
+
+        `avg_sequence`: Using an Entrez search without constraints.
+        """
+        return {
+            taxid: self.get_one(taxid)
+            for taxid in taxids
+        }
 
 
 def main():
