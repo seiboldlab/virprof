@@ -414,6 +414,7 @@ class Cache:
         path = os.path.expanduser(path)
         os.makedirs(path, exist_ok=True)
         self._path = path
+        LOG.info("Using cache: '%s'", path)
 
     def _make_path(self, cache: str, entry: any):
         entry = str(entry)
@@ -654,7 +655,7 @@ class GenomeSizes:
             return "avg_sequence", expected_length
         return "failed", 0
 
-    def get(self, taxids: Union[int, List[int]]) -> Dict[int, Tuple[str, int]]:
+    def get_many(self, taxids: List[int]) -> Dict[int, Tuple[str, int]]:
         """Fetches the genome sizes for the NCBI taxonomy IDs passed in ``taxids``.
 
         For each taxonomy ID, four different approaches are tried. The
@@ -674,8 +675,6 @@ class GenomeSizes:
 
         `avg_sequence`: Using an Entrez search without constraints.
         """
-        if isinstance(taxids, int):
-            taxids = [taxids]
         result = self.cache.get("genome_sizes", taxids)
         taxids = [taxid for taxid in taxids if taxid not in result]
         newresult = {
@@ -685,6 +684,9 @@ class GenomeSizes:
         self.cache.put("genome_sizes", newresult)
         result.update(newresult)
         return result
+
+    def get(self, taxid: int) -> Tuple[str, int]:
+        return self.get_many([taxid]).get(taxid, (None, None))
 
 
 def main():

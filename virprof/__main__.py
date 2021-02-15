@@ -408,7 +408,7 @@ def blastbin(
     LOG.info("Writing bins to: %s", out.name)
     fields = ["sample", "words"] + chain_tpl.fields + ["taxid"]
     if genome_sizes is not None:
-        fields += ["genome_size"]
+        fields += ["genome_size_source", "genome_size"]
     if not taxonomy.is_null():
         fields += ["taxname", "species", "lineage", "lineage_ranks"]
     LOG.info("  output fields: %s", " ".join(fields))
@@ -475,7 +475,7 @@ def blastbin(
         })
 
         if genome_sizes is not None:
-            row["genome_size"] = genome_sizes.get(taxid)
+            row["genome_size_source"], row["genome_size"] = genome_sizes.get(taxid)
 
         if not taxonomy.is_null():
             row.update({
