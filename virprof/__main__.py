@@ -29,7 +29,7 @@ from .taxonomy import load_taxonomy
 from .fasta import filter_fasta, FastaFile
 from .regionlist import RegionList
 from .fasta import scaffold_contigs
-from .entrez import FeatureTables
+from .entrez import FeatureTables, GenomeSizes
 
 LOG = logging.getLogger(__name__)
 
@@ -303,6 +303,7 @@ def cli() -> None:
     default="entrez_cache"
 )
 @click.option("--ncbi-api-key", type=str, help="NCBI API Key")
+@click.option("--genome-size/--no-genome-size", default=True, help="Obtain genome sizes for bins from NCBI")
 def blastbin(
     in_blast7: click.utils.LazyFile,
     in_coverage: click.utils.LazyFile,
@@ -321,7 +322,8 @@ def blastbin(
     profile: bool = False,
     debug: bool = False,
     cache_path: str = "entrez_cache",
-    ncbi_api_key = None,
+    ncbi_api_key: Optional[str] = None,
+    genome_size: bool = True,
 ) -> bool:
     # pylint: disable=too-many-arguments
     """Merge and classify contigs based on BLAST search results"""
@@ -338,6 +340,11 @@ def blastbin(
         features = FeatureTables(cache_path=cache_path, api_key=ncbi_api_key)
     else:
         features = None
+
+    if genome_size:
+        genome_sizes = GenomeSizes(cache_path=cache_path, api_key=ncbi_api_key)
+    else:
+        genome_sizes = None
 
     if not in_coverage:
         chain_tpl = HitChain(chain_penalty=chain_penalty)
@@ -400,6 +407,8 @@ def blastbin(
 
     LOG.info("Writing bins to: %s", out.name)
     fields = ["sample", "words"] + chain_tpl.fields + ["taxid"]
+    if genome_sizes is not None:
+        fields += ["genome_size"]
     if not taxonomy.is_null():
         fields += ["taxname", "species", "lineage", "lineage_ranks"]
     LOG.info("  output fields: %s", " ".join(fields))
@@ -464,6 +473,10 @@ def blastbin(
             "taxid": taxid,
             "words": wordscorer.score(chains),
         })
+
+        if genome_sizes is not None:
+            row["genome_size"] = genome_sizes.get(taxid)
+
         if not taxonomy.is_null():
             row.update({
                 "lineage": "; ".join(taxonomy.get_lineage(taxid)),
