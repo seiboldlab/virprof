@@ -73,6 +73,7 @@ field_name_map <- list(
     "Merged BP" = "slen",
     "Merged BP(s)" = "slens",
     "% Genome" = "genome_coverage",
+    "% Genome(s)" = "genome_coverages",
     "Positive Samples" = "positive_samples",
     "Host" = "host",
     "Known Respiratory Virus" = "respiratory"
@@ -365,6 +366,7 @@ merge_species <- function(samples) {
             numreads = sum(numreads),
             min_log_evalue = min(log_evalue),
             pident   = round(sum(pident * slen) / sum(slen), 1),
+            genome_coverages = concat(genome_coverage),
             slens     = concat(slen),
             n_frag   = sum(n_frag),
             saccs    = concat(sacc),
@@ -387,6 +389,7 @@ merge_samples <- function(samples) {
             numreadss = paste(collapse=";", numreads),
             min_log_evalues = paste(collapse=";", min_log_evalue),
             pidents = paste(collapse=";", pident),
+            genome_coverages = paste(collapse=";", genome_coverages),
             slens = paste(collapse=";", slens),
             n_frag = paste(collapse=";", n_frag),
             saccs = paste(collapse=";", saccs),
