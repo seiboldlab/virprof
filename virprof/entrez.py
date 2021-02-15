@@ -9,7 +9,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 
-from randim import randint
+from random import randint
 from typing import Optional, Set, Dict, Iterator, Union, List, Any, Tuple
 
 import requests
