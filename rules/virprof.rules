@@ -266,7 +266,7 @@ with Stage("summarize_vp") as S:
         message:
             "Creating virus summary for {wildcards.target} in {:this:}"
         input:
-            #virushostdb="{:prev:}/virushostdb.csv",
+            virushostdb="{:prev:}/virushostdb.tsv",
             calls="{:prev:}/{:target:}.virus.csv",
             call_files="{:this:}/{target}.call_files.txt",
         output:
@@ -285,6 +285,7 @@ with Stage("summarize_vp") as S:
         shell:
             "exec >{log} 2>&1;"
             "./R/aggregate_classifications.R"
+            "  --virushostdb '{input.virushostdb}'"
             "  --filter-host '{params.filter_host}'"
             "  --min-slen '{params.min_slen}'"
             "  --min-reads '{params.min_reads}'"

@@ -114,6 +114,7 @@ pipelines:
     stages:
       - group_BIN
       - format_bbmapL200
+      - ref_VHDB
       - group_ALL
       - summarize_vp
 
@@ -300,6 +301,12 @@ references:
       files:
         ALL.NCBI.nodes.dmp: nodes.dmp
         ALL.NCBI.names.dmp: names.dmp
+  # VirusHostDB from genome.jp
+  VHDB:
+    - url: ftp://ftp.genome.jp/pub/db/virushostdb/
+      type: dirx
+      files:
+        virushostdb.tsv: virushostdb.tsv
   # SILVA databases for removing rRNA (unused at this time)
   SilvaSSU:
     - url: https://www.arb-silva.de/fileadmin/silva_databases/release_138/Exports/SILVA_138_SSURef_NR99_tax_silva_trunc.fasta.gz
