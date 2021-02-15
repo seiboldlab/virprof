@@ -9,6 +9,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 
+from randim import randint
 from typing import Optional, Set, Dict, Iterator, Union, List, Any, Tuple
 
 import requests
@@ -113,7 +114,7 @@ class EntrezAPI:
         all_params = self._defaults.copy()
         all_params.update(params)
         request = self._session.get(url, params=all_params,
-                                            timeout=self.timeout)
+                                    timeout=self.timeout)
         request.raise_for_status()
         text = request.text.strip()
         if text.startswith("Error:"):
