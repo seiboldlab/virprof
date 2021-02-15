@@ -510,8 +510,11 @@ if (!interactive()) {
     }
 
     write_xlsx(rev(results), opt$options$excel)
+    message("Writing CSVs...")
     for (name in names(results)) {
-        fn <- sprintf(opt$options$out, name)
+        fname <- tolower(sub(" ", "_", name))
+        fn <- sprintf(opt$options$out, fname)
+        message("... ", fn)
         write_csv(results[[name]], fn)
     }
 
