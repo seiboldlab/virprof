@@ -283,7 +283,6 @@ with Stage("summarize_vp") as S:
             "{:this:}/{target}.summary.log"
         params:
             csv_out="{:this:}/{target}.summary_%s.csv",
-            filter="^Viruses;",
             filter_host="Homo sapiens",
             min_slen=200,
             min_reads=3,
@@ -294,7 +293,6 @@ with Stage("summarize_vp") as S:
         shell:
             "exec >{log} 2>&1;"
             "./R/aggregate_classifications.R"
-            "  --filter '{params.filter}'"
             "  --filter-host '{params.filter_host}'"
             "  --min-slen '{params.min_slen}'"
             "  --min-reads '{params.min_reads}'"

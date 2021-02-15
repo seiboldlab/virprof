@@ -42,39 +42,54 @@ write_xlsx <- function(sheets, file,
 
 
 field_name_map <- list(
+    "Unit" = "unit",
     "Sample" = "sample",
-    "Frequent Words" = "words",
+    "Sample(s)" = "samples",
+    "Sample Count" = "n_samples",
+    "Title Summary" = "words",
     "Log E-Value" = "log_evalue",
     "Log E-Value (min)" = "min_log_evalue",
-    "Log E-Values (min)" = "min_log_evalues",
-    "# Contigs" = "n_frag",
+    "Log E-Value(s) (min)" = "min_log_evalues",
+    "Contig Count" = "n_frag",
+    "Contig Count(s)" = "n_frags",
     "Reference Accession" = "sacc",
-    "Reference Accessions" = "saccs",
+    "Reference Accession(s)" = "saccs",
     "Reference Title" = "stitle",
     "Reference Taxonomy IDs" = "staxids",
     "Reference Genome Size" = "genome_size",
+    "Reference Size Source" = "genome_size_source",
     "% Identity" = "pident",
     "% Identities" = "pidents",
-    "# Reads" = "numreads",
+    "Read Count" = "numreads",
+    "Read Count(s)" = "numreadss",
     "Taxonomy ID" = "taxid",
+    "Taxonomy IDs" = "taxids",
     "Taxonomic Name" = "taxname",
-    "Taxonomic Names" = "taxnames",
-    "Species" = "species",
+    "Taxonomic Name(s)" = "taxnames",
+    "Species Name" = "species",
     "Lineage" = "lineage",
+    "Lineage(s)" = "lineage",
     "Lineage Ranks" = "lineage_ranks",
-    "Reference BP covered" = "slen",
-    "Genome % covered", "genome_coverage",
-    "Positive Samples" = "positive_samples"
+    "Merged BP" = "slen",
+    "Merged BP(s)" = "slens",
+    "% Genome" = "genome_coverage",
+    "Positive Samples" = "positive_samples",
+    "Host" = "host",
+    "Known Respiratory Virus" = "respiratory"
 )
 
 #' Convert code to natural names
 rename_fields <- function(names) {
     for (i in seq_along(field_name_map)) {
-        from_name = field_name_map[[i]]
-        to_name = names(field_name_map)[[i]]
-        match = pmatch(from_name, names)
-        if (!is.na(match)) {
-            names[[match]] <- to_name
+        from_name <- field_name_map[[i]]
+        to_name <- names(field_name_map)[[i]]
+        if (!nzchar(to_name)) {
+            message("Can't rename ", from_name, " to empty string")
+        } else {
+            idx <- match(from_name, names)
+            if (!is.na(idx)) {
+                names[[idx]] <- to_name
+            }
         }
     }
     names
@@ -126,11 +141,6 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "FILE_OR_URL",
                     default = "ftp://ftp.genome.jp/pub/db/virushostdb/virushostdb.tsv",
                     help = "Virus Host DB. Can be local file or remote URL."
-                    ),
-        make_option(c("-f", "--filter"),
-                    metavar = "REGEX",
-                    default = "^Viruses;",
-                    help = "Global lineage filter (default: '%default')"
                     ),
         make_option(c("--filter-host"),
                     metavar = "NAME",
@@ -290,6 +300,19 @@ load_files <- function(samples, opt) {
         message("... found ", n_samples, "unique sample names after rewrite")
     }
     message("... found a total of ", nrow(samples), " detected organisms")
+    samples <- samples %>%
+        select(
+            unit, sample,
+            words,
+            numreads,
+            log_evalue, pident, slen, n_frag,
+            species, taxname, stitle,
+            everything()
+        )
+
+    if (all(samples$unit == samples$sample)) {
+        samples <- select(samples, -unit)
+    }
     message("... done")
     samples
 }
@@ -299,11 +322,9 @@ filter_hits <- function(samples, opt) {
     message("Filtering accession level bins...")
     message("... minimum `slen`: ", opt$option$min_slen)
     message("... minimum read count: ", opt$option$min_reads)
-    message("... lineage regex: ", opt$option$filter)
 
     samples <- samples %>%
         filter(
-            grepl(opt$option$filter, lineage),
             slen >= opt$option$min_slen,
             numreads >= opt$option$min_reads
         )
@@ -311,28 +332,25 @@ filter_hits <- function(samples, opt) {
     samples
 }
 
-#' Load and add virus to host annotation from VirusHostDB (genome.jp)
-filter_vhdb_host <- function(samples, opt) {
-    message("Filtering by virual host '", opt$options$filter_host, "' ...")
+annotate_viruses <- function(samples, opt) {
+    message("Annotating Viruses")
+    re <- paste0("(", paste(collapse="|", respiratory_viruses), ")")
+
     samples <- samples %>%
-        mutate(
-            host = vhdb_get_host(lineage, taxid, url=opt$options$virushostdb)
-        ) %>%
         filter(
-            grepl(opt$options$filter_host, host)
+            grepl("^Viruses;", lineage)
+        ) %>%
+        mutate(
+            host = vhdb_get_host(lineage, taxid, url=opt$options$virushostdb),
+            respiratory = grepl(re, taxname, ignore.case = TRUE)
         )
-    message("... remaining detections: ", nrow(samples))
+    message("... found Viruses: ", nrow(samples))
     samples
 }
 
 #' Filter known respiratory viruses
 filter_respiratory_viruses <- function(samples) {
     message("Filtering with positive list...")
-    re <- paste0("(", paste(collapse="|", respiratory_viruses), ")")
-    samples <- samples %>%
-        filter(
-            grepl(re, taxname, ignore.case = TRUE)
-        )
     message("... remaining detections: ", nrow(samples))
     samples
 }
@@ -343,16 +361,16 @@ merge_species <- function(samples) {
     samples <- samples %>%
         group_by(sample, species) %>%
         summarize(
-            taxid    = concat(taxid),
-            taxname  = concat(taxname),
+            taxnames  = concat(taxname),
             numreads = sum(numreads),
             min_log_evalue = min(log_evalue),
             pident   = round(sum(pident * slen) / sum(slen), 1),
-            slen     = concat(slen),
+            slens     = concat(slen),
             n_frag   = sum(n_frag),
-            sacc     = concat(sacc),
+            saccs    = concat(sacc),
             staxids  = concat(staxids, split=";"),
-            lineage  = concat(lineage, "|"),
+            taxids    = concat(taxid),
+            lineages  = concat(lineage, "|"),
             .groups="drop"
         ) %>%
         ungroup()
@@ -365,13 +383,13 @@ merge_samples <- function(samples) {
         group_by(sample) %>%
         arrange(desc(numreads)) %>%
         summarize(
-            taxnames = paste(collapse=";", taxname),
-            numreads = paste(collapse=";", numreads),
+            taxnames = paste(collapse=";", taxnames),
+            numreadss = paste(collapse=";", numreads),
             min_log_evalues = paste(collapse=";", min_log_evalue),
             pidents = paste(collapse=";", pident),
-            slen = paste(collapse=";", slen),
+            slens = paste(collapse=";", slens),
             n_frag = paste(collapse=";", n_frag),
-            saccs = paste(collapse=";", sacc),
+            saccs = paste(collapse=";", saccs),
             .groups="drop"
         ) %>%
         ungroup()
@@ -384,7 +402,7 @@ if (!interactive()) {
     results <- list()
     summary <- tibble(
         Description=character(),
-        Value=numeric(),
+        Count=numeric(),
         Tab=character()
     )
 
@@ -392,7 +410,7 @@ if (!interactive()) {
     files <- locate_files(opt)
     summary %<>%
         add_row(
-            Value=nrow(files),
+            Count=nrow(files),
             Description="Units (files) processed",
             Tab=""
         )
@@ -401,24 +419,31 @@ if (!interactive()) {
     calls <- load_files(files, opt)
     summary %<>%
         add_row(
-            Value=nrow(calls),
+            Count=nrow(calls),
             Description="Total detections",
             Tab=""
         )
 
-    ## Filter calls by lineage, length and read count
+    ## Compute Genome Coverage
     calls <- calls %>%
         mutate(
-            genome_coverage = if_else(genome_size > 0,
-                                      round(slen / genome_size * 100),
-                                      NA)
+            genome_coverage = if_else(
+                genome_size > 0,
+                round(slen / genome_size * 100),
+                NA_real_
+            )
+        ) %>%
+        relocate(
+            genome_coverage,
+            .before=slen
         )
 
+    ## Filter calls and read count
     filtered_calls <- filter_hits(calls, opt)
     results$Detections <- filtered_calls
     summary %<>%
         add_row(
-            Value=nrow(filtered_calls),
+            Count=nrow(filtered_calls),
             Description="Filtered detections",
             Tab="Detections"
         ) %>%
@@ -427,68 +452,58 @@ if (!interactive()) {
         ) %>%
         add_row(
             Description=paste("... Minimum read count:", opt$options$min_reads)
-        ) %>%
-        add_row(
-            Description=paste("... Lineage Regex: ", opt$options$filter)
         )
 
-    ## Filter calls by host
+    ## Summary taxonomic stats
+    species_found <- filtered_calls %>%
+        group_by(species) %>%
+        summarize(n_samples = length(unique(sample)), .groups="drop") %>%
+        arrange(species)
+    results$`Species Found` = species_found
+    message("Found ", nrow(species_found), " distinct species across all samples")
+    summary %<>%
+        add_row(
+            Count=nrow(species_found),
+            Description="Per species positive sample counts",
+            Tab="Species Found"
+        )
+
+    ## Filter & Annotate Viruses
     load_vhdb(url=opt$options$virushostdb)
-    host_filtered_calls <- filter_vhdb_host(filtered_calls, opt)
-    results$`Host Filtered` = host_filtered_calls
+    virus_calls <- annotate_viruses(filtered_calls, opt)
+    results$`Virus Detections` <- virus_calls
     summary %<>%
         add_row(
-            Value=nrow(host_filtered_calls),
-            Description="Host filtered detections",
-            Tab="Host Filtered"
+            Count=nrow(virus_calls),
+            Description="Annotated virus detections",
+            Tab="Virus Detections"
+        )
+
+    host_respvir_calls <- virus_calls %>%
+        filter(
+            grepl(opt$options$filter_host, host),
+            respiratory == TRUE
         ) %>%
-        add_row(
-            Description=paste("... Host Regex:", opt$options$filter_host)
-        )
-
-    ## Count found viruses
-    viruses_found <- host_filtered_calls %>%
-        group_by(taxname) %>%
-        summarize(positive_samples=n(), .groups="drop") %>%
-        arrange(taxname)
-    results$`Viruses Found` = viruses_found
-    message("Found ", nrow(viruses_found), " distinct viruses across all samples")
+        merge_species()
+    results$`Respiratory Viruses` <- host_respvir_calls
     summary %<>%
         add_row(
-            Value=nrow(viruses_found),
-            Description="Distinct Viruses Found",
-            Tab="Viruses Found"
-        )
-
-    ## Filter respiratory viruses (positive list)
-    resp_viruses <- filter_respiratory_viruses(host_filtered_calls)
-    results$`Respiratory Viruses` <- resp_viruses
-    summary %<>%
-        add_row(
-            Value=nrow(resp_viruses),
-            Description="Respiratory Virus detections",
+            Count=nrow(host_respvir_calls),
+            Description=paste0("Respiratory Viruses (", opt$options$filter_host, ")"),
             Tab="Respiratory Viruses"
         )
 
-    row_per_species <- merge_species(resp_viruses)
-    results$`Species` <-  row_per_species
+    positive_samples <- host_respvir_calls %>%
+        merge_samples()
+    results$`Positive Samples` <- positive_samples
     summary %<>%
         add_row(
-            Value=nrow(row_per_species),
-            Description="Detections after merging multiple calls per species",
-            Tab="Species"
-        )
-
-    row_per_sample  <- merge_samples(row_per_species)
-    results$`Samples` <- row_per_sample
-    summary %<>%
-        add_row(
-            Value=nrow(row_per_sample),
+            Count=nrow(positive_samples),
             Description="Positive Samples",
-            Tab="Samples"
+            Tab="Positive Samples"
         )
 
-    results$Summary <- summary
+    results$`Summary` <- summary
 
     for (i in seq_along(results)) {
         results[[i]] %<>% rename_with(rename_fields)
