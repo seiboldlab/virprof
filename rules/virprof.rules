@@ -109,8 +109,6 @@ with Stage("blastbin_vp") as S:
     """)
 
     rule vp_blastbin:
-        version:
-            2
         message:
             "Classifying - {output.result}"
         input:
@@ -146,8 +144,6 @@ with Stage("blastbin_vp") as S:
             " --ncbi-api-key '{params.ncbi_api_key}'"
 
     rule vp_show_bins:
-        version:
-            1
         message:
             "Visualizing binning"
         input:
@@ -195,8 +191,6 @@ with Stage("scaffold_vp") as S:
     Creates genomes from blast bins and contigs
     """)
     checkpoint vp_export_fasta:
-        version:
-            1
         message:
             "Exporting recovered genomes into bins"
         input:
@@ -269,8 +263,6 @@ with Stage("summarize_vp") as S:
                     outfile.write('\n')
 
     rule vp_aggregate_classifiations:
-        version:
-            1
         message:
             "Creating virus summary for {wildcards.target} in {:this:}"
         input:
