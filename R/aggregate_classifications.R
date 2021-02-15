@@ -52,6 +52,7 @@ field_name_map <- list(
     "Reference Accessions" = "saccs",
     "Reference Title" = "stitle",
     "Reference Taxonomy IDs" = "staxids",
+    "Reference Genome Size" = "genome_size",
     "% Identity" = "pident",
     "% Identities" = "pidents",
     "# Reads" = "numreads",
@@ -62,6 +63,7 @@ field_name_map <- list(
     "Lineage" = "lineage",
     "Lineage Ranks" = "lineage_ranks",
     "Reference BP covered" = "slen",
+    "Genome % covered", "genome_coverage",
     "Positive Samples" = "positive_samples"
 )
 
@@ -263,6 +265,7 @@ load_files <- function(samples, opt) {
         pident = col_double(),
         numreads = col_integer(),
         taxid = col_integer(),
+        genome_size = col_integer(),
         taxname = col_character(),
         species = col_character(),
         lineage = col_character(),
@@ -404,6 +407,13 @@ if (!interactive()) {
         )
 
     ## Filter calls by lineage, length and read count
+    calls <- calls %>%
+        mutate(
+            genome_coverage = if_else(genome_size > 0,
+                                      round(slen / genome_size * 100),
+                                      NA)
+        )
+
     filtered_calls <- filter_hits(calls, opt)
     results$Detections <- filtered_calls
     summary %<>%
