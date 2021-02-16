@@ -24,7 +24,8 @@ respiratory_viruses <- c(
     "Parainfluenza",
     "Respirovirus",
     "Rubulavirus",
-    "Respiratory"
+    "Respiratory",
+    "Bocavirus"
 )
 
 
