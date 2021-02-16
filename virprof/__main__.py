@@ -397,6 +397,8 @@ def blastbin(
             "uncultured bacterium",
             "uncultured eukaryote",
             "uncultured fungus",
+            "uncultured phage",
+            "uncultured virus",
         )
         exclude += ("Hominidae",)
 
