@@ -106,14 +106,17 @@ rename_fields <- function(names) {
 #' @param split Split each string using this RE before combining
 #' @param sort Sort strings before combining
 #'
-concat <- function(strings, sep=";", split=NULL, sort=TRUE) {
+concat <- function(strings, sep=";", split=NULL, sort=FALSE, unique=FALSE) {
     if (!is.null(split)) {
         strings <- unlist(strsplit(strings, split))
     }
     if (sort) {
         strings <- sort(strings)
     }
-    paste(collapse=sep, unique(strings))
+    if (unique) {
+        strings <- unique(strings)
+    }
+    paste(collapse=sep, strings)
 }
 
 
@@ -362,17 +365,24 @@ merge_species <- function(samples) {
     samples <- samples %>%
         group_by(sample, species) %>%
         summarize(
-            taxnames  = concat(taxname),
+            # minimize taxononomic names list
+            taxnames  = concat(taxname, ", ", sort=TRUE, unique=TRUE),
+            # sum up the read count
             numreads = sum(numreads),
+            # pick the best evalue
             min_log_evalue = min(log_evalue),
+            # calculate weighted % identity
             pident   = round(sum(pident * slen) / sum(slen), 1),
+            # collect each value for these:
             genome_coverages = concat(genome_coverage),
             slens     = concat(slen),
-            n_frag   = sum(n_frag),
-            saccs    = concat(sacc),
-            staxids  = concat(staxids, split=";"),
-            taxids    = concat(taxid),
-            lineages  = concat(lineage, "|"),
+            n_frags   = concat(n_frag),
+            saccs     = concat(sacc),
+            # summarize these:
+            staxids   = concat(staxids, ", ", split=";", sort=TRUE, unique=TRUE),
+            taxids    = concat(taxid, ", ", sort=TRUE, unique=TRUE),
+            # should be just one anyway:
+            lineages  = concat(lineage, ", ", sort=TRUE, unique=TRUE),
             .groups="drop"
         ) %>%
         ungroup()
@@ -385,14 +395,14 @@ merge_samples <- function(samples) {
         group_by(sample) %>%
         arrange(desc(numreads)) %>%
         summarize(
-            taxnames = paste(collapse="|", taxnames),
-            numreadss = paste(collapse="|", numreads),
-            min_log_evalues = paste(collapse="|", min_log_evalue),
-            pidents = paste(collapse="|", pident),
-            genome_coverages = paste(collapse="|", genome_coverages),
-            slens = paste(collapse="|", slens),
-            n_frag = paste(collapse="|", n_frag),
-            saccs = paste(collapse="|", saccs),
+            taxnames = concat(taxnames, " | "),
+            numreadss = concat(numreads, " | "),
+            min_log_evalues = concat(min_log_evalue, " | "),
+            pidents = concat(pident, " | "),
+            genome_coverages = concat(genome_coverages, " | "),
+            slens = concat(slens, " | "),
+            n_frags = concat(n_frags, " | "),
+            saccs = concat(saccs, " | "),
             .groups="drop"
         ) %>%
         ungroup()
