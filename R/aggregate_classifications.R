@@ -385,14 +385,14 @@ merge_samples <- function(samples) {
         group_by(sample) %>%
         arrange(desc(numreads)) %>%
         summarize(
-            taxnames = paste(collapse=";", taxnames),
-            numreadss = paste(collapse=";", numreads),
-            min_log_evalues = paste(collapse=";", min_log_evalue),
-            pidents = paste(collapse=";", pident),
-            genome_coverages = paste(collapse=";", genome_coverages),
-            slens = paste(collapse=";", slens),
-            n_frag = paste(collapse=";", n_frag),
-            saccs = paste(collapse=";", saccs),
+            taxnames = paste(collapse="|", taxnames),
+            numreadss = paste(collapse="|", numreads),
+            min_log_evalues = paste(collapse="|", min_log_evalue),
+            pidents = paste(collapse="|", pident),
+            genome_coverages = paste(collapse="|", genome_coverages),
+            slens = paste(collapse="|", slens),
+            n_frag = paste(collapse="|", n_frag),
+            saccs = paste(collapse="|", saccs),
             .groups="drop"
         ) %>%
         ungroup()
