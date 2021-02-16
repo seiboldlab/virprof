@@ -33,6 +33,7 @@ class EntrezAPI:
       defaults: Additional parameters to add to the URL on each
          API call. This is useful to e.g. set `apikey`.
       timeout: Maximum time to wait for any ony server response.
+      retries: Outer loop retries for batch requests failing on 400, 429 and 500
     """
 
     #: Entrez API base URL (with tool name as `{tool}`)
@@ -42,10 +43,11 @@ class EntrezAPI:
     #: by retrying the request.
     default_retry_codes = set(
         (
-#            500,  # Internal Server Error
             502,  # Bad Gateway Error
             504,  # Gateway Timeout
             429,  # Too Many Requests
+            # 500 may be caused by single entry in batch request, so
+            # simple retry does not help.
         )
     )
 
@@ -54,11 +56,13 @@ class EntrezAPI:
         session: Optional[Session] = None,
         defaults: Optional[Dict[str, str]] = None,
         timeout: int = 120,
+        retries: int = 3,
     ) -> None:
         self._session = self.make_session() if session is None else session
         self._defaults = {} if defaults is None else defaults
         self.timeout = timeout
         self._old_loglevel: Optional[int] = None
+        self._retries = retries
 
     @classmethod
     def make_session(
@@ -122,6 +126,64 @@ class EntrezAPI:
             text = ""
         return text
 
+    def _batch_get(
+            self,
+            tool: str,
+            parms: Dict[str, str],
+            batch_param: str,
+            batch_data: List[str],
+            batch_size: int,
+    ) -> str:
+        result = []
+        done = 0
+        retry = 0
+        cur_batch_size = batch_size
+        while done < len(batch_data):
+            to_get = batch_data[done:done + cur_batch_size]
+            LOG.info("Calling Entrez %s (%i of %i done, fetching %i)",
+                     tool, done, len(batch_data), len(to_get))
+            try:
+                parms[batch_param] = ",".join(to_get)
+                data = self._get(tool, parms)
+            except RequestException as exc:
+                if len(to_get) > 1:
+                    # Try again with smaller batch size
+                    cur_batch_size = int(cur_batch_size / 2)
+                    continue
+                if exc.response is None:
+                    # No http error?
+                    LOG.error("Unknown error '%s'- re-raising", exc)
+                    raise
+                if exc.response.status_code in (400, 429, 500):
+                    # Handle 400, 429 and 500 by retrying again after 60-90 seconds
+                    if retry < self._retries:
+                        retry += 1
+                        waitfor = randint(60, 90)
+                        LOG.error(
+                            "Error fetching data for '%s'. Retrying %i/%i in %i seconds",
+                            to_get[0],
+                            retry,
+                            self._retries,
+                            waitfor
+                        )
+                        time.sleep(waitfor)
+                    else:
+                        LOG.error("Skipping sequence '%s' due to recurring errors", to_get[0])
+                        done += 1
+                        cur_batch_size = batch_size
+                        retry = 0
+                else:
+                    LOG.error("Unknown error - re-raising")
+                    raise
+            else:
+                result.append(data)
+                done += len(to_get)
+                cur_batch_size = min(batch_size, cur_batch_size * 2)
+                retry = 0
+
+        LOG.info("Calling Entrez efetch: DONE")
+        return "\n".join(result)
+
     def search(self, database: str, term: str):
         """Calls Entrez Search (esearch) API"""
         result = self._get(
@@ -172,48 +234,17 @@ class EntrezAPI:
         """
         if isinstance(ids, str):
             ids = [ids]
-        result = []
-        done = 0
-        cur_batch_size = batch_size
-        while done < len(ids):
-            to_get = ids[done:done + cur_batch_size]
-            LOG.info("Calling Entrez efetch (%i of %i done, fetching %i)",
-                     done, len(ids), len(to_get))
-            try:
-                data = self._get(
-                    "efetch",
-                    {
-                        "db": database,
-                        "id": ",".join(to_get),
-                        "rettype": rettype,
-                        "retmode": retmode,
-                    },
-                )
-            except RequestException as exc:
-                if len(to_get) == 1:
-                    if exc.response is not None:
-                        if exc.response.status_code in (400, 500):
-                            LOG.error("Skipping sequence '%s' due to recurring errors", ",".join(to_get))
-                            done += 1
-                        elif exc.response.status_code == 429:
-                            waitfor = randint(60, 90)
-                            LOG.error("Too many retries. Retrying ad infinitum. Waiting %i seconds...", waitfor)
-                            time.sleep(waitfor)
-                        else:
-                            LOG.error("Unknown error - re-raising")
-                            raise
-                    else:
-                        LOG.error("Unknown error - re-raising")
-                        raise
-                else:
-                    cur_batch_size = int(cur_batch_size / 2)
-            else:
-                result.append(data)
-                done += len(to_get)
-                cur_batch_size = min(batch_size, cur_batch_size * 2)
-
-        LOG.info("Calling Entrez efetch: DONE")
-        return "\n".join(result)
+        return self._batch_get(
+            "efetch",
+            {
+                "db": database,
+                "rettype": rettype,
+                "retmode": retmode,
+            },
+            batch_param = "id",
+            batch_data = ids,
+            batch_size = batch_size,
+        )
 
     def enable_debug(self):
         """Enables debug logging from urllib3 library
