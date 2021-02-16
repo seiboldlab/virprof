@@ -16,35 +16,6 @@ library(httr)
 library(xml2)
 library(progress)
 
-NCBI_genome_size_check <- function(taxids) {
-    API_SERVER <- "https://api.ncbi.nlm.nih.gov"
-    API_PATH <- "genome/v0/expected_genome_size"
-    unique_taxids <- unique(taxids)
-    pb <- progress::progress_bar$new(total=length(unique_taxids))
-    pb$tick(0)
-    check_one <- function(taxid) {
-        url <- httr::modify_url(API_SERVER, path=API_PATH,
-                                query = list(species_taxid=taxid))
-        response <- GET(url)
-        if (httr::status_code(response) != 200) {
-            stop("status code")
-        }
-        pb$tick()
-        text = httr::content(response, "text", encoding = "utf-8")
-        dx <- xml2::read_xml(text)
-        xml2::xml_ns_strip(dx)
-        nodes <- xml2::xml_find_all(dx, "/genome_size_response/*[not(self::input)]")
-        res <- set_names(
-            sapply(nodes, xml2::xml_text),
-            sapply(nodes, xml2::xml_name)
-        )
-    }
-    unique_results <- lapply(unique_taxids, check_one)
-    results <- unique_results[match(taxids, unique_taxids)]
-    do.call(bind_rows, results) %>%
-        as_tibble() %>%
-        type_convert()
-}
 
 load_data <- function(.data, .f, .file_pattern="%s", .id=NULL, ...) {
     set_names(
@@ -119,24 +90,6 @@ rviruses <- load_data(
     .id="study") %>%
     mutate_at(vars(study, unit, sample, lineage, host),
               as.factor)
-
-## Determine Virus Genome Sizes
-genome_sizes <- NCBI_genome_size_check(rviruses$taxid)
-
-manual_sizes <- tribble(
-    ~ organism_name,  ~ species_taxid, ~ len, ~acc,
-    "Human respirovirus 1",     12730, 15600, "NC_003461",
-    "Human coronavirus NL63",  277944, 27553, "NC_005831",
-    "Betacoronavirus 1",       694003, 30741, "NC_006213", ## OC43
-    "Human respirovirus 3",     11216, 15462, "NC_001796", # parainfluenza
-    "Human coronavirus 229E",   11137, 27317, "NC_002645",
-    "Human coronavirus HKU1",  290028, 29926, "NC_006577",
-    "Enterovirus D",           138951,  7390, "NC_001430", #D70
-    "Human rhinovirus AMS323", 433730,  7160, "EF155421",
-    "Influenza B virus",        11520, 2313 + 2204 + 1882 + 1841 + 1557 +
-                                       1191 + 1096 + 2368, "NC_002204", 
-    "Human rhinovirus sp.",    169066,  7208, "X01087.1" #HRV-14
-)
 
 genome_sizes %<>%
     left_join(select(manual_sizes, species_taxid, len)) %>%
