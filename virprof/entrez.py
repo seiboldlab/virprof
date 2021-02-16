@@ -192,7 +192,7 @@ class EntrezAPI:
             except RequestException as exc:
                 if len(to_get) == 1:
                     if exc.response is not None:
-                        if exc.response.status_code == 400:
+                        if exc.response.status_code in (400, 500):
                             LOG.error("Skipping sequence '%s' due to recurring errors", ",".join(to_get))
                             done += 1
                         elif exc.response.status_code == 429:
