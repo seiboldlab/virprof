@@ -226,6 +226,8 @@ class HitChain:
     def qlen(self) -> int:
         """Combined query length of all items in the HitChain.
 
+        This will include overlapping regions.
+
         Note that ``len(hitChain)`` returns the number of items, not
         the length in basepairs.
         """
@@ -251,9 +253,9 @@ class HitChain:
     @property
     def blast_score(self) -> float:
         "Aggegated BLAST score for all items in the HitChain"
-        return sum(hit.score for hit in self.hits) - self.chain_penalty * (
-            len(self) - 1
-        )
+        sum_score = sum(hit.score for hit in self.hits)
+        penalty = self.chain_penalty * (len(self) - 1)
+        return sum_score - penalty
 
     @property
     def pident(self) -> Optional[float]:
