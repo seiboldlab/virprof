@@ -37,7 +37,7 @@ feature_table_raw = "\n".join(
 )
 
 feature_table_expected = {
-    "NC_045512.2": [
+    "NC_045512": [
         (1, 265, "5'UTR", {}),
         (
             266,
