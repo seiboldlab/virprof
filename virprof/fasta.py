@@ -189,7 +189,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
             # FIXME: Check for deletion!
-            sequence.append(b"n" * (section_len + 1))
+            sequence.append(b"n" * section_len)
         elif len(section_seqs) == 1:
             ## Singleton piece - fill with sequence
             sequence.append(section_seqs[0])
