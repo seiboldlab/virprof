@@ -174,18 +174,18 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
         # Iterate over each hit overlapping piece
         for qacc, sstart, send, qstart, qend in hits:
             qaccs.add(qacc)
+            seq = contigs.get(qacc)
 
-            if send > sstart:
-                offset = qstart + section_start - sstart
-            else:
-                offset = qstart + sstart - section_end
-            offset -= 1  # make 0-indexed
-
-            seq = contigs.get(qacc)[offset:offset+section_len]
             if sstart > send:
+                # Reverse mapped region, flip contig and qstart
                 seq = revcomp(seq)
-            section_seqs.append(seq)
+                qstart = len(seq) - qstart + 1
 
+            offset = qstart + section_start - sstart - 1
+
+            section_seqs.append(seq[offset:offset+section_len])
+
+        last_section_from_reference = False
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
             # FIXME: Check for deletion!
