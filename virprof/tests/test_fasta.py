@@ -32,7 +32,6 @@ def test_FastaFile():
     for acc, seq in contigs.sequences.items():
         fa.put(acc.decode("ASCII"), seq)
     fa.close()
-    print(fa.name)
     fa = FastaFile(tmp, "r")
     for acc, seq in contigs.sequences.items():
         seq2 = fa.get(acc.decode("ASCII"))
