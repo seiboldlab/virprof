@@ -178,14 +178,21 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
         for qacc, sstart, send, qstart, qend in hits:
             seq = contigs.get(qacc)
             qaccs.add(qacc)
+
+            # Remove/replace reference only sections with the same
+            # contig mapped to either side.  This addresses larger
+            # insertion/deletion/replacement events that BLAST will
+            # align as separate hits.
             if qacc in last_hits and last_section_from_reference:
                 (_, lend), (rstart, _) = sorted((last_hits[qacc], (qstart, qend)))
                 sequence[-1] = seq[lend : rstart - 1]
 
+            # Reverse contig if blast hit was on negative strand
             if sstart > send:
-                # Reverse mapped region, flip contig and qstart
                 seq = revcomp(seq)
                 qstart = len(seq) - qstart + 1
+
+            # Extract sequence matching reference section and add to list
             offset = qstart + section_start - sstart - 1
             section_seqs.append(seq[offset : offset + section_len])
 
