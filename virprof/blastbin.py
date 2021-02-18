@@ -93,6 +93,7 @@ class BlastHit(NamedTuple):
     stitle: str
     staxids: List[int]
     bitscore: int
+    btop: str
 
 
 class OverlapException(Exception):
@@ -377,12 +378,13 @@ class HitChain:
                 'qend': hit.qend,
                 'sstart': hit.sstart,
                 'send': hit.send,
+                'btop': hit.btop,
             }
 
     @property
     def hit_fields(self) -> List[str]:
         """List keys of ``hits_to_dict()``"""
-        return ['qacc', 'qlen', 'pident', 'bitscore', 'qstart', 'qend', 'sstart', 'send']
+        return ['qacc', 'qlen', 'pident', 'bitscore', 'qstart', 'qend', 'sstart', 'send', 'btop']
 
 
 class CheckOverlaps(HitChain):

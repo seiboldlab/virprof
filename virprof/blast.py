@@ -95,7 +95,7 @@ class BlastBase(object):
         # "": "frames",  # Query and subject frames separated by a '/'
         "query frame": "qframe",  # Query frame
         "sbjct frame": "sframe",  # Subject frame
-        # "": "btop",  # Blast traceback operations (BTOP)
+        "BTOP": "btop",  # Blast traceback operations (BTOP)
         # "": "staxid",  # Subject Taxonomy ID
         # "": "scciname",  # Subject Scientifi Name
         # "": "scomname",  # Subject Common Name
