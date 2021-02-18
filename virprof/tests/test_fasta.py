@@ -178,3 +178,19 @@ def test_scaffold_replacement_in_contig_mixed():
         + contigs.get("replacement-mixed")[10:]  # right overhang
     )
     assert sequence["replacement-mixed"] == expected
+
+
+def test_scaffold_left_overhanging_contig():
+    """A contig overlapping the reference on its left end should stay intact"""
+    rl = RegionList()
+    rl.add(1, 20, ("left_overhang", 1, 20, 5, 24))
+    sequence = scaffold_contigs(rl, contigs)
+    assert sequence["left_overhang"] == contigs.get("left_overhang")
+
+
+def test_scaffold_right_overhanging_contig():
+    """A contig overlapping the reference on its left end should stay intact"""
+    rl = RegionList()
+    rl.add(1, 20, ("right_overhang", 1, 20, 1, 20))
+    sequence = scaffold_contigs(rl, contigs)
+    assert sequence["right_overhang"] == contigs.get("right_overhang")

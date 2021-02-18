@@ -171,7 +171,9 @@ def consensus(sequences: List[bytes]) -> bytes:
     Uncertain bases are filled with 'n'.
     """
     if any(len(sequences[0]) != len(seq) for seq in sequences):
-        LOG.error("section sizes differ: %s", " ".join(str(len(seq)) for seq in sequences))
+        LOG.error(
+            "section sizes differ: %s", " ".join(str(len(seq)) for seq in sequences)
+        )
     ## Overlapping piece - fill with consensus
     bases = []
     for base_counts in map(Counter, zip(*sequences)):
@@ -202,7 +204,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
     last_hits = {}
     last_section_from_reference = False
     # Iterate over each disjoined piece
-    for section_start, section_end, hits in regs:
+    for section_num, (section_start, section_end, hits) in enumerate(regs):
         section_len = section_end - section_start + 1
         section_seqs = []
 
@@ -228,9 +230,18 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
                 seq = revcomp(seq)
                 qstart = len(seq) - qstart + 1
 
-            # Extract sequence matching reference section and add to list
-            offset = qstart + section_start - sstart - 1
-            section_seqs.append(seq[offset : offset + section_len])
+            # Compute start and end of hit inside contig sequence
+            start = qstart + section_start - sstart - 1
+            end = start + section_len
+
+            # For leftmost hit, start from beginning of contig if there is only one:
+            if not sequence and len(hits) == 1:
+                start = 0
+
+            if section_num == len(regs) - 1 and len(hits) == 1:
+                end = len(seq)
+
+            section_seqs.append(seq[start:end])
 
         if hits:
             last_hits = {
