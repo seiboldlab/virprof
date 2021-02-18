@@ -3,7 +3,7 @@
 import logging
 import subprocess as sp
 from collections import Counter
-from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict, Tuple
+from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict, Tuple, List
 
 import Bio.Seq
 
@@ -160,11 +160,43 @@ class FastaFile:
 
 
 def revcomp(sequence: bytes) -> bytes:
+    """Reverse complement a bytes sequence"""
     seq = Bio.Seq.Seq(sequence.decode("ASCII"))
     return str(seq.reverse_complement()).encode("ASCII")
 
 
+def consensus(sequences: List[bytes]) -> bytes:
+    """Compute consensus for a set of sequences
+
+    Uncertain bases are filled with 'n'.
+    """
+    if any(len(sequences[0]) != len(seq) for seq in sequences):
+        LOG.error("section sizes differ: %s", " ".join(str(len(seq)) for seq in sequences))
+    ## Overlapping piece - fill with consensus
+    bases = []
+    for base_counts in map(Counter, zip(*sequences)):
+        if len(base_counts) == 1:
+            best, best_count = next(iter(base_counts.items()))
+            second_count = 0
+        else:
+            (best, best_count), (_, second_count) = base_counts.most_common(2)
+
+        if best_count == second_count:
+            bases.append(110)  # 110 == 'n'
+        else:
+            bases.append(best)
+    return bytes(bases)
+
+
 def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]:
+    """Scaffold sequence from BLAST hits
+
+    Args:
+      regs: A RegionList containing the blast hits. The data field
+        must be qacc, sstart, send, qstart, qend.
+      contigs: FastaFile object containing the sequences referenced
+        in ``regs``.
+    """
     sequence = []  # sequence fragments
     qaccs = set()  # seen contig names
     last_hits = {}
@@ -208,27 +240,5 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             ## Singleton piece - fill with sequence
             sequence.append(section_seqs[0])
         else:
-            if any(len(section_seqs[0]) != len(seq) for seq in section_seqs):
-                LOG.error("section sizes differ!")
-                LOG.error(
-                    "section: start=%i end=%i len=%i lens=%s",
-                    section_start,
-                    section_end,
-                    section_len,
-                    ", ".join(str(len(seq)) for seq in section_seqs),
-                )
-            ## Overlapping piece - fill with consensus
-            section_consensus = []
-            for base_counts in map(Counter, zip(*section_seqs)):
-                if len(base_counts) == 1:
-                    best, best_count = next(iter(base_counts.items()))
-                    second_count = 0
-                else:
-                    (best, best_count), (_, second_count) = base_counts.most_common(2)
-
-                if best_count == second_count:
-                    section_consensus.append(110)  # 110 == 'n'
-                else:
-                    section_consensus.append(best)
-            sequence.append(bytes(section_consensus))
+            sequence.append(consensus(section_seqs))
     return {"+".join(qaccs): b"".join(sequence)}
