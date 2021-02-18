@@ -17,7 +17,7 @@ class RegionList:
         self._region_data: List[List] = []
 
     def __len__(self) -> int:
-        return len(self._region_starts)
+        return 0 if not self._region_starts else len(self._region_starts) - 1
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}: starts={self._region_starts} data={self._region_data}"
@@ -111,7 +111,7 @@ class RegionList:
         for idx in range(start_idx, stop_idx + 1):
             self._region_data[idx].remove(data)
         dups = set()
-        for idx in range(1, len(self)):
+        for idx in range(1, len(self._region_data)):
             if self._region_data[idx - 1] == self._region_data[idx]:
                 dups.add(idx)
         if self._region_data[0] == []:

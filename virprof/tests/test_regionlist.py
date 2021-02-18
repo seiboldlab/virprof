@@ -189,9 +189,13 @@ def test_intersect():
 def test_remove():
     rl = RegionList()
     rl.add(10, 20, "10-20")
+    assert len(rl) == 1
     rl.add(30, 40, "30-40")
+    assert len(rl) == 3
     rl.add(15, 35, "15-35")
+    assert len(rl) == 5
     rl.remove(30, 40, "30-40")
+    assert len(rl) == 3
 
     rl2 = RegionList()
     rl2.add(10, 20, "10-20")
