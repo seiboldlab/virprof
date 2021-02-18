@@ -165,30 +165,37 @@ def revcomp(sequence: bytes) -> bytes:
 
 
 def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]:
-    sequence = []
-    qaccs = set()
+    sequence = []  # sequence fragments
+    qaccs = set()  # seen contig names
+    last_hits = {}
+    last_section_from_reference = False
     # Iterate over each disjoined piece
     for section_start, section_end, hits in regs:
         section_len = section_end - section_start + 1
         section_seqs = []
+
         # Iterate over each hit overlapping piece
         for qacc, sstart, send, qstart, qend in hits:
-            qaccs.add(qacc)
             seq = contigs.get(qacc)
+            qaccs.add(qacc)
+            if qacc in last_hits and last_section_from_reference:
+                (_, lend), (rstart, _) = sorted((last_hits[qacc], (qstart, qend)))
+                sequence[-1] = seq[lend:rstart-1]
 
             if sstart > send:
                 # Reverse mapped region, flip contig and qstart
                 seq = revcomp(seq)
                 qstart = len(seq) - qstart + 1
-
             offset = qstart + section_start - sstart - 1
-
             section_seqs.append(seq[offset:offset+section_len])
+
+        if hits:
+            last_hits = {qacc: (qstart, qend) for qacc, _, _, qstart, qend in hits}
 
         last_section_from_reference = False
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
-            # FIXME: Check for deletion!
+            last_section_from_reference = True
             sequence.append(b"n" * section_len)
         elif len(section_seqs) == 1:
             ## Singleton piece - fill with sequence
@@ -197,8 +204,8 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             if any(len(section_seqs[0]) != len(seq) for seq in section_seqs):
                 LOG.error("section sizes differ!")
                 LOG.error(
-                    "section: start=%i end=%i len=%i acc=%s lens=%s",
-                    section_start, section_end, section_len, qacc,
+                    "section: start=%i end=%i len=%i lens=%s",
+                    section_start, section_end, section_len,
                     ", ".join(str(len(seq)) for seq in section_seqs)
                 )
             ## Overlapping piece - fill with consensus
