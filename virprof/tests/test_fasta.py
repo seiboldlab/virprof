@@ -157,13 +157,24 @@ def test_scaffold_replacement_in_contig_reversed():
 
 
 def test_scaffold_replacement_in_contig_mixed():
-    """A contig in which bases were replaced w.r.t. the reference should
-    stay intact. Second hit is reversed.
+    """A contig with two hits to the reference where one is reversed.
+
+    There is no way to know which orientation the middle bases should
+    have. This situation really should be avoided when choosing the
+    reference.
+
+    Expecting N's in the middle.
     """
     rl = RegionList()
-    # First match of 5 bp (reversed)
+    # First match of 5 bp - REVERSED
     rl.add(5, 1, ("replacement-mixed", 5, 1, 15, 20))
-    # Second match after replacement of 4bp for 5bp in reference
+    # Second match after replacement of 4bp for 5bp in reference - FORWARD
     rl.add(11, 20, ("replacement-mixed", 11, 20, 1, 10))
     sequence = scaffold_contigs(rl, contigs)
-    assert sequence["replacement-mixed"] == contigs.get("replacement")
+    expected = (
+        subject[0:5]  # first part
+        + b"n" * 5  # gap not replaced
+        + subject[10:]  # second part
+        + contigs.get("replacement-mixed")[10:]  # right overhang
+    )
+    assert sequence["replacement-mixed"] == expected

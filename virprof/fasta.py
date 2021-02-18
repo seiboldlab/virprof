@@ -215,8 +215,12 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             # contig mapped to either side.  This addresses larger
             # insertion/deletion/replacement events that BLAST will
             # align as separate hits.
-            if qacc in last_hits and last_section_from_reference:
-                (_, lend), (rstart, _) = sorted((last_hits[qacc], (qstart, qend)))
+            if (
+                qacc in last_hits
+                and (sstart > send) == last_hits[qacc][2]  # same orientation
+                and last_section_from_reference
+            ):
+                (_, lend), (rstart, _) = sorted((last_hits[qacc][0:2], (qstart, qend)))
                 sequence[-1] = seq[lend : rstart - 1]
 
             # Reverse contig if blast hit was on negative strand
@@ -229,7 +233,10 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             section_seqs.append(seq[offset : offset + section_len])
 
         if hits:
-            last_hits = {qacc: (qstart, qend) for qacc, _, _, qstart, qend in hits}
+            last_hits = {
+                qacc: (qstart, qend, sstart > send)
+                for qacc, sstart, send, qstart, qend in hits
+            }
 
         last_section_from_reference = False
         if len(section_seqs) == 0:
