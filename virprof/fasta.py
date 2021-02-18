@@ -147,9 +147,9 @@ class FastaFile:
         # Make sure we have unique id
         if acc in self._written:
             n = 1
-            while f'{acc}_{n}' in self._written:
+            while f"{acc}_{n}" in self._written:
                 n = n + 1
-            acc = f'{acc}_{n}'
+            acc = f"{acc}_{n}"
         self._written.add(acc)
 
         if comment is not None:
@@ -180,14 +180,14 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             qaccs.add(qacc)
             if qacc in last_hits and last_section_from_reference:
                 (_, lend), (rstart, _) = sorted((last_hits[qacc], (qstart, qend)))
-                sequence[-1] = seq[lend:rstart-1]
+                sequence[-1] = seq[lend : rstart - 1]
 
             if sstart > send:
                 # Reverse mapped region, flip contig and qstart
                 seq = revcomp(seq)
                 qstart = len(seq) - qstart + 1
             offset = qstart + section_start - sstart - 1
-            section_seqs.append(seq[offset:offset+section_len])
+            section_seqs.append(seq[offset : offset + section_len])
 
         if hits:
             last_hits = {qacc: (qstart, qend) for qacc, _, _, qstart, qend in hits}
@@ -205,8 +205,10 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
                 LOG.error("section sizes differ!")
                 LOG.error(
                     "section: start=%i end=%i len=%i lens=%s",
-                    section_start, section_end, section_len,
-                    ", ".join(str(len(seq)) for seq in section_seqs)
+                    section_start,
+                    section_end,
+                    section_len,
+                    ", ".join(str(len(seq)) for seq in section_seqs),
                 )
             ## Overlapping piece - fill with consensus
             section_consensus = []

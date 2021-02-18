@@ -35,6 +35,7 @@ def test_nonoverlapping():
     assert rl.end_pos() == 40
     assert list(iter(rl)) == [(10, 20, ["10-20"]), (21, 29, []), (30, 40, ["30-40"])]
 
+
 def test_adjacent():
     rl = RegionList()
     rl.add(11, 20, "11-20")

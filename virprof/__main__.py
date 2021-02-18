@@ -35,7 +35,7 @@ LOG = logging.getLogger(__name__)
 
 
 # Increase CSV field size limit to 2GB
-csv.field_size_limit(2**31)
+csv.field_size_limit(2 ** 31)
 
 
 class TqdmHandler(logging.Handler):
@@ -102,11 +102,13 @@ def setup_profiling() -> None:
 def setup_debug() -> None:
     import signal
     import traceback
+
     def handlesigusr1(sig, frame):
         print("------------------")
         print("Dumping stack (caught signal %i)" % sig)
         traceback.print_stack(f=frame, limit=5)
         print("------------------")
+
     signal.signal(signal.SIGUSR1, handlesigusr1)
 
 
@@ -242,7 +244,7 @@ def cli() -> None:
     "--out-features",
     "--of",
     type=click.File("w"),
-    help="Output CSV file containing reference feature annotation (one row per feature)"
+    help="Output CSV file containing reference feature annotation (one row per feature)",
 )
 @click.option(
     "--ncbi-taxonomy",
@@ -294,16 +296,24 @@ def cli() -> None:
 @click.option(
     "--num-words", type=int, default=4, help="Number of words to add to 'words' field"
 )
-@click.option("--profile", is_flag=True, help="Enable performance profiling. Requires YAPPI to be installed.")
+@click.option(
+    "--profile",
+    is_flag=True,
+    help="Enable performance profiling. Requires YAPPI to be installed.",
+)
 @click.option("--debug", is_flag=True, help="Dump stack on receipt of SIGUSR1")
 @click.option(
     "--cache-path",
     type=click.Path(),
     help="Location for caching of remote data",
-    default="entrez_cache"
+    default="entrez_cache",
 )
 @click.option("--ncbi-api-key", type=str, help="NCBI API Key")
-@click.option("--genome-size/--no-genome-size", default=True, help="Obtain genome sizes for bins from NCBI")
+@click.option(
+    "--genome-size/--no-genome-size",
+    default=True,
+    help="Obtain genome sizes for bins from NCBI",
+)
 def blastbin(
     in_blast7: click.utils.LazyFile,
     in_coverage: click.utils.LazyFile,
@@ -470,30 +480,36 @@ def blastbin(
         selected_chain = chains[0]
 
         row = selected_chain.to_dict()
-        row.update({
-            "sample": sample,
-            "taxid": taxid,
-            "words": wordscorer.score(chains),
-        })
+        row.update(
+            {
+                "sample": sample,
+                "taxid": taxid,
+                "words": wordscorer.score(chains),
+            }
+        )
 
         if genome_sizes is not None:
             row["genome_size_source"], row["genome_size"] = genome_sizes.get(taxid)
 
         if not taxonomy.is_null():
-            row.update({
-                "lineage": "; ".join(taxonomy.get_lineage(taxid)),
-                "lineage_ranks": "; ".join(taxonomy.get_lineage_ranks(taxid)),
-                "taxname": taxonomy.get_name(taxid),
-                "species": taxonomy.get_rank(taxid, "species"),
-            })
+            row.update(
+                {
+                    "lineage": "; ".join(taxonomy.get_lineage(taxid)),
+                    "lineage_ranks": "; ".join(taxonomy.get_lineage_ranks(taxid)),
+                    "taxname": taxonomy.get_name(taxid),
+                    "species": taxonomy.get_rank(taxid, "species"),
+                }
+            )
         LOG.info("Found     %s -- %s", row.get("taxname", ""), row["words"])
         bin_writer.writerow(row)
 
         for row in selected_chain.hits_to_dict():
-            row.update({
-                "sample": sample,
-                "sacc": selected_chain.sacc,
-            })
+            row.update(
+                {
+                    "sample": sample,
+                    "sacc": selected_chain.sacc,
+                }
+            )
             hits_writer.writerow(row)
 
         if features is not None:
@@ -617,15 +633,27 @@ def filter_blast(
 
 
 def as_file_name(name):
-    return name.replace(" ", "_").replace("/", "_").replace(".", "_").replace("__", "_").strip("_")
+    return (
+        name.replace(" ", "_")
+        .replace("/", "_")
+        .replace(".", "_")
+        .replace("__", "_")
+        .strip("_")
+    )
 
 
 @cli.command()
 @click.option(
-    "--in-bins", type=click.File("r"), required=True, help="Bins CSV from blastbin command"
+    "--in-bins",
+    type=click.File("r"),
+    required=True,
+    help="Bins CSV from blastbin command",
 )
 @click.option(
-    "--in-hits", type=click.File("r"), required=True, help="Hits CSV from blastbin command"
+    "--in-hits",
+    type=click.File("r"),
+    required=True,
+    help="Hits CSV from blastbin command",
 )
 @click.option(
     "--in-fasta",
@@ -652,7 +680,10 @@ def as_file_name(name):
 @click.option("--file-per-bin", is_flag=True, help="Create separate file for each bin")
 @click.option("--filter-lineage", type=str, help="Filter by lineage prefix")
 @click.option(
-    "--merge-overlapping/--no-merge-overlapping", is_flag=True, default=True, help="Do not merge overlapping regions"
+    "--merge-overlapping/--no-merge-overlapping",
+    is_flag=True,
+    default=True,
+    help="Do not merge overlapping regions",
 )
 def export_fasta(
     in_bins,
@@ -718,14 +749,18 @@ def export_fasta(
     LOG.info("Loading hits from '%s'", in_hits.name)
     hits = {}
     for row in csv.DictReader(in_hits):
-        regl = hits.setdefault(row['sacc'], RegionList())
-        regl.add(int(row['sstart']), int(row['send']), (
-            row['qacc'],
-            int(row['sstart']),
-            int(row['send']),
-            int(row['qstart']),
-            int(row['qend'])
-        ))
+        regl = hits.setdefault(row["sacc"], RegionList())
+        regl.add(
+            int(row["sstart"]),
+            int(row["send"]),
+            (
+                row["qacc"],
+                int(row["sstart"]),
+                int(row["send"]),
+                int(row["qstart"]),
+                int(row["qend"]),
+            ),
+        )
     LOG.info("Found %i hits", sum(len(hit) for hit in hits.values()))
 
     # Load and merge bins
@@ -733,9 +768,9 @@ def export_fasta(
     LOG.info("Loading calls from '%s'", in_bins.name)
     bins = {}
     for row in csv.DictReader(in_bins):
-        sacc = row['sacc']
+        sacc = row["sacc"]
         bin_name = as_file_name(row[bin_by])
-        row['regionlist'] = hits[sacc]
+        row["regionlist"] = hits[sacc]
         bins.setdefault(bin_name, []).append(row)
     LOG.info(
         "  found %i bins in %i calls", len(bins), sum(len(bin) for bin in bins.items())
@@ -760,7 +795,7 @@ def export_fasta(
         LOG.info("writing bin %s", bin_name)
         outfile = update_outfile(bin_name)
         for call in bin_data:
-            reglist = call['regionlist']
+            reglist = call["regionlist"]
             accs = set(data[0] for _, _, datas in reglist for data in datas)
 
             # Convert call to region list
@@ -770,7 +805,7 @@ def export_fasta(
                 sequences = {acc: contigs.get(acc) for acc in accs}
 
             for acc, sequence in sequences.items():
-                bp = sum(sequence.count(base) for base in (b'A', b'G', b'C', b'T'))
+                bp = sum(sequence.count(base) for base in (b"A", b"G", b"C", b"T"))
                 acc, _, comment = fasta_id_format.format(
                     bin_name=bin_name, acc=acc, bp=bp, **call
                 ).partition(" ")

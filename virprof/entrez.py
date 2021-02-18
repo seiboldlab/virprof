@@ -117,31 +117,37 @@ class EntrezAPI:
         url = self.URL.format(tool=tool)
         all_params = self._defaults.copy()
         all_params.update(params)
-        request = self._session.get(url, params=all_params,
-                                    timeout=self.timeout)
+        request = self._session.get(url, params=all_params, timeout=self.timeout)
         request.raise_for_status()
         text = request.text.strip()
         if text.startswith("Error:"):
-            LOG.info("Entrez request failed with '%s'. Returning empty string instead.", text)
+            LOG.info(
+                "Entrez request failed with '%s'. Returning empty string instead.", text
+            )
             text = ""
         return text
 
     def _batch_get(
-            self,
-            tool: str,
-            parms: Dict[str, str],
-            batch_param: str,
-            batch_data: List[str],
-            batch_size: int,
+        self,
+        tool: str,
+        parms: Dict[str, str],
+        batch_param: str,
+        batch_data: List[str],
+        batch_size: int,
     ) -> str:
         result = []
         done = 0
         retry = 0
         cur_batch_size = batch_size
         while done < len(batch_data):
-            to_get = batch_data[done:done + cur_batch_size]
-            LOG.info("Calling Entrez %s (%i of %i done, fetching %i)",
-                     tool, done, len(batch_data), len(to_get))
+            to_get = batch_data[done : done + cur_batch_size]
+            LOG.info(
+                "Calling Entrez %s (%i of %i done, fetching %i)",
+                tool,
+                done,
+                len(batch_data),
+                len(to_get),
+            )
             try:
                 parms[batch_param] = ",".join(to_get)
                 data = self._get(tool, parms)
@@ -164,11 +170,13 @@ class EntrezAPI:
                             to_get[0],
                             retry,
                             self._retries,
-                            waitfor
+                            waitfor,
                         )
                         time.sleep(waitfor)
                     else:
-                        LOG.error("Skipping sequence '%s' due to recurring errors", to_get[0])
+                        LOG.error(
+                            "Skipping sequence '%s' due to recurring errors", to_get[0]
+                        )
                         done += 1
                         cur_batch_size = batch_size
                         retry = 0
@@ -193,7 +201,7 @@ class EntrezAPI:
                 "term": term,
                 "usehistory": "y",
                 "retmode": "json",
-            }
+            },
         )
         parsed = json.loads(result)
         return parsed["esearchresult"]
@@ -206,7 +214,7 @@ class EntrezAPI:
                 "db": database,
                 "query_key": query["querykey"],
                 "WebEnv": query["webenv"],
-            }
+            },
         )
         xml = ET.fromstring(data)
         return xml
@@ -241,9 +249,9 @@ class EntrezAPI:
                 "rettype": rettype,
                 "retmode": retmode,
             },
-            batch_param = "id",
-            batch_data = ids,
-            batch_size = batch_size,
+            batch_param="id",
+            batch_data=ids,
+            batch_size=batch_size,
         )
 
     def enable_debug(self):
@@ -294,6 +302,7 @@ class FeatureTableParsingError(Exception):
             f"  Line: '{self.line}'\n"
             f"  Last OK: '{self.lastok}'\n"
         )
+
 
 class FeatureTableParser:
     """Parses Entrez feature table format"""
@@ -452,9 +461,7 @@ class Cache:
         entry = str(entry)
         if len(entry) < 6:
             entry += "x" * (6 - len(entry))
-        path = os.path.join(
-            self._path, cache, entry[0:2], entry[2:5]
-        )
+        path = os.path.join(self._path, cache, entry[0:2], entry[2:5])
         os.makedirs(path, exist_ok=True)
         return os.path.join(path, entry[5:])
 
@@ -483,14 +490,16 @@ class Cache:
 
 class FeatureTables:
     """Access Entrez Feature Tables"""
+
     def __init__(
-        self, entrez: EntrezAPI = None,
+        self,
+        entrez: EntrezAPI = None,
         parser: FeatureTableParser = None,
         cache_path: str = None,
-        api_key = None
+        api_key=None,
     ) -> None:
         if api_key is not None:
-            defaults = {'api_key': api_key}
+            defaults = {"api_key": api_key}
         else:
             defaults = None
         self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
@@ -514,7 +523,9 @@ class FeatureTables:
             LOG.info("Retrieved %i accessions from disk cache", len(result))
             accessions = [acc for acc in accessions if acc not in result]
         if accessions:
-            text = self.entrez.fetch("nucleotide", accessions, rettype="ft", retmode="text")
+            text = self.entrez.fetch(
+                "nucleotide", accessions, rettype="ft", retmode="text"
+            )
             try:
                 parsed = self.parser.parse(text)
             except FeatureTableParsingError as exc:
@@ -535,25 +546,27 @@ class FeatureTables:
         result = []
         for acc, annotation in parsed.items():
             for start, stop, typ, data in annotation:
-                if not (typ in select or '*' in select):
+                if not (typ in select or "*" in select):
                     continue
-                select2 = select.get(typ, set()) | select.get('*', set())
+                select2 = select.get(typ, set()) | select.get("*", set())
                 for key, value in data.items():
-                    if not (key in select2 or '*' in select2):
+                    if not (key in select2 or "*" in select2):
                         continue
-                    result.append({
-                        'acc': acc,
-                        'start': start,
-                        'stop': stop,
-                        'typ': typ,
-                        'key': key,
-                        'value': value,
-                    })
+                    result.append(
+                        {
+                            "acc": acc,
+                            "start": start,
+                            "stop": stop,
+                            "typ": typ,
+                            "key": key,
+                            "value": value,
+                        }
+                    )
         return result
 
     @property
     def fields(_self):
-        return ['acc', 'start', 'stop', 'typ', 'key', 'value']
+        return ["acc", "start", "stop", "typ", "key", "value"]
 
     @staticmethod
     def write_table(table, out):
@@ -571,12 +584,10 @@ class GenomeSizes:
     GENOME_SIZE_URL = "https://api.ncbi.nlm.nih.gov/genome/v0/expected_genome_size"
 
     def __init__(
-        self, entrez: EntrezAPI = None,
-        cache_path: str = None,
-        api_key = None
+        self, entrez: EntrezAPI = None, cache_path: str = None, api_key=None
     ) -> None:
         if api_key is not None:
-            defaults = {'api_key': api_key}
+            defaults = {"api_key": api_key}
         else:
             defaults = None
         self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
@@ -592,14 +603,10 @@ class GenomeSizes:
 
     def genome_size_check_query(self, taxid: int) -> Dict[str, str]:
         """Queries NCBI genome size check API"""
-        response = requests.get(
-            self.GENOME_SIZE_URL,
-            params={"species_taxid": taxid}
-        )
+        response = requests.get(self.GENOME_SIZE_URL, params={"species_taxid": taxid})
         response.raise_for_status()
         genome_size_response = ET.fromstring(response.text)
-        return {node.tag:node.text for node in genome_size_response}
-
+        return {node.tag: node.text for node in genome_size_response}
 
     def genome_size_check(self, taxid: int) -> Optional[int]:
         """Determines the genome size using NCBI genome size check API
@@ -612,7 +619,7 @@ class GenomeSizes:
           genome.
         """
         results = self.genome_size_check_query(taxid)
-        exp_len = results.get('expected_ungapped_length')
+        exp_len = results.get("expected_ungapped_length")
         if not exp_len:
             # No result, usually means that there are fewer than 4 accepted reference
             # genomes for the taxonomy ID in question
@@ -623,16 +630,15 @@ class GenomeSizes:
             # Result, but not an integer. Let's log this, but then
             # continue with alternate ways of finding the genome size.
             LOG.error(
-                "NCBI genome size check API returned malformed value '%s'",
-                exp_len
+                "NCBI genome size check API returned malformed value '%s'", exp_len
             )
             return None
 
     def entrez_genome_search(
-            self,
-            taxid: int,
-            refseq: bool = False,
-            complete: bool = False,
+        self,
+        taxid: int,
+        refseq: bool = False,
+        complete: bool = False,
     ) -> int:
         """Determines the genome size using Entrez APIs
 
@@ -656,9 +662,9 @@ class GenomeSizes:
         """
         term = f"(txid{taxid}[Organism:exp])"
         if refseq:
-            term +=  "AND (refseq[filter])"
+            term += "AND (refseq[filter])"
         if complete:
-            term +=  "AND (complete genome)"
+            term += "AND (complete genome)"
         query = self.entrez.search("nucleotide", term)
         summaries = self.entrez.summary("nucleotide", query)
         lengths = [
@@ -709,10 +715,7 @@ class GenomeSizes:
         """
         result = self.cache.get("genome_sizes", taxids)
         taxids = [taxid for taxid in taxids if taxid not in result]
-        newresult = {
-            taxid: self.get_one(taxid)
-            for taxid in taxids
-        }
+        newresult = {taxid: self.get_one(taxid) for taxid in taxids}
         self.cache.put("genome_sizes", newresult)
         result.update(newresult)
         return result
@@ -725,6 +728,7 @@ def main():
     """test main"""
     logging.basicConfig()
     import sys
+
     features = FeatureTables(cache_path="cache_path")
     features.entrez.enable_debug()
     accs = [

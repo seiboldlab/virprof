@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 from ..regionlist import RegionList
 from ..fasta import FastaFile, scaffold_contigs
 
-subject =      b"AGAAA" b"TGTTT" b"CACCC" b"GAGGG"
+subject = b"AGAAA" b"TGTTT" b"CACCC" b"GAGGG"
 subject_comp = b"TCTTT" b"ACAAA" b"GTGGG" b"CTCCC"
 insert = b"CGCA"
 
@@ -88,7 +88,7 @@ def test_scaffold_gap():
     rl.add(16, 20, ("second10bp", 16, 20, 6, 10))
     sequence = scaffold_contigs(rl, contigs)
     assert len(sequence) == 1
-    assert next(iter(sequence.values())) == subject[0:10] + b"n"*5 + subject[15:20]
+    assert next(iter(sequence.values())) == subject[0:10] + b"n" * 5 + subject[15:20]
 
 
 def test_scaffold_deletion_in_contig():
@@ -114,7 +114,7 @@ def test_scaffold_split_contig_inserted():
     # Mapping something else into the middle
     rl.add(12, 14, ("identity", 12, 14, 12, 14))
     sequence = scaffold_contigs(rl, contigs)
-    expected = subject[0:10] + b'n' + subject[11:14] + b'n' + subject[15:20]
+    expected = subject[0:10] + b"n" + subject[11:14] + b"n" + subject[15:20]
     assert len(sequence) == 1
     assert next(iter(sequence.values())) == expected
 

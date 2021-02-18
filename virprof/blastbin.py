@@ -141,10 +141,7 @@ class HitChain:
         return len(self.hits)
 
     def __str__(self) -> str:
-        return (
-            f"acc={self.sacc} e={self.log10_evalue} "
-            f"l={self.qlens}"
-        )
+        return f"acc={self.sacc} e={self.log10_evalue} " f"l={self.qlens}"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self)})"
@@ -370,21 +367,31 @@ class HitChain:
         """Dump hits comprising this HitChain"""
         for hit in self.hits:
             yield {
-                'qacc': hit.qacc,
-                'qlen': hit.qlen,
-                'pident': hit.pident,
-                'bitscore': hit.bitscore,
-                'qstart': hit.qstart,
-                'qend': hit.qend,
-                'sstart': hit.sstart,
-                'send': hit.send,
-                'btop': hit.btop,
+                "qacc": hit.qacc,
+                "qlen": hit.qlen,
+                "pident": hit.pident,
+                "bitscore": hit.bitscore,
+                "qstart": hit.qstart,
+                "qend": hit.qend,
+                "sstart": hit.sstart,
+                "send": hit.send,
+                "btop": hit.btop,
             }
 
     @property
     def hit_fields(self) -> List[str]:
         """List keys of ``hits_to_dict()``"""
-        return ['qacc', 'qlen', 'pident', 'bitscore', 'qstart', 'qend', 'sstart', 'send', 'btop']
+        return [
+            "qacc",
+            "qlen",
+            "pident",
+            "bitscore",
+            "qstart",
+            "qend",
+            "sstart",
+            "send",
+            "btop",
+        ]
 
 
 class CheckOverlaps(HitChain):
@@ -546,19 +553,21 @@ class CoverageHitChain(HitChain):
 
     def to_dict(self) -> Dict[str, Any]:
         res = super().to_dict()
-        res.update({
-            "numreads": self.numreads,
-        })
+        res.update(
+            {
+                "numreads": self.numreads,
+            }
+        )
         return res
 
     def hits_to_dict(self) -> Iterator[Dict[str, Any]]:
         for hit, row in zip(self.hits, super().hits_to_dict()):
-            row['numreads'] = sum(self.get_numreads(hit.qacc))
+            row["numreads"] = sum(self.get_numreads(hit.qacc))
             yield row
 
     @property
     def hit_fields(self):
-        return super().hit_fields + ['numreads']
+        return super().hit_fields + ["numreads"]
 
 
 def greedy_select_chains(
