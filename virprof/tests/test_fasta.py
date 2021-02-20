@@ -9,10 +9,20 @@ Unit tests for fasta module
 from tempfile import NamedTemporaryFile
 
 from ..regionlist import RegionList
-from ..fasta import FastaFile, scaffold_contigs
+from ..fasta import FastaFile, Btop, scaffold_contigs
 
 subject = b"AGAAA" b"TGTTT" b"CACCC" b"GAGGG"
 subject_comp = b"TCTTT" b"ACAAA" b"GTGGG" b"CTCCC"
+
+mutated = b"AGACC" b"TGTTT" b"CACCC" b"GAGGG"
+mutated_btop = "3CACA15"
+insertion = b"AGAAAG" b"TGTTT" b"CACCC" b"GAGGG"
+insertion_subj = b"AGAAA-" b"TGTTT" b"CACCC" b"GAGGG"
+insertion_btop = "5G-15"
+deletion = b"AGAA" b"TGTTT" b"CACCC" b"GAGGG"
+deletion_alig = b"AGAA-" b"TGTTT" b"CACCC" b"GAGGG"
+deletion_btop = "4-A15"
+
 insert = b"CGCA"
 
 contigs = FastaFile(None, mode="")
@@ -45,6 +55,34 @@ def test_FastaFile():
     for acc, seq in contigs.sequences.items():
         seq2 = fa.get(acc.decode("ASCII"))
         assert seq == seq2
+
+
+def test_Btop_identity():
+    """Simple BTOP of exact match"""
+    btop = Btop(str(len(subject)))
+    assert btop.get_aligned_query(subject) == subject
+    assert btop.get_aligned_subject(subject) == subject
+
+
+def test_Btop_mutation():
+    """Simple BTOP with 2bp mutated"""
+    btop = Btop(mutated_btop)
+    assert btop.get_aligned_query(mutated) == mutated
+    assert btop.get_aligned_subject(mutated) == subject
+
+
+def test_Btop_insertion():
+    """Simple BTOP with one insertion in query"""
+    btop = Btop(insertion_btop)
+    assert btop.get_aligned_query(insertion) == insertion
+    assert btop.get_aligned_subject(insertion) == insertion_subj
+
+
+def test_Btop_deletion():
+    """Simple BTOP with one deletion in query"""
+    btop = Btop(deletion_btop)
+    assert btop.get_aligned_query(deletion) == deletion_alig
+    assert btop.get_aligned_subject(deletion) == subject
 
 
 def test_scaffold_contigs_simple():

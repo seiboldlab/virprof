@@ -2,6 +2,7 @@
 
 import logging
 import subprocess as sp
+import re
 from collections import Counter
 from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict, Tuple, List
 
@@ -157,6 +158,65 @@ class FastaFile:
         else:
             header = ">{}".format(acc).encode("utf-8")
         self.outzip.stdin.write(b"\n".join((header, sequence, b"")))
+
+
+class Btop:
+    """BLAST Trace-back operations (alignment) string"""
+
+    def __init__(self, btop: str) -> None:
+        self._ops = self._parse_btop(btop)
+
+    @staticmethod
+    def _parse_btop(btop: str):
+        ops = list()
+        for match in re.finditer("([0-9]+)?([A-Z-]{2}|$)", btop):
+            digits, letters = match.groups()
+            matched = int(digits) if digits else 0
+            if letters:
+                query, subject = letters.encode("ascii")
+            else:
+                query, subject = None, None
+            ops.append((matched, query, subject))
+        return ops
+
+    def _get_aligned(self, sequence: bytes, get_query: bool) -> bytes:
+        aligned = []
+        offset = 0
+        for matched, query, subject in self._ops:
+            aligned.extend(sequence[offset : offset + matched])
+            offset += matched
+            if query:
+                if get_query:
+                    aligned.append(query)
+                else:
+                    aligned.append(subject)
+                if query != 45:  # '-'
+                    offset += 1
+        return bytes(aligned)
+
+    def get_aligned_query(self, sequence: bytes) -> bytes:
+        """Return aligned query sequence (with gaps)
+
+        Sequence is identical to passed ``sequence``, with "-"
+        characters inserted for gaps.
+
+        Args:
+          sequence: query sequence
+
+        """
+        return self._get_aligned(sequence, get_query=True)
+
+    def get_aligned_subject(self, sequence: bytes) -> bytes:
+        """Return aligned subject sequence (with gaps)
+
+        Sequence is mutated from passed ``sequence`` and has had gaps
+        ("-") inserted.
+
+        Args:
+          sequence: query sequence
+
+        """
+        return self._get_aligned(sequence, get_query=False)
 
 
 def revcomp(sequence: bytes) -> bytes:
