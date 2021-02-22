@@ -278,7 +278,7 @@ def consensus(sequences: List[bytes]) -> bytes:
 
         if best_count == second_count:
             bases.append(110)  # 110 == 'n'
-        else:
+        elif best != 45:  # '-'
             bases.append(best)
     return bytes(bases)
 
