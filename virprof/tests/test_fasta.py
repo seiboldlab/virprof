@@ -62,13 +62,21 @@ def test_Btop_identity():
     btop = Btop(str(len(subject)))
     assert btop.get_aligned_query(subject) == subject
     assert btop.get_aligned_subject(subject) == subject
+    assert btop.get_aligned_query(subject, 1, len(subject)) == subject
+    assert btop.get_aligned_subject(subject, 1, len(subject)) == subject
+    assert btop.get_aligned_query(subject, 10, 15) == subject[9:15]
+    assert btop.get_aligned_subject(subject, 10, 15) == subject[9:15]
 
 
 def test_Btop_mutation():
-    """Simple BTOP with 2bp mutated"""
+    """Simple BTOP with 2bp mutated (4 and 5)"""
     btop = Btop(mutated_btop)
     assert btop.get_aligned_query(mutated) == mutated
     assert btop.get_aligned_subject(mutated) == subject
+    for l in (1, 3, 4, 5, 6):
+        for r in (3, 4, 5, 6):
+            assert btop.get_aligned_query(subject, l, r) == mutated[l - 1 : r]
+            assert btop.get_aligned_subject(subject, l, r) == subject[l - 1 : r]
 
 
 def test_Btop_insertion():
@@ -76,6 +84,14 @@ def test_Btop_insertion():
     btop = Btop(insertion_btop)
     assert btop.get_aligned_query(insertion) == insertion
     assert btop.get_aligned_subject(insertion) == insertion_subj
+    for l in range(1, 8):
+        for r in range(1, 8):
+            assert (
+                btop.get_aligned_query(insertion, l, r) == insertion[l - 1 : r]
+            ), f"l={l}, r={r}"
+            assert (
+                btop.get_aligned_subject(insertion, l, r) == insertion_subj[l - 1 : r]
+            ), f"l={l}, r={r}"
 
 
 def test_Btop_deletion():
@@ -83,6 +99,18 @@ def test_Btop_deletion():
     btop = Btop(deletion_btop)
     assert btop.get_aligned_query(deletion) == deletion_alig
     assert btop.get_aligned_subject(deletion) == subject
+    for l in range(1, 8):
+        for r in range(1, 8):
+            offset = deletion_alig[0 : l - 1].count(b"-")
+            expected = deletion_alig[l - 1 + offset : r + offset]
+            add = 0
+            while len(expected.replace(b"-", b"")) < r - l + 1:
+                add += 1
+                expected = deletion_alig[l - 1 + offset : r + add + offset]
+            assert expected.replace(b"-", b"") == deletion[l - 1 : r], f"l={l}, r={r}"
+            assert btop.get_aligned_query(deletion, l, r) == expected, f"l={l}, r={r}"
+            expected = subject[l - 1 + offset : r + add + offset]
+            assert btop.get_aligned_subject(deletion, l, r) == expected, f"l={l}, r={r}"
 
 
 def test_scaffold_contigs_simple():

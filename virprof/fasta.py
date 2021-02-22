@@ -186,22 +186,43 @@ class Btop:
             ops.append((matched, query, subject))
         return ops
 
-    def _get_aligned(self, sequence: bytes, get_query: bool) -> bytes:
+    def _get_aligned(
+        self,
+        sequence: bytes,
+        start: int = None,
+        end: int = None,
+        get_query: bool = True,
+    ) -> bytes:
+        if start is None:
+            start = 1
+        if end is None:
+            end = len(sequence)
         aligned = []
         offset = 0
+        start -= 1  # convert blast coordinates to python
         for matched, query, subject in self._ops:
-            aligned.extend(sequence[offset : offset + matched])
+            startpos = max(offset, start)
+            endpos = min(offset + matched, end)
+            if endpos > startpos:
+                aligned.extend(sequence[startpos:endpos])
             offset += matched
+
             if query:
-                if get_query:
-                    aligned.append(query)
-                else:
-                    aligned.append(subject)
+                if offset >= start and offset < end:
+                    if get_query:
+                        aligned.append(query)
+                    else:
+                        aligned.append(subject)
                 if query != 45:  # '-'
                     offset += 1
         return bytes(aligned)
 
-    def get_aligned_query(self, sequence: bytes) -> bytes:
+    def get_aligned_query(
+        self,
+        sequence: bytes,
+        start: int = None,
+        end: int = None,
+    ) -> bytes:
         """Return aligned query sequence (with gaps)
 
         Sequence is identical to passed ``sequence``, with "-"
@@ -211,9 +232,14 @@ class Btop:
           sequence: query sequence
 
         """
-        return self._get_aligned(sequence, get_query=True)
+        return self._get_aligned(sequence, start, end, get_query=True)
 
-    def get_aligned_subject(self, sequence: bytes) -> bytes:
+    def get_aligned_subject(
+        self,
+        sequence: bytes,
+        start: int = None,
+        end: int = None,
+    ) -> bytes:
         """Return aligned subject sequence (with gaps)
 
         Sequence is mutated from passed ``sequence`` and has had gaps
@@ -223,7 +249,7 @@ class Btop:
           sequence: query sequence
 
         """
-        return self._get_aligned(sequence, get_query=False)
+        return self._get_aligned(sequence, start, end, get_query=False)
 
 
 def revcomp(sequence: bytes) -> bytes:
