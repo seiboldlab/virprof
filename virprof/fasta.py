@@ -334,7 +334,10 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             if section_num == len(regs) - 1 and len(hits) == 1:
                 end = len(seq)
 
-            section_seqs.append(seq[start:end])
+            if len(hits) > 1:
+                section_seqs.append(btop.get_aligned_query(seq, start + 1, end))
+            else:
+                section_seqs.append(seq[start:end])
 
         if hits:
             last_hits = {
