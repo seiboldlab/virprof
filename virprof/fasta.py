@@ -340,6 +340,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
                 section_seqs.append(seq[start:end])
 
         if hits:
+            section_seqs.append(btop.get_aligned_subject(seq, start + 1, end))
             last_hits = {
                 qacc: (qstart, qend, sstart > send)
                 for qacc, sstart, send, qstart, qend, _btop in hits
@@ -350,7 +351,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             # No contig covering this piece of reference.
             last_section_from_reference = True
             sequence.append(b"n" * section_len)
-        elif len(section_seqs) == 1:
+        elif len(section_seqs) == 2:
             ## Singleton piece - fill with sequence
             sequence.append(section_seqs[0])
         else:
