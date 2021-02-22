@@ -16,6 +16,8 @@ subject_comp = b"TCTTT" b"ACAAA" b"GTGGG" b"CTCCC"
 
 mutated = b"AGACC" b"TGTTT" b"CACCC" b"GAGGG"
 mutated_btop = "3CACA15"
+mutated1_comp = b"TCTTG" b"ACAAA" b"GTGGG" b"CTCCC"
+mutated1_comp_btop = "15GT4"
 insertion = b"AGAAAG" b"TGTTT" b"CACCC" b"GAGGG"
 insertion_subj = b"AGAAA-" b"TGTTT" b"CACCC" b"GAGGG"
 insertion_btop = "5G-15"
@@ -40,6 +42,7 @@ contigs.sequences = {
     b"replacement": subject[0:5] + insert + subject[10:20],
     b"replacement-revcomp": subject_comp[19:9:-1] + insert + subject_comp[4::-1],
     b"replacement-mixed": subject[10:20] + insert + subject_comp[4::-1],
+    b"mutated1-revcomp": mutated1_comp[::-1],
     b"left_overhang": insert + subject,
     b"right_overhang": subject + insert,
 }
@@ -75,8 +78,21 @@ def test_Btop_mutation():
     assert btop.get_aligned_subject(mutated) == subject
     for l in (1, 3, 4, 5, 6):
         for r in (3, 4, 5, 6):
-            assert btop.get_aligned_query(subject, l, r) == mutated[l - 1 : r]
-            assert btop.get_aligned_subject(subject, l, r) == subject[l - 1 : r]
+            assert btop.get_aligned_query(mutated, l, r) == mutated[l - 1 : r]
+            assert btop.get_aligned_subject(mutated, l, r) == subject[l - 1 : r]
+
+
+def test_Btop_mutation1_comp():
+    """Simple BTOP with 2bp mutated (4 and 5)"""
+    btop = Btop(mutated1_comp_btop)
+    query = mutated1_comp[::-1]
+    subj = subject_comp[::-1]
+    assert btop.get_aligned_query(query) == query
+    assert btop.get_aligned_subject(query) == subj
+    for l in (1, 3, 4, 5, 6):
+        for r in (3, 4, 5, 6):
+            assert btop.get_aligned_query(query, l, r) == query[l - 1 : r]
+            assert btop.get_aligned_subject(query, l, r) == subj[l - 1 : r]
 
 
 def test_Btop_insertion():
