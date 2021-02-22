@@ -28,7 +28,7 @@ from .wordscore import WordScorer
 from .taxonomy import load_taxonomy
 from .fasta import filter_fasta, FastaFile
 from .regionlist import RegionList
-from .fasta import scaffold_contigs
+from .fasta import scaffold_contigs, Btop
 from .entrez import FeatureTables, GenomeSizes
 
 LOG = logging.getLogger(__name__)
@@ -759,6 +759,7 @@ def export_fasta(
                 int(row["send"]),
                 int(row["qstart"]),
                 int(row["qend"]),
+                Btop(row["btop"]),
             ),
         )
     LOG.info("Found %i hits", sum(len(hit) for hit in hits.values()))

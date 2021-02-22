@@ -302,7 +302,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
         section_seqs = []
 
         # Iterate over each hit overlapping piece
-        for qacc, sstart, send, qstart, qend in hits:
+        for qacc, sstart, send, qstart, qend, btop in hits:
             seq = contigs.get(qacc)
             qaccs.add(qacc)
 
@@ -339,7 +339,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
         if hits:
             last_hits = {
                 qacc: (qstart, qend, sstart > send)
-                for qacc, sstart, send, qstart, qend in hits
+                for qacc, sstart, send, qstart, qend, _btop in hits
             }
 
         last_section_from_reference = False
