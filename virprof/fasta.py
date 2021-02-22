@@ -164,7 +164,14 @@ class Btop:
     """BLAST Trace-back operations (alignment) string"""
 
     def __init__(self, btop: str) -> None:
+        self._btop = btop
         self._ops = self._parse_btop(btop)
+
+    def __str__(self):
+        return self._btop
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._btop})"
 
     @staticmethod
     def _parse_btop(btop: str):
