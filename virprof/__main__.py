@@ -755,9 +755,7 @@ def export_fasta(
             int(row["send"]),
             (
                 row["qacc"],
-                int(row["sstart"]),
-                int(row["send"]),
-                Btop(row["btop"], int(row["qstart"])),
+                Btop(int(row["sstart"]), int(row["send"]), int(row["qstart"]), row["btop"]),
             ),
         )
     LOG.info("Found %i hits", sum(len(hit) for hit in hits.values()))

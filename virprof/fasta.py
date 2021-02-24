@@ -163,9 +163,11 @@ class FastaFile:
 class Btop:
     """BLAST Trace-back operations (alignment) string"""
 
-    def __init__(self, btop: str, qstart: int) -> None:
-        self._btop = btop
+    def __init__(self, sstart: int, send: int, qstart: int, btop: str) -> None:
+        self._sstart = sstart
+        self._send = send
         self._qstart = qstart
+        self._btop = btop
         self._length, self._ops = self._parse_btop(btop)
 
     def __str__(self):
@@ -173,6 +175,9 @@ class Btop:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._btop, self._qstart})"
+
+    def is_forward(self):
+        return self._send > self._sstart
 
     @staticmethod
     def _parse_btop(btop: str):
@@ -266,6 +271,7 @@ class Btop:
         sequence: bytes,
         start: int = None,
         end: int = None,
+        subject_coordinates: bool = False,
     ) -> bytes:
         """Return aligned query sequence (with gaps)
 
@@ -276,7 +282,17 @@ class Btop:
           sequence: query sequence
 
         """
-        return self._get_aligned(sequence, start, end, get_query=True)
+        if subject_coordinates:
+            if self.is_forward():
+                start = start - self._sstart + 1
+                end = end - self._sstart + 1
+            else:
+                start = start - self._send + 1
+                end = end - self._send + 1
+        aligned, left, right = self._get_aligned(sequence, start, end, get_query=True)
+        if subject_coordinates and not self.is_forward():
+            aligned = revcomp(aligned)
+        return aligned, left, right
 
     def get_aligned_subject(
         self,
@@ -346,20 +362,14 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
         current_hits = {}
 
         # Iterate over each hit overlapping piece
-        for qacc, sstart, send, btop in hits:
+        for qacc, btop in hits:
             qaccs.add(qacc)
             seq = contigs.get(qacc)
-            is_forward = send > sstart
-
-            if is_forward:
-                aligned, start, end = btop.get_aligned_query(
-                    seq, section_start - sstart + 1, section_end - sstart + 1
-                )
-            else:
-                aligned, start, end = btop.get_aligned_query(
-                    seq, section_start - send + 1, section_end - send + 1
-                )
-                aligned = revcomp(aligned)
+            aligned, start, end = btop.get_aligned_query(
+                seq, section_start, section_end,
+                subject_coordinates = True
+            )
+            is_forward = btop.is_forward()
 
             # Handle split contig
             current_hits[qacc] = (start, end, is_forward)
