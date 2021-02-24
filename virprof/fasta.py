@@ -163,28 +163,33 @@ class FastaFile:
 class Btop:
     """BLAST Trace-back operations (alignment) string"""
 
-    def __init__(self, btop: str) -> None:
+    def __init__(self, btop: str, qstart: int = 1) -> None:
         self._btop = btop
-        self._ops = self._parse_btop(btop)
+        self._qstart = qstart
+        self._length, self._ops = self._parse_btop(btop)
 
     def __str__(self):
         return self._btop
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self._btop})"
+        return f"{self.__class__.__name__}({self._btop, self._qstart})"
 
     @staticmethod
     def _parse_btop(btop: str):
         ops = list()
+        length = 0
         for match in re.finditer("([0-9]+)?([A-Z-]{2}|$)", btop):
             digits, letters = match.groups()
             matched = int(digits) if digits else 0
+            length += matched
             if letters:
                 query, subject = letters.encode("ascii")
+                if subject != "-":
+                    length += 1
             else:
                 query, subject = None, None
             ops.append((matched, query, subject))
-        return ops
+        return length, ops
 
     def _get_aligned(
         self,
@@ -193,32 +198,58 @@ class Btop:
         end: int = None,
         get_query: bool = True,
     ) -> bytes:
+        """Get aligned query/subject in subject coordinates"""
         if start is None:
-            start = 1
-        if end is None:
-            end = len(sequence)
-        if start < 1 or end > len(sequence):
+            start = 0
+        elif start < self._qstart:
             raise IndexError(
-                f"Btop out of bounds error: start={start} end={end} len={len(sequence)}"
+                f"{repr(self)}: out of bounds "
+                f"(start={start} < qstart={self._qstart})"
             )
-        aligned = []
-        offset = 0
-        start -= 1  # convert blast coordinates to python
-        for matched, query, subject in self._ops:
-            startpos = max(offset, start)
-            endpos = min(offset + matched, end)
-            if endpos > startpos:
-                aligned.extend(sequence[startpos:endpos])
-            offset += matched
+        else:
+            start = start - self._qstart
 
-            if query:
-                if start <= offset < end:
-                    if get_query:
-                        aligned.append(query)
-                    else:
-                        aligned.append(subject)
-                if query != 45:  # '-'
-                    offset += 1
+        sequence = sequence[self._qstart - 1 :]
+
+        if end is None:
+            end = self._length
+        elif end > self._qstart + self._length:
+            raise IndexError(
+                f"{repr(self)}: out of bounds "
+                f"(end={end}) > qstart={self._qstart}+len={self._length})"
+            )
+        else:
+            end = end - self._qstart + 1
+
+        aligned = []
+        query_ptr = 0
+        subject_ptr = 0
+        for matched, query, subject in self._ops:
+            offset = query_ptr - subject_ptr
+            # Process matches
+            startpos = max(start + offset, query_ptr)
+            endpos = min(end + offset, query_ptr + matched)
+            if endpos > startpos:
+                aligned += sequence[startpos:endpos]
+            query_ptr += matched
+            subject_ptr += matched
+            if endpos == end + offset:
+                break
+
+            if not query:
+                LOG.error("ARGH")
+                break
+
+            # Process mismatch/indel
+            if start <= subject_ptr < end:
+                if get_query:
+                    aligned.append(query)
+                else:
+                    aligned.append(subject)
+            if subject != 45:  # '-'
+                subject_ptr += 1
+            if query != 45:  # '-'
+                query_ptr += 1
         return bytes(aligned)
 
     def get_aligned_query(
@@ -336,7 +367,9 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             # Add outside overhang:
             if len(hits) == 1:
 
-                def get_edge(left):
+                def get_edge(
+                    left, seq=seq, start=start, end=end, is_forward=is_forward
+                ):
                     res = seq[: start - 1] if left == is_forward else seq[end:]
                     if is_forward:
                         return res
