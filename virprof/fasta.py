@@ -184,7 +184,7 @@ class Btop:
             length += matched
             if letters:
                 query, subject = letters.encode("ascii")
-                if subject != "-":
+                if subject != 45:  # '-':
                     length += 1
             else:
                 query, subject = None, None
