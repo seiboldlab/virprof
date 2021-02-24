@@ -212,7 +212,7 @@ class Btop:
             offset += matched
 
             if query:
-                if offset >= start and offset < end:
+                if start <= offset < end:
                     if get_query:
                         aligned.append(query)
                     else:
@@ -304,60 +304,59 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
     for section_num, (section_start, section_end, hits) in enumerate(regs):
         section_len = section_end - section_start + 1
         section_seqs = []
+        current_hits = {}
 
         # Iterate over each hit overlapping piece
-        for qacc, sstart, send, qstart, qend, btop in hits:
-            seq = contigs.get(qacc)
+        for qacc, sstart, send, qstart, _qend, btop in hits:
             qaccs.add(qacc)
+            seq = contigs.get(qacc)
+            is_forward = send > sstart
 
-            # Remove/replace reference only sections with the same
-            # contig mapped to either side.  This addresses larger
-            # insertion/deletion/replacement events that BLAST will
-            # align as separate hits.
-            if (
-                qacc in last_hits
-                and (sstart > send) == last_hits[qacc][2]  # same orientation
-                and last_section_from_reference
-            ):
-                (_, lend), (rstart, _) = sorted((last_hits[qacc][0:2], (qstart, qend)))
-                sequence[-1] = seq[lend : rstart - 1]
-
-            # Reverse contig if blast hit was on negative strand
-            if sstart > send:
-                seq = revcomp(seq)
-                qstart = len(seq) - qstart + 1
-
-            # Compute start and end of hit inside contig sequence
-            start = qstart + section_start - sstart - 1
-            end = start + section_len
-
-            # For leftmost hit, start from beginning of contig if there is only one:
-            if not sequence and len(hits) == 1:
-                start = 0
-
-            if section_num == len(regs) - 1 and len(hits) == 1:
-                end = len(seq)
-
-            if len(hits) > 1:
-                section_seqs.append(btop.get_aligned_query(seq, start + 1, end))
+            # Compute start and end within contig:
+            if is_forward:
+                start = qstart + section_start - sstart
             else:
-                section_seqs.append(seq[start:end])
+                start = qstart + section_start - send
+            end = start + section_len - 1
 
-        if hits:
-            section_seqs.append(btop.get_aligned_subject(seq, start + 1, end))
-            last_hits = {
-                qacc: (qstart, qend, sstart > send)
-                for qacc, sstart, send, qstart, qend, _btop in hits
-            }
+            # Handle split contig
+            current_hits[qacc] = (start, end, is_forward)
+            if last_section_from_reference and qacc in last_hits:
+                l_start, l_end, l_is_forward = last_hits[qacc]
+                if is_forward and l_is_forward:
+                    sequence[-1] = seq[l_end : start - 1]
+                elif not is_forward and not l_is_forward:
+                    sequence[-1] = revcomp(seq[end : l_start - 1])
+
+            aligned = btop.get_aligned_query(seq, start, end)
+
+            if not is_forward:
+                aligned = revcomp(aligned)
+
+            # Add outside overhang:
+            if len(hits) == 1:
+
+                def get_edge(left):
+                    res = seq[: start - 1] if left == is_forward else seq[end:]
+                    if is_forward:
+                        return res
+                    return revcomp(res)
+
+                if section_num == 0:
+                    aligned = get_edge(True) + aligned
+                if section_num == len(regs) - 1:
+                    aligned = aligned + get_edge(False)
+            section_seqs.append(aligned)
+
+        # if hits:
+        #    section_seqs.append(btop.get_aligned_subject(seq, start + 1, end))
 
         last_section_from_reference = False
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
             last_section_from_reference = True
             sequence.append(b"n" * section_len)
-        elif len(section_seqs) == 2:
-            ## Singleton piece - fill with sequence
-            sequence.append(section_seqs[0])
         else:
             sequence.append(consensus(section_seqs))
+            last_hits = current_hits
     return {"+".join(qaccs): b"".join(sequence)}

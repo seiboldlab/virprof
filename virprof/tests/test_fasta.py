@@ -16,6 +16,7 @@ subject_comp = b"TCTTT" b"ACAAA" b"GTGGG" b"CTCCC"
 
 mutated = b"AGACC" b"TGTTT" b"CACCC" b"GAGGG"
 mutated_btop = "3CACA15"
+mutated1 = b"AGAAC" b"TGTTT" b"CACCC" b"GAGGG"
 mutated1_comp = b"TCTTG" b"ACAAA" b"GTGGG" b"CTCCC"
 mutated1_comp_btop = "15GT4"
 insertion = b"AGAAAG" b"TGTTT" b"CACCC" b"GAGGG"
@@ -26,6 +27,7 @@ deletion_alig = b"AGAA-" b"TGTTT" b"CACCC" b"GAGGG"
 deletion_btop = "4-A15"
 
 insert = b"CGCA"
+insert_comp = b"GCGT"
 
 contigs = FastaFile(None, mode="")
 contigs.sequences = {
@@ -40,7 +42,9 @@ contigs.sequences = {
     b"deletion": subject[0:10] + subject[15:20],
     b"insertion": subject[0:10] + insert + subject[10:20],
     b"replacement": subject[0:5] + insert + subject[10:20],
-    b"replacement-revcomp": subject_comp[19:9:-1] + insert + subject_comp[4::-1],
+    b"replacement-revcomp": subject_comp[19:9:-1]
+    + insert_comp[::-1]
+    + subject_comp[4::-1],
     b"replacement-mixed": subject[10:20] + insert + subject_comp[4::-1],
     b"mutated1-revcomp": mutated1_comp[::-1],
     b"left_overhang": insert + subject,
@@ -260,6 +264,23 @@ def test_scaffold_replacement_in_contig_mixed():
         + contigs.get("replacement-mixed")[10:]  # right overhang
     )
     assert sequence["replacement-mixed"] == expected
+
+
+def test_scaffold_mutation_revcomp():
+    """Reverse complemented contig with 1 bp changed"""
+    rl = RegionList()
+    # Whole sequence
+    rl.add(20, 1, ("mutated1-revcomp", 20, 1, 1, 20, Btop(mutated1_comp_btop)))
+    sequence = scaffold_contigs(rl, contigs)
+    assert sequence["mutated1-revcomp"] == mutated1
+    rl = RegionList()
+    # Disjoint alignment with 2 hits
+    # First match of 5 bp
+    rl.add(5, 1, ("mutated1-revcomp", 5, 1, 15, 20, Btop(mutated1_comp_btop)))
+    # Second match after replacement of 4bp for 5bp in reference
+    rl.add(20, 11, ("mutated1-revcomp", 20, 11, 1, 10, Btop(mutated1_comp_btop)))
+    sequence = scaffold_contigs(rl, contigs)
+    assert sequence["mutated1-revcomp"] == mutated1
 
 
 def test_scaffold_left_overhanging_contig():
