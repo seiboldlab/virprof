@@ -215,9 +215,14 @@ class Btop:
                 f"{repr(self)}: out of bounds (end={end}) > len={self._length})"
             )
 
+        if start >= end:
+            raise IndexError(f"{repr(self)}: empty or negative range {start} to {end}")
+
         aligned = []
         query_ptr = 0
         subject_ptr = 0
+        query_first_base = None
+        query_last_base = None
         for matched, query, subject in self._ops:
             offset = query_ptr - subject_ptr
             # Process matches
@@ -225,17 +230,22 @@ class Btop:
             endpos = min(end + offset, query_ptr + matched)
             if endpos > startpos:
                 aligned += sequence[startpos:endpos]
+                if query_first_base is None:
+                    query_first_base = startpos + 1
             query_ptr += matched
             subject_ptr += matched
-            if endpos == end + offset:
+
+            if endpos >= end + offset:
+                query_last_base = endpos
                 break
 
             if not query:
-                LOG.error("ARGH")
-                break
+                raise RuntimeError("Failed to process sequence alignment (b)")
 
             # Process mismatch/indel
             if start <= subject_ptr < end:
+                if query_first_base is None:
+                    query_first_base = query_ptr + 1
                 if get_query:
                     aligned.append(query)
                 else:
@@ -244,7 +254,12 @@ class Btop:
                 subject_ptr += 1
             if query != 45:  # '-'
                 query_ptr += 1
-        return bytes(aligned)
+            if subject_ptr == end:
+                query_last_base = query_ptr + 1
+                break
+        else:
+            raise RuntimeError("Failed to process sequence alignment")
+        return bytes(aligned), query_first_base, query_last_base
 
     def get_aligned_query(
         self,
@@ -337,12 +352,17 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             seq = contigs.get(qacc)
             is_forward = send > sstart
 
-            # Compute start and end within contig:
             if is_forward:
-                start = qstart + section_start - sstart
+                aligned, start, end = btop.get_aligned_query(
+                    seq, section_start - sstart + 1, section_end - sstart + 1
+                )
             else:
-                start = qstart + section_start - send
-            end = start + section_len - 1
+                aligned, start, end = btop.get_aligned_query(
+                    seq, section_start - send + 1, section_end - send + 1
+                )
+                aligned = revcomp(aligned)
+            start += qstart - 1
+            end += qstart - 1
 
             # Handle split contig
             current_hits[qacc] = (start, end, is_forward)
@@ -352,16 +372,6 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
                     sequence[-1] = seq[l_end : start - 1]
                 elif not is_forward and not l_is_forward:
                     sequence[-1] = revcomp(seq[end : l_start - 1])
-
-            if is_forward:
-                aligned = btop.get_aligned_query(
-                    seq, section_start - sstart + 1, section_end - sstart + 1
-                )
-            else:
-                aligned = btop.get_aligned_query(
-                    seq, section_start - send + 1, section_end - send + 1
-                )
-                aligned = revcomp(aligned)
 
             # Add outside overhang:
             if len(hits) == 1:

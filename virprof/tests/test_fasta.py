@@ -65,19 +65,27 @@ def test_FastaFile():
 def test_Btop_identity():
     """Simple BTOP of exact match"""
     btop = Btop(str(len(subject)))
-    assert btop.get_aligned_query(subject) == subject
-    assert btop.get_aligned_subject(subject) == subject
-    assert btop.get_aligned_query(subject, 1, len(subject)) == subject
-    assert btop.get_aligned_subject(subject, 1, len(subject)) == subject
-    assert btop.get_aligned_query(subject, 10, 15) == subject[9:15]
-    assert btop.get_aligned_subject(subject, 10, 15) == subject[9:15]
+    assert btop.get_aligned_query(subject) == (subject, 1, len(subject))
+    assert btop.get_aligned_subject(subject) == (subject, 1, len(subject))
+    assert btop.get_aligned_query(subject, 1, len(subject)) == (
+        subject,
+        1,
+        len(subject),
+    )
+    assert btop.get_aligned_subject(subject, 1, len(subject)) == (
+        subject,
+        1,
+        len(subject),
+    )
+    assert btop.get_aligned_query(subject, 10, 15) == (subject[9:15], 10, 15)
+    assert btop.get_aligned_subject(subject, 10, 15) == (subject[9:15], 10, 15)
 
 
 def test_Btop_mutation():
     """Simple BTOP with 2bp mutated (4 and 5)"""
     btop = Btop(mutated_btop)
-    assert btop.get_aligned_query(mutated) == mutated
-    assert btop.get_aligned_subject(mutated) == subject
+    assert btop.get_aligned_query(mutated) == (mutated, 1, len(mutated))
+    assert btop.get_aligned_subject(mutated) == (subject, 1, len(mutated))
 
 
 def test_Btop_mutation1_comp():
@@ -85,11 +93,13 @@ def test_Btop_mutation1_comp():
     btop = Btop(mutated1_comp_btop)
     query = mutated1_comp[::-1]
     subj = subject_comp[::-1]
-    assert btop.get_aligned_query(query) == query
-    assert btop.get_aligned_subject(query) == subj
+    assert btop.get_aligned_query(query) == (query, 1, len(query))
+    assert btop.get_aligned_subject(query) == (subj, 1, len(query))
     for l, r in product(*[range(1, 6)] * 2):
-        assert btop.get_aligned_query(query, l, r) == query[l - 1 : r]
-        assert btop.get_aligned_subject(query, l, r) == subj[l - 1 : r]
+        if r < l:
+            continue
+        assert btop.get_aligned_query(query, l, r) == (query[l - 1 : r], l, r), (l, r)
+        assert btop.get_aligned_subject(query, l, r) == (subj[l - 1 : r], l, r), (l, r)
 
 
 def test_Btop_insertion():
@@ -99,22 +109,26 @@ def test_Btop_insertion():
     insertion_btop = "5G-15"
 
     btop = Btop(insertion_btop)
-    assert btop.get_aligned_query(insertion) == insertion
-    assert btop.get_aligned_subject(insertion) == insertion_subject
+    assert btop.get_aligned_query(insertion) == (insertion, 1, len(insertion))
+    assert btop.get_aligned_subject(insertion) == (insertion_subject, 1, len(insertion))
     # Insertion between subject 5 and 6 is prepended on position 6
-    assert btop.get_aligned_query(insertion, 6, 6) == insertion[5:7]
+    assert btop.get_aligned_query(insertion, 6, 6) == (insertion[5:7], 6, 7)
     # Expecting gap on aligned subject
-    assert btop.get_aligned_subject(insertion, 6, 6) == insertion_subject[5:7]
+    assert btop.get_aligned_subject(insertion, 6, 6) == (insertion_subject[5:7], 6, 7)
     # Full match is 11 bp long
-    assert btop.get_aligned_query(insertion, 1, 20) == insertion
-    assert btop.get_aligned_subject(insertion, 1, 20) == insertion_subject
+    assert btop.get_aligned_query(insertion, 1, 20) == (insertion, 1, len(insertion))
+    assert btop.get_aligned_subject(insertion, 1, 20) == (
+        insertion_subject,
+        1,
+        len(insertion),
+    )
     # Part before is normal
-    assert btop.get_aligned_query(insertion, 1, 5) == insertion[0:5]
-    assert btop.get_aligned_subject(insertion, 1, 5) == subject[0:5]
+    assert btop.get_aligned_query(insertion, 1, 5) == (insertion[0:5], 1, 5)
+    assert btop.get_aligned_subject(insertion, 1, 5) == (subject[0:5], 1, 5)
     # Part after has offset in aligned query template
-    assert btop.get_aligned_query(insertion, 11, 15) == insertion[11:16]
+    assert btop.get_aligned_query(insertion, 11, 15) == (insertion[11:16], 12, 16)
     # But not for subject
-    assert btop.get_aligned_subject(insertion, 11, 15) == subject[10:15]
+    assert btop.get_aligned_subject(insertion, 11, 15) == (subject[10:15], 12, 16)
 
 
 def test_Btop_deletion():
@@ -123,24 +137,24 @@ def test_Btop_deletion():
     Base 5 is deleted in query
     """
     btop = Btop(deletion_btop)
-    assert btop.get_aligned_query(deletion) == deletion_alig
-    assert btop.get_aligned_subject(deletion) == subject
+    assert btop.get_aligned_query(deletion) == (deletion_alig, 1, len(deletion))
+    assert btop.get_aligned_subject(deletion) == (subject, 1, len(deletion))
     # At subject position 5 we get a gap character
-    assert btop.get_aligned_query(deletion, 5, 5) == b"-"
-    assert btop.get_aligned_subject(deletion, 5, 5) == subject[4:5]
+    assert btop.get_aligned_query(deletion, 5, 5) == (b"-", 5, 5)
+    assert btop.get_aligned_subject(deletion, 5, 5) == (subject[4:5], 5, 5)
     # Part before
-    assert btop.get_aligned_query(deletion, 1, 3) == subject[0:3]
-    assert btop.get_aligned_subject(deletion, 1, 3) == subject[0:3]
+    assert btop.get_aligned_query(deletion, 1, 3) == (subject[0:3], 1, 3)
+    assert btop.get_aligned_subject(deletion, 1, 3) == (subject[0:3], 1, 3)
     # Part spanning
-    assert btop.get_aligned_query(deletion, 5, 6) == deletion_alig[4:6]
-    assert btop.get_aligned_subject(deletion, 5, 6) == subject[4:6]
-    assert btop.get_aligned_query(deletion, 6, 7) == deletion_alig[5:7]
-    assert btop.get_aligned_subject(deletion, 6, 7) == subject[5:7]
-    assert btop.get_aligned_query(deletion, 5, 7) == deletion_alig[4:7]
-    assert btop.get_aligned_subject(deletion, 5, 7) == subject[4:7]
+    assert btop.get_aligned_query(deletion, 5, 6) == (deletion_alig[4:6], 5, 5)
+    assert btop.get_aligned_subject(deletion, 5, 6) == (subject[4:6], 5, 5)
+    assert btop.get_aligned_query(deletion, 6, 7) == (deletion_alig[5:7], 5, 6)
+    assert btop.get_aligned_subject(deletion, 6, 7) == (subject[5:7], 5, 6)
+    assert btop.get_aligned_query(deletion, 5, 7) == (deletion_alig[4:7], 5, 6)
+    assert btop.get_aligned_subject(deletion, 5, 7) == (subject[4:7], 5, 6)
     # Part after
-    assert btop.get_aligned_query(deletion, 11, 15) == subject[10:15]
-    assert btop.get_aligned_subject(deletion, 11, 15) == subject[10:15]
+    assert btop.get_aligned_query(deletion, 11, 15) == (subject[10:15], 10, 14)
+    assert btop.get_aligned_subject(deletion, 11, 15) == (subject[10:15], 10, 14)
 
 
 def test_scaffold_contigs_simple():
