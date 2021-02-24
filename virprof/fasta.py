@@ -201,25 +201,19 @@ class Btop:
         """Get aligned query/subject in subject coordinates"""
         if start is None:
             start = 0
-        elif start < self._qstart:
-            raise IndexError(
-                f"{repr(self)}: out of bounds "
-                f"(start={start} < qstart={self._qstart})"
-            )
+        elif start < 0:
+            raise IndexError(f"{repr(self)}: out of bounds (start={start} < 0")
         else:
-            start = start - self._qstart
+            start -= 1
 
         sequence = sequence[self._qstart - 1 :]
 
         if end is None:
             end = self._length
-        elif end > self._qstart + self._length:
+        elif end > self._length:
             raise IndexError(
-                f"{repr(self)}: out of bounds "
-                f"(end={end}) > qstart={self._qstart}+len={self._length})"
+                f"{repr(self)}: out of bounds (end={end}) > len={self._length})"
             )
-        else:
-            end = end - self._qstart + 1
 
         aligned = []
         query_ptr = 0
@@ -359,9 +353,14 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
                 elif not is_forward and not l_is_forward:
                     sequence[-1] = revcomp(seq[end : l_start - 1])
 
-            aligned = btop.get_aligned_query(seq, start, end)
-
-            if not is_forward:
+            if is_forward:
+                aligned = btop.get_aligned_query(
+                    seq, section_start - sstart + 1, section_end - sstart + 1
+                )
+            else:
+                aligned = btop.get_aligned_query(
+                    seq, section_start - send + 1, section_end - send + 1
+                )
                 aligned = revcomp(aligned)
 
             # Add outside overhang:
