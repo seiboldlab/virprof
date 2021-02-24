@@ -197,6 +197,10 @@ class Btop:
             start = 1
         if end is None:
             end = len(sequence)
+        if start < 1 or end > len(sequence):
+            raise IndexError(
+                f"Btop out of bounds error: start={start} end={end} len={len(sequence)}"
+            )
         aligned = []
         offset = 0
         start -= 1  # convert blast coordinates to python
