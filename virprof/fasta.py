@@ -163,7 +163,7 @@ class FastaFile:
 class Btop:
     """BLAST Trace-back operations (alignment) string"""
 
-    def __init__(self, btop: str, qstart: int = 1) -> None:
+    def __init__(self, btop: str, qstart: int) -> None:
         self._btop = btop
         self._qstart = qstart
         self._length, self._ops = self._parse_btop(btop)
@@ -231,12 +231,12 @@ class Btop:
             if endpos > startpos:
                 aligned += sequence[startpos:endpos]
                 if query_first_base is None:
-                    query_first_base = startpos + 1
+                    query_first_base = startpos
             query_ptr += matched
             subject_ptr += matched
 
             if endpos >= end + offset:
-                query_last_base = endpos
+                query_last_base = endpos - 1
                 break
 
             if not query:
@@ -245,7 +245,7 @@ class Btop:
             # Process mismatch/indel
             if start <= subject_ptr < end:
                 if query_first_base is None:
-                    query_first_base = query_ptr + 1
+                    query_first_base = query_ptr
                 if get_query:
                     aligned.append(query)
                 else:
@@ -255,11 +255,11 @@ class Btop:
             if query != 45:  # '-'
                 query_ptr += 1
             if subject_ptr == end:
-                query_last_base = query_ptr + 1
+                query_last_base = query_ptr
                 break
         else:
             raise RuntimeError("Failed to process sequence alignment")
-        return bytes(aligned), query_first_base, query_last_base
+        return bytes(aligned), query_first_base + self._qstart, query_last_base + self._qstart
 
     def get_aligned_query(
         self,
@@ -342,12 +342,11 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
     last_section_from_reference = False
     # Iterate over each disjoined piece
     for section_num, (section_start, section_end, hits) in enumerate(regs):
-        section_len = section_end - section_start + 1
         section_seqs = []
         current_hits = {}
 
         # Iterate over each hit overlapping piece
-        for qacc, sstart, send, qstart, _qend, btop in hits:
+        for qacc, sstart, send, btop in hits:
             qaccs.add(qacc)
             seq = contigs.get(qacc)
             is_forward = send > sstart
@@ -361,8 +360,6 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
                     seq, section_start - send + 1, section_end - send + 1
                 )
                 aligned = revcomp(aligned)
-            start += qstart - 1
-            end += qstart - 1
 
             # Handle split contig
             current_hits[qacc] = (start, end, is_forward)
@@ -397,6 +394,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
             last_section_from_reference = True
+            section_len = section_end - section_start + 1
             sequence.append(b"n" * section_len)
         else:
             sequence.append(consensus(section_seqs))

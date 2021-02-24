@@ -64,7 +64,7 @@ def test_FastaFile():
 
 def test_Btop_identity():
     """Simple BTOP of exact match"""
-    btop = Btop(str(len(subject)))
+    btop = Btop(str(len(subject)), 1)
     assert btop.get_aligned_query(subject) == (subject, 1, len(subject))
     assert btop.get_aligned_subject(subject) == (subject, 1, len(subject))
     assert btop.get_aligned_query(subject, 1, len(subject)) == (
@@ -83,14 +83,14 @@ def test_Btop_identity():
 
 def test_Btop_mutation():
     """Simple BTOP with 2bp mutated (4 and 5)"""
-    btop = Btop(mutated_btop)
+    btop = Btop(mutated_btop, 1)
     assert btop.get_aligned_query(mutated) == (mutated, 1, len(mutated))
     assert btop.get_aligned_subject(mutated) == (subject, 1, len(mutated))
 
 
 def test_Btop_mutation1_comp():
     """Simple BTOP with 2bp mutated (4 and 5)"""
-    btop = Btop(mutated1_comp_btop)
+    btop = Btop(mutated1_comp_btop, 1)
     query = mutated1_comp[::-1]
     subj = subject_comp[::-1]
     assert btop.get_aligned_query(query) == (query, 1, len(query))
@@ -108,7 +108,7 @@ def test_Btop_insertion():
     insertion_subject = b"AGAAA-" b"TGTTT" b"CACCC" b"GAGGG"
     insertion_btop = "5G-15"
 
-    btop = Btop(insertion_btop)
+    btop = Btop(insertion_btop, 1)
     assert btop.get_aligned_query(insertion) == (insertion, 1, len(insertion))
     assert btop.get_aligned_subject(insertion) == (insertion_subject, 1, len(insertion))
     # Insertion between subject 5 and 6 is prepended on position 6
@@ -136,7 +136,7 @@ def test_Btop_deletion():
 
     Base 5 is deleted in query
     """
-    btop = Btop(deletion_btop)
+    btop = Btop(deletion_btop, 1)
     assert btop.get_aligned_query(deletion) == (deletion_alig, 1, len(deletion))
     assert btop.get_aligned_subject(deletion) == (subject, 1, len(deletion))
     # At subject position 5 we get a gap character
@@ -159,22 +159,22 @@ def test_Btop_deletion():
 
 def test_scaffold_contigs_simple():
     rl = RegionList()
-    rl.add(1, 10, ("first10bp", 1, 10, 1, 10, Btop("10")))
+    rl.add(1, 10, ("first10bp", 1, 10, Btop("10", 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["first10bp"] == subject[0:10]
 
 
 def test_scaffold_contigs_simple_reversed():
     rl = RegionList()
-    rl.add(10, 1, ("first10bp-revcomp", 10, 1, 1, 10, Btop("10")))
+    rl.add(10, 1, ("first10bp-revcomp", 10, 1, Btop("10", 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["first10bp-revcomp"] == subject[0:10]
 
 
 def test_scaffold_contigs_split():
     rl = RegionList()
-    rl.add(1, 10, ("first10bp", 1, 10, 1, 10, Btop("10")))
-    rl.add(11, 20, ("second10bp", 11, 20, 1, 10, Btop("10")))
+    rl.add(1, 10, ("first10bp", 1, 10, Btop("10", 1)))
+    rl.add(11, 20, ("second10bp", 11, 20, Btop("10", 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert len(sequence) == 1
     assert next(iter(sequence.values())) == subject
@@ -182,9 +182,9 @@ def test_scaffold_contigs_split():
 
 def test_scaffold_contigs_overlap():
     rl = RegionList()
-    rl.add(1, 10, ("first10bp", 1, 10, 1, 10, Btop("10")))
-    rl.add(11, 20, ("second10bp", 11, 20, 1, 10, Btop("10")))
-    rl.add(6, 15, ("middle10bp", 6, 15, 1, 10, Btop("10")))
+    rl.add(1, 10, ("first10bp", 1, 10, Btop("10", 1)))
+    rl.add(11, 20, ("second10bp", 11, 20, Btop("10", 1)))
+    rl.add(6, 15, ("middle10bp", 6, 15, Btop("10", 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert len(sequence) == 1
     assert next(iter(sequence.values())) == subject
@@ -194,8 +194,8 @@ def test_scaffold_gap():
     """Two contigs mapped with gap on reference in between should have
     missing piece filled with Ns"""
     rl = RegionList()
-    rl.add(1, 10, ("first10bp", 1, 10, 1, 10, Btop("10")))
-    rl.add(16, 20, ("second10bp", 16, 20, 6, 10, Btop("10", 6)))
+    rl.add(1, 10, ("first10bp", 1, 10, Btop("10", 1)))
+    rl.add(16, 20, ("second10bp", 16, 20, Btop("10", 6)))
     sequence = scaffold_contigs(rl, contigs)
     assert len(sequence) == 1
     assert next(iter(sequence.values())) == subject[0:10] + b"n" * 5 + subject[15:20]
@@ -207,8 +207,8 @@ def test_scaffold_deletion_in_contig():
     inserted.
     """
     rl = RegionList()
-    rl.add(1, 10, ("deletion", 1, 10, 1, 10, Btop("20")))
-    rl.add(16, 20, ("deletion", 16, 20, 11, 15, Btop("20", 11)))
+    rl.add(1, 10, ("deletion", 1, 10, Btop("20", 1)))
+    rl.add(16, 20, ("deletion", 16, 20, Btop("20", 11)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["deletion"] == contigs.get("deletion")
 
@@ -219,10 +219,10 @@ def test_scaffold_split_contig_inserted():
     """
     rl = RegionList()
     # Mapping deletion contig with 5bp gap
-    rl.add(1, 10, ("deletion", 1, 10, 1, 10, Btop("10")))
-    rl.add(16, 20, ("deletion", 16, 20, 11, 15, Btop("20", 11)))
+    rl.add(1, 10, ("deletion", 1, 10, Btop("10", 1)))
+    rl.add(16, 20, ("deletion", 16, 20, Btop("20", 11)))
     # Mapping something else into the middle
-    rl.add(12, 14, ("identity", 12, 14, 12, 14, Btop("20", 12)))
+    rl.add(12, 14, ("identity", 12, 14, Btop("20", 12)))
     sequence = scaffold_contigs(rl, contigs)
     expected = subject[0:10] + b"n" + subject[11:14] + b"n" + subject[15:20]
     assert len(sequence) == 1
@@ -234,8 +234,8 @@ def test_scaffold_insertion_in_contig():
     insertion.
     """
     rl = RegionList()
-    rl.add(1, 10, ("deletion", 1, 10, 1, 10, Btop("10")))
-    rl.add(16, 20, ("deletion", 16, 20, 11, 15, Btop("20", 11)))
+    rl.add(1, 10, ("deletion", 1, 10, Btop("10", 1)))
+    rl.add(16, 20, ("deletion", 16, 20, Btop("20", 11)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["deletion"] == contigs.get("deletion")
 
@@ -246,9 +246,9 @@ def test_scaffold_replacement_in_contig():
     """
     rl = RegionList()
     # First match of 5 bp
-    rl.add(1, 5, ("replacement", 1, 5, 1, 5, Btop("10")))
+    rl.add(1, 5, ("replacement", 1, 5, Btop("10", 1)))
     # Second match after replacement of 4bp for 5bp in reference
-    rl.add(11, 20, ("replacement", 11, 20, 10, 19, Btop("20", 10)))
+    rl.add(11, 20, ("replacement", 11, 20, Btop("20", 11)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["replacement"] == contigs.get("replacement")
 
@@ -259,9 +259,9 @@ def test_scaffold_replacement_in_contig_reversed():
     """
     rl = RegionList()
     # First match of 5 bp
-    rl.add(5, 1, ("replacement-revcomp", 5, 1, 15, 20, Btop("20", 15)))
+    rl.add(5, 1, ("replacement-revcomp", 5, 1, Btop("20", 15)))
     # Second match after replacement of 4bp for 5bp in reference
-    rl.add(20, 11, ("replacement-revcomp", 20, 11, 1, 10, Btop("20")))
+    rl.add(20, 11, ("replacement-revcomp", 20, 11, Btop("20", 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["replacement-revcomp"] == contigs.get("replacement")
 
@@ -277,9 +277,9 @@ def test_scaffold_replacement_in_contig_mixed():
     """
     rl = RegionList()
     # First match of 5 bp - REVERSED
-    rl.add(5, 1, ("replacement-mixed", 5, 1, 15, 20, Btop("20", 15)))
+    rl.add(5, 1, ("replacement-mixed", 5, 1, Btop("20", 15)))
     # Second match after replacement of 4bp for 5bp in reference - FORWARD
-    rl.add(11, 20, ("replacement-mixed", 11, 20, 1, 10, Btop("20")))
+    rl.add(11, 20, ("replacement-mixed", 11, 20, Btop("20", 1)))
     sequence = scaffold_contigs(rl, contigs)
     expected = (
         subject[0:5]  # first part
@@ -294,15 +294,15 @@ def test_scaffold_mutation_revcomp():
     """Reverse complemented contig with 1 bp changed"""
     rl = RegionList()
     # Whole sequence
-    rl.add(20, 1, ("mutated1-revcomp", 20, 1, 1, 20, Btop(mutated1_comp_btop)))
+    rl.add(20, 1, ("mutated1-revcomp", 20, 1, Btop(mutated1_comp_btop, 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["mutated1-revcomp"] == mutated1
     rl = RegionList()
     # Disjoint alignment with 2 hits
     # First match of 5 bp
-    rl.add(5, 1, ("mutated1-revcomp", 5, 1, 15, 20, Btop(mutated1_comp_btop, 15)))
+    rl.add(5, 1, ("mutated1-revcomp", 5, 1, Btop(mutated1_comp_btop, 15)))
     # Second match after replacement of 4bp for 5bp in reference
-    rl.add(20, 11, ("mutated1-revcomp", 20, 11, 1, 10, Btop(mutated1_comp_btop)))
+    rl.add(20, 11, ("mutated1-revcomp", 20, 11, Btop(mutated1_comp_btop, 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["mutated1-revcomp"] == mutated1
 
@@ -310,7 +310,7 @@ def test_scaffold_mutation_revcomp():
 def test_scaffold_left_overhanging_contig():
     """A contig overlapping the reference on its left end should stay intact"""
     rl = RegionList()
-    rl.add(1, 20, ("left_overhang", 1, 20, 5, 24, Btop("24", 5)))
+    rl.add(1, 20, ("left_overhang", 1, 20, Btop("24", 5)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["left_overhang"] == contigs.get("left_overhang")
 
@@ -318,6 +318,6 @@ def test_scaffold_left_overhanging_contig():
 def test_scaffold_right_overhanging_contig():
     """A contig overlapping the reference on its left end should stay intact"""
     rl = RegionList()
-    rl.add(1, 20, ("right_overhang", 1, 20, 1, 20, Btop("20")))
+    rl.add(1, 20, ("right_overhang", 1, 20, Btop("20", 1)))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["right_overhang"] == contigs.get("right_overhang")

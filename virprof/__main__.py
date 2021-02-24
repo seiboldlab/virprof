@@ -757,8 +757,6 @@ def export_fasta(
                 row["qacc"],
                 int(row["sstart"]),
                 int(row["send"]),
-                int(row["qstart"]),
-                int(row["qend"]),
                 Btop(row["btop"], int(row["qstart"])),
             ),
         )
