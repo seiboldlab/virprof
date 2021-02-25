@@ -85,6 +85,7 @@ class FastaFile:
 
     @property
     def name(self) -> str:
+        """File name"""
         return self.iofile.name
 
     def __str__(self) -> str:
@@ -161,7 +162,16 @@ class FastaFile:
 
 
 class Btop:
-    """BLAST Trace-back operations (alignment) string"""
+    """BLAST alignment
+
+    All parameters are 1-indexed.
+
+    Args:
+       sstart: First base of alignment on subject (reference) sequence
+       send: Last base of alignment on subject (reference) sequence
+       qstart: First base of alignment on query (contig) sequence
+       btop: Blast trace-back operations string (CIGAR like)
+    """
 
     def __init__(self, sstart: int, send: int, qstart: int, btop: str) -> None:
         self._sstart = sstart
@@ -177,6 +187,7 @@ class Btop:
         return f"{self.__class__.__name__}({self._btop, self._qstart})"
 
     def is_forward(self):
+        """Check if query and subject have same orientation"""
         return self._send > self._sstart
 
     @staticmethod
@@ -264,7 +275,11 @@ class Btop:
                 break
         else:
             raise RuntimeError("Failed to process sequence alignment")
-        return bytes(aligned), query_first_base + self._qstart, query_last_base + self._qstart
+        return (
+            bytes(aligned),
+            query_first_base + self._qstart,
+            query_last_base + self._qstart,
+        )
 
     def get_aligned_query(
         self,
@@ -275,12 +290,18 @@ class Btop:
     ) -> bytes:
         """Return aligned query sequence (with gaps)
 
-        Sequence is identical to passed ``sequence``, with "-"
-        characters inserted for gaps.
+        All coordinates are 1-indexed closed intervals (matching BLAST).
 
         Args:
-          sequence: query sequence
+          sequence: Entire query sequence
+          start: Position of first base to extract
+          end: Position of last base to extract
+          subject_coordinates: If true, coordinates are relative to
+            the start of the alignment.
 
+        Returns:
+          Three-tuple of aligned sequence, and start and end position
+            of the extracted sequence œin query coordinates.
         """
         if subject_coordinates:
             if self.is_forward():
@@ -302,12 +323,7 @@ class Btop:
     ) -> bytes:
         """Return aligned subject sequence (with gaps)
 
-        Sequence is mutated from passed ``sequence`` and has had gaps
-        ("-") inserted.
-
-        Args:
-          sequence: query sequence
-
+        See `get_aligned_query`
         """
         return self._get_aligned(sequence, start, end, get_query=False)
 
@@ -322,10 +338,12 @@ def consensus(sequences: List[bytes]) -> bytes:
     """Compute consensus for a set of sequences
 
     Uncertain bases are filled with 'n'.
+
+    Raises `ValueError` if the ``sequences`` vary in length.
     """
     if any(len(sequences[0]) != len(seq) for seq in sequences):
-        LOG.error(
-            "section sizes differ: %s", " ".join(str(len(seq)) for seq in sequences)
+        raise ValueError(
+            f"section sizes differ: {', '.join(str(len(seq)) for seq in sequences)}"
         )
     ## Overlapping piece - fill with consensus
     bases = []
@@ -346,11 +364,15 @@ def consensus(sequences: List[bytes]) -> bytes:
 def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]:
     """Scaffold sequence from BLAST hits
 
-    Args:
-      regs: A RegionList containing the blast hits. The data field
-        must be qacc, sstart, send, qstart, qend.
-      contigs: FastaFile object containing the sequences referenced
-        in ``regs``.
+        TODO: describe exact output decisions
+
+        Args:
+
+          regs: A RegionList containing the blast hits. The data field
+            must contain tuples of the identifyer string used in
+            ``contigs`` and a `Btop` object
+    .
+          contigs: FastaFile object containing the sequences
     """
     sequence = []  # sequence fragments
     qaccs = set()  # seen contig names
@@ -366,8 +388,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             qaccs.add(qacc)
             seq = contigs.get(qacc)
             aligned, start, end = btop.get_aligned_query(
-                seq, section_start, section_end,
-                subject_coordinates = True
+                seq, section_start, section_end, subject_coordinates=True
             )
             is_forward = btop.is_forward()
 

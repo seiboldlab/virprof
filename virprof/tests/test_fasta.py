@@ -318,6 +318,6 @@ def test_scaffold_left_overhanging_contig():
 def test_scaffold_right_overhanging_contig():
     """A contig overlapping the reference on its left end should stay intact"""
     rl = RegionList()
-    rl.add(1, 20, ("right_overhang", Btop( 1, 20, 1, "20")))
+    rl.add(1, 20, ("right_overhang", Btop(1, 20, 1, "20")))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["right_overhang"] == contigs.get("right_overhang")
