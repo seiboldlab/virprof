@@ -148,7 +148,8 @@ with Stage("blastbin_vp") as S:
             "Visualizing binning"
         input:
             calls = "{:this:}/{target}.virus.csv",
-            bam    = "{:prev:}/{:target:}.sorted.bam"
+            hits  = "{:this:}/{target}.hits.csv",
+            bam   = "{:prev:}/{:target:}.sorted.bam"
         output:
             plot =  "{:this:}/{target}.virus.pdf"
         log:
@@ -168,6 +169,7 @@ with Stage("blastbin_vp") as S:
             "exec >{log} 2>&1;"
             "./R/show_bins.R"
             " --input {input.calls}"
+            " --input-hits {input.hits}"
             " --input-bam {params.bamlist}"
             " --output {output.plot}"
             " --page-width {params.page_width}"

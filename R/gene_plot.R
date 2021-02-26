@@ -148,33 +148,33 @@ center_spread_ranges <- function(contigs, spacing, max_iter = 100) {
     }
     ranges <- ranges - spacing / 2
     contigs$cstart <- IRanges::start(ranges)
-    contigs$cstop <- IRanges::end(ranges)
+    contigs$cend <- IRanges::end(ranges)
     contigs
 }
 
 
 #' Create offsets for qacc positions in plot
 #'
-#' @param alignments data.frame with columns sacc, qaccs, sstart, sstop, qstart, qstop, qlens
-#' @return data.frame with columns sacc, qaccs, cstart, cstop
+#' @param alignments data.frame with columns sacc, qacc, sstart, send, qstart, qend, qlen
+#' @return data.frame with columns sacc, qacc, cstart, cend
 place_contigs <- function(alignments, merge_dist = 50, spacing = 10) {
     if (nrow(alignments) == 0) {
-        emptyres <- data.frame(
+        empty_res <- data.frame(
             sacc = character(),
-            qaccs = character(),
+            qacc = character(),
             cstart = numeric(),
-            cstop = numeric()
+            cend = numeric()
             )
-        return(emptyres)
+        return(empty_res)
     }
 
     ## Align each contig to have leftmost qstart be above sstart
     contigs <- alignments %>%
-        group_by(sacc, qaccs) %>%
+        group_by(sacc, qacc) %>%
         slice_min(qstart, n = 1, with_ties = FALSE) %>%
         mutate(
-            cstart = (sstart+sstop)/2 - (qstart+qstop)/2 + 1,
-            cstop = cstart + qlens
+            cstart = (sstart+send)/2 - (qstart+qend)/2 + 1,
+            cend = cstart + qlen
         )  %>%
         group_by(sacc) %>%
         group_modify(~ center_spread_ranges(., spacing)) %>%

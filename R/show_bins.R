@@ -11,7 +11,12 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
     option_list <- list(
         make_option(c("--input"),
                     metavar = "FILE",
-                    help = "Result file from blastbin [REQUIRED]"
+                    help = "Result calls file from blastbin [REQUIRED]"
+                    ),
+        make_option(c("--input-hits"),
+                    metavar = "FILE",
+                    help = "Result hits file from blastbin [REQUIRED]"
+                    ),
                     ),
         make_option(c("--input-bam"),
                     metavar = "FILELIST",
@@ -78,59 +83,6 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
     opt
 }
 
-#' Parses CSV from python blastbin
-#'
-#' The CSV contains one row per bin, combining multiple contigs and
-#' alignments. For plotting, we split this here into multiple data
-#' rows again - one per alignment. The fields qaccs, qranges, sranges,
-#' reversed, pidents and numreadss each contain semi-colon separated
-#' per contig data. The qranges and sranges also contain
-#' dash-separated start/end positions. Lastly, we undo the sorting of
-#' start/stop positions and flip contigs for which the majority of
-#' alignments are reversed.
-#'
-#' @param data Data.frame containing data from blastbin output
-#' @return data.frame containing alignments
-#'   qstart, qstop 1-indexed first and last position of alignment in query
-#'   sstart, sstop 1-indexed first and last position of alignment in subject
-#'   flip TRUE if the contig coordinates (qstart, qstop) have been flipped
-#'   qaccs Query accession
-#'   sacc  Subject accession
-#'   pidents Percent Identity
-#'   numreadss Count of reads mapped to contig
-#'   qlens Length of query/contig
-#'
-parse_blastbins <- function(data) {
-    data %>%
-        # Split alignments from row-per-bin data
-        separate_rows(qranges, sranges, reversed, qaccs, pidents, numreadss, qlens, sep=";") %>%
-        mutate(
-            pidents=as.numeric(pidents),
-            numreadss=as.numeric(numreadss),
-            reversed=as.logical(reversed=="T"),
-            qlens=as.numeric(qlens),
-            contig=qaccs
-        ) %>%
-        separate(qranges, c("qstart", "qstop"), convert = TRUE) %>%
-        separate(sranges, c("sstart", "sstop"), convert = TRUE) %>%
-        # Restore qstart/qstop order
-        mutate(
-            swap_if(reversed, qstart, qstop)
-        ) %>%
-        ## Flip entire contig if majority of alignments are reversed
-        group_by(qaccs) %>%
-        mutate(
-            flip = as.logical(median(reversed))
-        ) %>%
-        ungroup() %>%
-        mutate(
-            qstart = if_else(flip, as.integer(qlens - qstart + 1), qstart),
-            qstop  = if_else(flip, as.integer(qlens - qstop  + 1), qstop)
-        ) %>%
-        arrange(-log_evalue, sacc, sstart) %>%
-        ungroup()
-}
-
 
 #' Get depth from BAM file
 coverage_depth <- function(fname) {
@@ -176,6 +128,8 @@ break_lineage <- function(lineage, maxlen=200, insert="\n") {
 
 #' The actual plot function
 plot_ranges <- function(reference, hits, depths, feature_tables) {
+    message("Plotting ", reference$sacc)
+    cat(".")
     heights <- c(
         labels = 1.5,
         coverage = 4,
@@ -199,14 +153,13 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
     )
 
     label_tpl <- paste0(
-        "keywords: {reference$words}\n",
+        "Keywords: {reference$words}\n",
         "{reference$sacc}: \"{reference$stitle}\"\n",
         "{lineage}\n",
-        "nreads={reference$numreads}, ",
-        "log(evalue)={reference$log_evalue}, ",
-        "id={reference$pident}%, ",
-        "qlen={reference$qlen}, ",
-        "slen={reference$slen}"
+        "Read Count: {reference$numreads}, ",
+        "log E-Value: {reference$log_evalue}, ",
+        "Identity: {reference$pident}%, ",
+        "Genome Coverage {reference$slen}bp ({reference$genome_coverage}%)"
     )
     ylabel_tpl <- paste0(
         "{reference$species}\n",
@@ -214,40 +167,46 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
     )
     lineage <- break_lineage(reference$lineage)
 
+    cat(".")
     ## Calculate alignment positions for hits
     hits <- hits %>%
-        select(sacc, qaccs, qstart, qstop, sstart, sstop, cstart, cstop, flip, contig, pidents) %>%
+        mutate(flip = sstart > send) %>%
+        select(sacc, qacc, qstart, qend, sstart, send, cstart, cend, flip, contig, pident) %>%
         mutate(
             aleft  = cstart + qstart - 1,
-            aright = cstart + qstop - 1
+            aright = cstart + qend - 1
         )
 
 
+    cat(".")
     ## Get unique contigs from hits
     contigs <- hits %>%
-        group_by(qaccs, flip, cstart, cstop, contig) %>%
+        group_by(qacc, flip, cstart, cend, contig) %>%
         summarize(.groups="drop")
 
+    cat(".")
     ## Make compressed X scale
     xtrans <-
         bind_rows(
-            hits %>% mutate(start=sstart, stop=sstop) %>% select(start, stop),
-            hits %>% mutate(start=cstart, stop=cstop) %>% select(start, stop)
+            hits %>% mutate(start=sstart, stop=send) %>% select(start, stop),
+            hits %>% mutate(start=cstart, stop=cend) %>% select(start, stop)
         ) %>%
         arrange(start, stop) %>%
         compress_axis()
 
+    cat(".")
     ## Setup corners for trapezoid showing alignment mapping
     alignment_boxes <- bind_rows(
         hits %>% mutate(y = ymax$alignments, x = aleft),
         hits %>% mutate(y = ymax$alignments, x = aright),
-        hits %>% mutate(y = ymin$alignments, x = sstop),
+        hits %>% mutate(y = ymin$alignments, x = send),
         hits %>% mutate(y = ymin$alignments, x = sstart)
     ) %>%
         mutate(
-            alignment = paste(qaccs, aleft, aright, sstop, sstart)
+            alignment = paste(qacc, aleft, aright, send, sstart)
         )
 
+    cat(".")
     p <- ggplot() +
         scale_y_continuous(limits = c(0, 16)) +
         theme_minimal() +
@@ -259,7 +218,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         ## Contigs
         geom_rect(
             data = contigs,
-            aes(xmin = cstart, xmax = cstop),
+            aes(xmin = cstart, xmax = cend),
             ymin = ymin$contigs, ymax = ymax$contigs,
             fill = fill$contigs
         ) +
@@ -273,7 +232,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         ## Contig labels
         geom_text_repel(
             data = contigs,
-            aes(x = (cstart+cstop)/2, label = contig),
+            aes(x = (cstart+cend)/2, label = contig),
             y = ymin$labels,
             size = 2,
             nudge_y = 3,
@@ -285,24 +244,25 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         ## Plot Subject sequence pieces
         geom_rect(
             data = hits,
-            aes(xmin=sstart, xmax=sstop),
+            aes(xmin=sstart, xmax=send),
             ymin=ymin$subject, ymax=ymax$subject, fill=fill$subject
         ) +
         ## Plot Alignment connection
         geom_polygon(
             data = alignment_boxes,
-            aes(x = x, y = y, group = alignment, fill = pidents),
+            aes(x = x, y = y, group = alignment, fill = pident),
             color=fill$alignments, alpha=.5
         ) +
         scale_fill_continuous(limits = c(70, 100))
 
 
+    cat(".")
     if(!is.null(depths)) {
-        label_tpl <- paste0(label_tpl, ", depth={mean_depth}")
+        label_tpl <- paste0(label_tpl, ", Average Read Depth: {mean_depth}")
 
         depths <- depths %>%
-            rename(qaccs=contig) %>%
-            inner_join(contigs, by="qaccs")
+            rename(qacc=contig) %>%
+            inner_join(contigs, by="qacc")
 
         mean_depth <- round(mean(depths$total), 1)
         max_depth <- max(depths$total)
@@ -310,7 +270,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
 
         depth_data <- depths %>%
             mutate(
-                x = if_else(flip, cstop - pos, cstart + pos),
+                x = if_else(flip, cend - pos, cstart + pos),
                 fplus = if_else(total == 0, 0.5, if_else(flip, minus, plus) / total),
                 total = total / norm_depth,
                 plus = plus / norm_depth,
@@ -321,7 +281,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
                 total, plus, minus, fplus, key="sense", value="y"
             ) %>%
             select(
-                qaccs, sense, x, y
+                qacc, sense, x, y
             )
 
         ## Plot depths above contigs
@@ -332,15 +292,16 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
                     x = x,
                     y = y * heights$coverage + ymin$coverage,
                     color=sense,
-                    group=interaction(sense,qaccs)
+                    group=interaction(sense,qacc)
                 )
             )
     }
 
     if (!is.null(feature_tables)) {
+    cat(".")
         ## Annotate subject sequences
         subject_annotations <- annotate_subjects(
-            hits$sstart, hits$sstop,
+            hits$sstart, hits$send,
             reference$sacc,
             feature_tables
         )
@@ -361,15 +322,21 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             )
     }
 
+    cat(".")
     ## Add labels
     p <- p +
         xlab(str_glue(label_tpl)) +
         ylab(str_glue(ylabel_tpl))
 
+    cat(".")
+    message(" [DONE]")
     p
 }
 
-
+#' Renders per page plots
+#'
+#' Calls the function plot_item for each item, printing
+#' plots_per_page plots at a time (per page).
 plot_pages <- function(plots_per_page, items, plot_item) {
     if (length(items) == 0) {
         return()
@@ -389,51 +356,77 @@ plot_pages <- function(plots_per_page, items, plot_item) {
 }
 
 run <- function() {
-    message("Loading data files ...")
-    data <- read_csv(opt$options$input, col_types = cols()) %>%
-        filter(
-            slen >= opt$options$min_slen,
-            numreads >= opt$options$min_reads
-        )
-    if (nrow(data) == 0) {
+    message("Loading calls...")
+    calls <- read_csv(opt$options$input, col_types = cols())
+    message("... ", nrow(calls), " calls found")
+    calls <- filter(calls, slen >= opt$options$min_slen)
+    message("... ", nrow(calls), " calls left after removing calls with <",
+            opt$options$min_slen, " bp on subject")
+    calls <- filter(calls, numreads >= opt$options$min_reads)
+    message("... ", nrow(calls), " calls left after removing calls with <",
+            opt$options$min_reads, " mapped reads")
+    if (nrow(calls) == 0) {
+        message("No calls left, exiting")
         return(NULL)
     }
-
-    message("Parsing input data ...")
-    alignments <- parse_blastbins(data)
-    message("Placing contigs ...")
-    contigs <- alignments %>%
-        select(qaccs, qstart, qstop, qlens, sacc, sstart, sstop) %>%
-        place_contigs %>%
-        select(qaccs, sacc, cstart, cstop)
-    ranges <- inner_join(contigs, alignments, by=c("sacc", "qaccs"))
-
-    message("Ordering results ...")
-    saccs <- ranges %>%
-        group_by(species) %>%
+    calls <- calls %>%
         mutate(
-            sumreads = sum(numreads)
+            genome_coverage = if_else(genome_size > 0,
+                                      round(slen / genome_size * 100, 1),
+                                      NA_real_)
+        )
+
+    message("Loading alignments...")
+    alignments <- read_csv(opt$options$input_hits, col_types = cols())
+    message("... ", nrow(alignments), " alignments found")
+    alignments <- filter(alignments, sacc %in% calls$sacc)
+    message("... ", nrow(alignments), " alignments matching filtered calls")
+    alignments <- alignments %>%
+        mutate(
+            ## Abbreviate spades contig names
+            contig = sub("^NODE_([0-9]+)_.*", "\\1", qacc),
+            ## Mark reversed contigs
+            reversed = sstart > send,
+            ## Alwaus have sstart > send
+            swap_if(reversed, qstart, qend),
+            swap_if(reversed, sstart, send)
         ) %>%
+        ## Check if we should flip contig to have majority alignments lined up
+        group_by(qacc) %>%
+        mutate(flip = as.logical(median(reversed))) %>%
         ungroup() %>%
-        group_by(species, sumreads, sacc, numreads) %>%
-        summarize(
-            log_evalue=min(log_evalue),
-            lineage=paste(unique(lineage), collapse=" ::: "),
-            .groups="drop"
+        ## Flip contigs
+        mutate(
+            qstart = if_else(flip, qlen - qstart + 1, qstart),
+            qend = if_else(flip, qlen - qend + 1, qend)
         ) %>%
-        arrange(desc(sumreads), desc(numreads)) %>%
-        filter(!is.na(sacc)) %>%
-        pull(sacc)
+        select(-reversed)
 
     if (length(saccs) ==  0) {
         return(NULL)
     }
 
+    message("Placing contigs ...")
+    contigs <- place_contigs(alignments)  %>% select(sacc, qacc, cstart, cend)
+    alignments <- alignments %>% left_join(contigs, by=c("sacc", "qacc"))
+
+    message("Ordering calls ...")
+    saccs <- calls %>%
+        # Get total read count per species
+        group_by(species) %>%
+        mutate(reads_per_species = sum(numreads)) %>%
+        ungroup() %>%
+        # Order by species total read count, then call read count
+        arrange(desc(reads_per_species), desc(numreads)) %>%
+        pull(sacc)
+
     if (opt$options$max_plots > 0) {
+        message("Plotting only top ", opt$options$max_plots, " calls")
         saccs <- head(saccs, opt$options$max_plots)
     }
 
     if (!is.null(opt$options$input_bam)) {
+        message("Getting coverages...")
         depths <- opt$options$input_bam %>%
             strsplit(",") %>%
             unlist() %>%
@@ -452,11 +445,16 @@ run <- function() {
         feature_tables <- NULL
     }
 
+    message("Generating plots...")
     plot_pages(opt$options$plots_per_page, saccs, function(acc) {
-        reference <- data %>% filter(sacc == acc)
-        df <- ranges %>% filter(sacc == acc)
-        plot_ranges(reference, df, depths, feature_tables)
+        plot_ranges(
+            calls %>% filter(sacc == acc),  # per call data
+            alignments %>% filter(sacc == acc),  # per alignment data
+            depths,  # coverage depth data
+            feature_tables %>% filter(acc == acc)
+        )
     })
+    message("Finished")
 }
 
 if (!interactive()) {
@@ -470,15 +468,13 @@ if (!interactive()) {
                                     "--max-plots", "5"))
     }
 
-    message("Writing output to ", opt$options$output, " ...")
+    message("Writing output to ", opt$options$output)
     pdf(
         file = opt$options$output,
         width = opt$options$page_width,
         height = opt$options$page_height
     )
-
     run()
-
     dev.off()
 }
 
