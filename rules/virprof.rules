@@ -149,6 +149,7 @@ with Stage("blastbin_vp") as S:
         input:
             calls = "{:this:}/{target}.virus.csv",
             hits  = "{:this:}/{target}.hits.csv",
+            features  = "{:this:}/{target}.features.csv",
             bam   = "{:prev:}/{:target:}.sorted.bam"
         output:
             plot =  "{:this:}/{target}.virus.pdf"
@@ -170,6 +171,7 @@ with Stage("blastbin_vp") as S:
             "./R/show_bins.R"
             " --input {input.calls}"
             " --input-hits {input.hits}"
+            " --input-features {input.features}"
             " --input-bam {params.bamlist}"
             " --output {output.plot}"
             " --page-width {params.page_width}"
@@ -177,7 +179,6 @@ with Stage("blastbin_vp") as S:
             " --plots-per-page {params.plots_per_page}"
             " --min-slen {params.min_slen}"
             " --min-reads {params.min_reads}"
-            " --no-annotate"
 
     rule vp_classify_all:
         message:

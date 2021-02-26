@@ -17,6 +17,9 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "FILE",
                     help = "Result hits file from blastbin [REQUIRED]"
                     ),
+        make_option(c("--input-features"),
+                    metavar = "FILE",
+                    help = "Result features file from blastbin"
                     ),
         make_option(c("--input-bam"),
                     metavar = "FILELIST",
@@ -61,10 +64,7 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
         make_option(c("--cache-path"),
                     metavar = "PATH",
                     help = "Data fetched from Entrez will be cached in this location",
-                    default = "/tmp/entrez_cache"),
-        make_option(c("--no-annotate"),
-                    dest = "do_annotate", action = "store_false", default = TRUE,
-                    help = "Disable annotation layer")
+                    default = "/tmp/entrez_cache")
     )
     usage <- "usage: %prog [options]"
     description <- paste(c(
@@ -297,8 +297,8 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             )
     }
 
-    if (!is.null(feature_tables)) {
     cat(".")
+    if (!is.null(feature_tables)) {
         ## Annotate subject sequences
         subject_annotations <- annotate_subjects(
             hits$sstart, hits$send,
@@ -402,8 +402,12 @@ run <- function() {
         ) %>%
         select(-reversed)
 
-    if (length(saccs) ==  0) {
-        return(NULL)
+    if (is.null(opt$options$input_features)) {
+        features_tables <- NULL
+    } else {
+        message("Loading feature tables...")
+        feature_tables <- read_csv(opt$options$input_features, col_types = cols())
+        message("... ", nrow(feature_tables), " feature annotations found")
     }
 
     message("Placing contigs ...")
@@ -435,14 +439,6 @@ run <- function() {
             summarize_all(sum)
     } else {
         depths <- NULL
-
-    }
-
-    if (opt$options$do_annotate) {
-        message("Loading ", length(saccs), " Feature Tables from Entrez...")
-        feature_tables <- load_feature_table(saccs, opt$options$cache_path)
-    } else {
-        feature_tables <- NULL
     }
 
     message("Generating plots...")

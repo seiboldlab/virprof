@@ -117,9 +117,9 @@ compress_axis <- function(include_ranges, merge_dist = 50, spacing = 50) {
 #' @param max_iter abort if no success after this many iterations
 center_spread_ranges <- function(contigs, spacing, max_iter = 100) {
     ## Sort the intervals
-    contigs <- arrange(contigs, cstart, cstop)
+    contigs <- arrange(contigs, cstart, cend)
     ## Make IRanges object from intervals with half spacing on either side
-    ranges <- IRanges::IRanges(contigs$cstart, contigs$cstop) + spacing / 2
+    ranges <- IRanges::IRanges(contigs$cstart, contigs$cend) + spacing / 2
 
     ## Do the following until nothing overlaps anymore
     iter <- 0

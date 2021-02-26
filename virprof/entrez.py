@@ -545,7 +545,7 @@ class FeatureTables:
 
         result = []
         for acc, annotation in parsed.items():
-            for start, stop, typ, data in annotation:
+            for start, end, typ, data in annotation:
                 if not (typ in select or "*" in select):
                     continue
                 select2 = select.get(typ, set()) | select.get("*", set())
@@ -556,7 +556,7 @@ class FeatureTables:
                         {
                             "acc": acc,
                             "start": start,
-                            "stop": stop,
+                            "end": end,
                             "typ": typ,
                             "key": key,
                             "value": value,
@@ -566,7 +566,7 @@ class FeatureTables:
 
     @property
     def fields(_self):
-        return ["acc", "start", "stop", "typ", "key", "value"]
+        return ["acc", "start", "end", "typ", "key", "value"]
 
     @staticmethod
     def write_table(table, out):
