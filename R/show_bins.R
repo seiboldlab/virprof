@@ -137,7 +137,6 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         labels = 1.5,
         coverage = 4,
         contigs = 1,
-        contig_hits = .5,
         alignments = 4,
         subject = 1,
         annotations = 2
@@ -147,11 +146,17 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
     heights <- as.list(heights)
     ymax <- as.list(ymax)
     ymin <- as.list(ymin)
-    fill <- list(
-        contigs     = "darkblue",
-        contig_hits = "darkgreen",
-        alignments  = "green",
-        subject     = "darkred"
+    box_colors <- c(
+        "Contig" = "darkblue",
+        "Reference" = "darkred",
+        "gene" = "orange",
+        "product" = "darkorange"
+    )
+    label_colors <- c(
+        "Contig" = "white",
+        "Reference" = "white",
+        "gene" = "black",
+        "product" = "black"
     )
 
     label_tpl <- paste0(
@@ -208,55 +213,40 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             alignment = paste(qacc, aleft, aright, send, sstart)
         )
 
-    cat(".")
+    contig_boxes <- data.frame(
+        xmin = contigs$cstart,
+        xmax = contigs$cend,
+        ymin = ymin$contigs,
+        ymax = ymax$contigs,
+        type = "Contig",
+        label = contigs$contig
+    )
+
+    subject_boxes<- data.frame(
+        xmin = hits$sstart,
+        xmax = hits$send,
+        ymin = ymin$subject,
+        ymax= ymax$subject,
+        type = "Reference",
+        label = NA
+    )
+
+    boxes <- rbind(
+        contig_boxes,
+        subject_boxes
+    )
+
+    polygons <- alignment_boxes
+
+    cat("x")
     p <- ggplot() +
-        scale_y_continuous(limits = c(0, 16)) +
         theme_minimal() +
         theme(
             axis.text.x = element_text(angle=90, hjust=1, size=6),
             axis.text.y = element_blank()
         ) +
+        scale_y_continuous(limits = c(min(unlist(ymin)), max(unlist(ymax)))) +
         scale_x_continuous(trans = display_slots$trans)  +
-        ## Contigs
-        geom_rect(
-            data = contigs,
-            aes(xmin = cstart, xmax = cend),
-            ymin = ymin$contigs, ymax = ymax$contigs,
-            fill = fill$contigs
-        ) +
-        ## Alignments on contigs
-        geom_rect(
-            data = hits,
-            aes(xmin = aleft, xmax = aright),
-            ymin = ymin$contig_hits, ymax = ymax$contig_hits,
-            fill = fill$contig_hits
-        ) +
-        ## Contig labels
-        geom_text_repel(
-            data = contigs,
-            aes(x = (cstart+cend)/2, label = contig),
-            y = ymin$labels,
-            size = 2,
-            nudge_y = 3,
-            direction  = "both",
-            angle = 0,
-            vjust = 0,
-            segment.size = 0.5
-        ) +
-        ## Plot Subject sequence pieces
-        geom_rect(
-            data = hits,
-            aes(xmin=sstart, xmax=send),
-            ymin=ymin$subject, ymax=ymax$subject, fill=fill$subject
-        ) +
-        ## Plot Alignment connection
-        geom_polygon(
-            data = alignment_boxes,
-            aes(x = x, y = y, group = alignment, fill = pident),
-            color=fill$alignments, alpha=.5
-        ) +
-        scale_fill_continuous(limits = c(70, 100))
-
 
     cat(".")
     if(!is.null(depths)) {
@@ -321,15 +311,10 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             mutate(
                 trans_s = display_slots$trans$trans(start),
                 trans_e = display_slots$trans$trans(stop),
-                label_x =
-                    display_slots$trans$inv((
-                        display_slots$trans$trans(start) +
-                        display_slots$trans$trans(stop)
-                    ) / 2)
             )
         ## Remove duplicates
         subject_annotations <- subject_annotations %>%
-            group_by(start, stop, label_x, key, value) %>%
+            group_by(start, stop, key, value) %>%
             summarize(.groups="drop")
         ## Stack
         subject_annotations <- subject_annotations %>%
@@ -340,37 +325,57 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         bins <- max(subject_annotations$bin)
         y <- ymin$annotations
         height <- (ymax$annotations - y)/bins
+
+        annotation_boxes <- data.frame(
+            xmin = subject_annotations$start,
+            xmax = subject_annotations$stop,
+            ymin = y + (subject_annotations$bin-1) * height,
+            ymax = y + (subject_annotations$bin-0.1) * height,
+            type = subject_annotations$key,
+            label = subject_annotations$value
+        )
+        boxes <- rbind(boxes, annotation_boxes)
+
         ## Plot annotations
-        p <- p +
-            new_scale_fill() +
-            scale_fill_discrete() +
-            geom_rect(
-                data = subject_annotations,
-                aes(
-                    xmin=start,
-                    xmax=stop,
-                    ymin=y + (bin-1) * height,
-                    ymax=y + (bin-0.1) * height,
-                    fill=key
-                ),
-            ) +
-            geom_text_repel(
-                data = subject_annotations,
-                aes(
-                    x = label_x,
-                    label = value,
-                    y = y + (bin-0.5) * height
-                ),
-                hjust = .5,
-                vjust = .5,
-                size=3,
-                min.segment.length = 0.1,
-                max.overlaps=1000,
-                direction = "both",
-                ylim=c(y-1, ymax$annotations),
-                point.size = NA
-            )
     }
+
+    boxes <- boxes %>%
+        mutate(
+            xmid = display_slots$trans$inv((
+                display_slots$trans$trans(xmin) +
+                display_slots$trans$trans(xmax)
+            ) / 2),
+            ymid = (ymin+ymax)/2
+        )
+
+    p <- p +
+        new_scale_fill() +
+        scale_fill_manual(values = box_colors) +
+        ## Boxes
+        geom_rect(
+            data = boxes,
+            aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill=type)
+        ) +
+        new_scale_color() +
+        scale_color_manual(values = label_colors) +
+        geom_text_repel(
+            data = boxes,
+            aes(x=xmid, ymid, label=label, color=type),
+            size = 3,
+            vjust = .5,
+            hjust = .5,
+            min.segment.length = 0.1,
+            point.size = NA,  # don't shift around center
+            max.overlaps = 100,
+        ) +
+        new_scale_fill() +
+        scale_fill_continuous(limits = c(70, 100)) +
+        new_scale_color() +
+        geom_polygon(
+            data = polygons,
+            aes(x = x, y = y, group = alignment, fill = pident),
+            color="green", alpha=.5
+        )
 
     cat(".")
     ## Add labels
@@ -523,4 +528,3 @@ if (!interactive()) {
     run()
     dev.off()
 }
-
