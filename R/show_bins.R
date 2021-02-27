@@ -134,15 +134,16 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
     #### CONFIG  ###
     cat(".")
     heights <- c(
-        labels = 1.5,
-        coverage = 4,
+        coverage = 5,
         contigs = 1,
-        alignments = 4,
+        alignments = 3,
         subject = 1,
-        annotations = 2
+        annotations = 1
     )
     ymax <- cumsum(rev(heights))
     ymin <- ymax - rev(heights)
+    ymax <- ymax - ymin[["coverage"]]
+    ymin <- ymin - ymin[["coverage"]]
     heights <- as.list(heights)
     ymax <- as.list(ymax)
     ymin <- as.list(ymin)
@@ -199,7 +200,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             hits %>% mutate(start=cstart, stop=cend) %>% select(start, stop)
         ) %>%
         arrange(start, stop) %>%
-        compress_axis()
+        compress_axis(spacing = 100)
 
     cat(".")
     ## Setup corners for trapezoid showing alignment mapping
@@ -217,7 +218,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         xmin = contigs$cstart,
         xmax = contigs$cend,
         ymin = ymin$contigs,
-        ymax = ymax$contigs,
+        ymax = ymax$contigs - 0.1,
         type = "Contig",
         label = contigs$contig
     )
@@ -238,15 +239,19 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
 
     polygons <- alignment_boxes
 
-    cat("x")
+    cat(".")
     p <- ggplot() +
         theme_minimal() +
         theme(
-            axis.text.x = element_text(angle=90, hjust=1, size=6),
-            axis.text.y = element_blank()
+            axis.text.x = element_text(angle=90, hjust=1, size=6)
         ) +
-        scale_y_continuous(limits = c(min(unlist(ymin)), max(unlist(ymax)))) +
+        scale_y_continuous() +
         scale_x_continuous(trans = display_slots$trans)  +
+        coord_cartesian(
+            ylim = c(NA, max(unlist(ymax))),
+            xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
+                     max(hits$cstart, hits$sstart, hits$cend, hits$send)),
+            )
 
     cat(".")
     if(!is.null(depths)) {
@@ -257,35 +262,30 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             inner_join(contigs, by="qacc")
 
         mean_depth <- round(mean(depths$total), 1)
+        sd_depth <- sd(depths$total)
         max_depth <- max(depths$total)
-        norm_depth <- pmin(mean_depth*5, max_depth)
+        cap_depth <- min(max_depth, mean_depth + 3 * sd_depth)
 
         depth_data <- depths %>%
             mutate(
+                y = total / cap_depth * heights$coverage,
                 x = if_else(flip, cend - pos, cstart + pos),
-                fplus = if_else(total == 0, 0.5, if_else(flip, minus, plus) / total),
-                total = total / norm_depth,
-                plus = plus / norm_depth,
-                minus = minus / norm_depth,
                 swap_if(flip, minus, plus),
-            ) %>%
-            gather(
-                total, plus, minus, fplus, key="sense", value="y"
+                fplus = if_else(total == 0, 0.5, plus / total),
             ) %>%
             select(
-                qacc, sense, x, y
+                qacc, x, y
             )
 
         ## Plot depths above contigs
         p <- p +
-            geom_line(
+            stat_summary_bin(
+                geom="bar",
+                orientation="x",
+                fun="median",
+                bins=min(2000, nrow(depth_data)),
                 data = depth_data,
-                aes(
-                    x = x,
-                    y = y * heights$coverage + ymin$coverage,
-                    color=sense,
-                    group=interaction(sense,qacc)
-                )
+                aes(x = x, y = y)
             )
     }
 
@@ -298,6 +298,11 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             reference$sacc,
             feature_tables
         )
+        ## Remove gene for now
+        subject_annotations <- subject_annotations %>%
+            filter(key == "product") %>%
+            mutate(key == "Annotation")
+
         ## Merge annotations spanning display ranges
         subject_annotations <- subject_annotations %>%
             group_by(gstart, gstop, key, value) %>%
@@ -323,14 +328,14 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             )
 
         bins <- max(subject_annotations$bin)
-        y <- ymin$annotations
-        height <- (ymax$annotations - y)/bins
+        y <- ymax$annotations
+        #height <- bins ##(ymax$annotations - y)/bins
 
         annotation_boxes <- data.frame(
             xmin = subject_annotations$start,
             xmax = subject_annotations$stop,
-            ymin = y + (subject_annotations$bin-1) * height,
-            ymax = y + (subject_annotations$bin-0.1) * height,
+            ymin = y - subject_annotations$bin + 0.9,
+            ymax = y - subject_annotations$bin,
             type = subject_annotations$key,
             label = subject_annotations$value
         )
@@ -374,7 +379,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         geom_polygon(
             data = polygons,
             aes(x = x, y = y, group = alignment, fill = pident),
-            color="green", alpha=.5
+            color="lightblue", alpha=.5
         )
 
     cat(".")
@@ -402,7 +407,10 @@ plot_pages <- function(plots_per_page, items, plot_item) {
         message("Printing page ", page, "/", npages, "...")
         first <- (page-1) * plots_per_page + 1
         last <- min(length(items), first + plots_per_page  - 1)
-        plots <- vector("list", last - first + 1)
+        plots <- vector("list", plots_per_page)
+        for (i in seq_along(plots)) {
+            plots[[i]] <- plot_spacer()
+        }
         for (i in first:last) {
             plots[[i - first + 1]] <- plot_item(items[[i]])
         }
