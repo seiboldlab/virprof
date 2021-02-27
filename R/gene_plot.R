@@ -151,7 +151,7 @@ center_spread_ranges <- function(contigs, spacing, max_iter = 100) {
 #'
 #' @param alignments data.frame with columns sacc, qacc, sstart, send, qstart, qend, qlen
 #' @return data.frame with columns sacc, qacc, cstart, cend
-place_contigs <- function(alignments, merge_dist = 50, spacing = 10) {
+place_contigs <- function(alignments, spacing = 10) {
     if (nrow(alignments) == 0) {
         empty_res <- data.frame(
             sacc = character(),
