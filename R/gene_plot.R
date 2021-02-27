@@ -37,78 +37,72 @@ swap_if <- function(cond, x, y) {
 #' @param spacing Spacing between output rangess
 #' @export
 compress_axis <- function(include_ranges, merge_dist = 50, spacing = 50) {
-    ## Do nothing if the range list is empty
     if (nrow(include_ranges) == 0) {
-        return("identity")
+        stop("Cannot commpress axis with empty range")
+    }
+    if (spacing < 2) {
+        stop("Spacing must be at least 2")
     }
 
-    ## Create translation ranges
     ranges <- IRanges::IRanges(include_ranges[[1]], include_ranges[[2]]) %>%
         IRanges::reduce(min.gapwidth = merge_dist) %>%
         as.data.frame() %>%
         mutate(
-            stop = end,
-            newstop = cumsum(stop - start + spacing) - spacing + 1,
-            newstart = newstop - stop + start
+            toend = cumsum(end - start + spacing + 1) - spacing,
+            tostart = toend - end + start
         ) %>%
-        select(start, stop, newstart, newstop) %>%
-        arrange(newstart, newstop)
+        select(start, end, tostart, toend)
 
-    ## Extend outside ranges
-    extra <- 10000000
-    ranges$start[[1]] <- ranges$start[[1]] - extra
-    ranges$newstart[[1]] <- ranges$newstart[[1]] - extra
-    ranges$stop[[nrow(ranges)]] <- ranges$stop[[nrow(ranges)]] + extra
-    ranges$newstop[[nrow(ranges)]] <- ranges$newstop[[nrow(ranges)]] + extra
+    convert <- function(x, from_start, from_end, to_start, to_end) {
+        result <- vector("integer", length(x))
+        result[is.na(x)] <- NA
+        ## between start and end
+        scale <- (to_start - to_end) / (from_start - from_end)
+        for (j in seq_along(from_start)) {
+            matches <- between(x, from_start[[j]], from_end[[j]])
+            matches[is.na(matches)] <- FALSE
+            result[matches] <- (x[matches] - from_start[[j]]) * scale[[j]] + to_start[[j]]
+        }
+        ## between end and start
+        scale <- (
+            as.double(to_start[-1] - to_end[-length(to_end)])
+            /
+            as.double(from_start[-1] - from_end[-length(to_end)])
+        )
+        for (j in seq_along(from_start[-1])) {
+            matches <- between(x, from_end[[j]], from_start[[j+1]])
+            matches[is.na(matches)] <- FALSE
+            result[matches] <- (x[matches] - from_end[[j]]) * scale[[j]] + to_end[[j]]
+        }
+        ## outside first start and last end
+        result[x<from_start[[1]] & !is.na(x)] <- x[x<from_start[[1]] & !is.na(x)] -
+            from_start[[1]] + to_start[[1]]
+        result[x>from_end[[length(from_end)]] & !is.na(x)] <- x[x>from_end[[length(from_end)]] & !is.na(x)] -
+            from_end[[length(from_end)]] + to_end[[length(to_end)]]
+        result
+    }
 
     ## Translate regular coordinates to compressed coordinates
     trans <- function(x) {
-        x_na = is.na(x)
-        seen = is.na(x)
-        for (j in 1:nrow(ranges)) {
-            matches <- between(x, ranges$start[[j]], ranges$stop[[j]] + 1)
-            matches <- matches & !seen
-            seen <- matches | seen
-            x[matches] <- x[matches] - ranges$stop[[j]] + ranges$newstop[[j]]
-        }
-        x[x_na] <- NA
-        if (any(!seen)) {
-            print(ranges)
-            print(x[!seen])
-            stop("Values out of display range!")
-        }
-        x
+        convert(x, ranges$start, ranges$end, ranges$tostart, ranges$toend)
     }
 
     ## Reverse translation
     inv <- function(x) {
-        x_na = is.na(x)
-        seen = is.na(x)
-        for (j in 1:nrow(ranges)) {
-            matches <- between(x, ranges$newstart[[j]], ranges$newstop[[j]])
-            matches <- matches & !seen
-            seen <- matches | seen
-            x[matches] <- x[matches] - ranges$newstop[[j]] + ranges$stop[[j]]
-        }
-
-        if (any(!seen)) {
-            print(ranges)
-            print(x)
-            print(seen)
-            warning("Values out of display range!")
-        }
-        x[x_na] <- NA
-        x
+        convert(x, ranges$tostart, ranges$toend, ranges$start, ranges$end)
     }
 
     ## Compute breaks (start/stop positions)
     breaks <- function(x) {
-        x <- unique(sort(c(ranges$start, ranges$stop)))
-        x
+        unique(sort(c(ranges$start, ranges$end)))
     }
 
-    scales::trans_new("compress_axis", trans, inv, breaks)
+    list(
+        "trans" = scales::trans_new("compress_axis", trans, inv, breaks),
+        "ranges" = ranges
+    )
 }
+
 
 #' Shifts overlapping intervals outwards until they have defined spacing
 #'
