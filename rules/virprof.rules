@@ -16,7 +16,8 @@ Env(name="virprof_r", base="bioconda",
         "r-here",
         "bioconductor-iranges",
         "bedtools",
-        "r-rentrez"
+        "r-rentrez",
+        "r-ggnewscale",
     ])
 
 Env(name="virprof_py", base="bioconda",

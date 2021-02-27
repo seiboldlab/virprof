@@ -256,25 +256,30 @@ load_feature_table <- function(accs, cache_path) {
 #'     annotated regions. Columns gstart and gstop indicated the full
 #'     range of the annotations.
 #' @seealso load_feature_table
-annotate_subjects <- function(starts, ends, acc, feature_table, key = "gene") {
-    acc_ <- acc
-    key_ <- key
-    subj <- IRanges::IRanges(starts, ends) %>%
+annotate_subjects <- function(starts, ends, acc_, feature_table) {
+    ## Convert start/end lists into iranges object
+    ranges <- IRanges::IRanges(starts, ends) %>%
         IRanges::reduce()
+
     ft <- feature_table %>%
-        filter(acc == acc_, key == key_) %>%
+        rowid_to_column() %>%
+        filter(acc == acc_) %>%
         mutate(swap_if(start > end, start, end)) %>%
-        {IRanges::IRanges(.$start, .$end, name = .$value)} %>%
-        IRanges::subsetByOverlaps(subj)
-    overlaps <- IRanges::intersect(subj, ft)
+        {IRanges::IRanges(.$start, .$end, name = .$rowid)} %>%
+        IRanges::subsetByOverlaps(ranges)
+
+    overlaps <- IRanges::intersect(ranges, ft)
     hits <- IRanges::findOverlaps(overlaps, ft)
     overlaps_out <- overlaps[S4Vectors::from(hits)]
     ft_out <- ft[S4Vectors::to(hits)]
-    data.frame(
+    index_out <- as.integer(names(ft_out))
+    res <- data.frame(
         start = IRanges::start(overlaps_out),
         stop  = IRanges::end(overlaps_out),
         gstart = IRanges::start(ft_out),
         gstop = IRanges::end(ft_out),
-        name = names(ft_out)
+        key = feature_table$key[index_out],
+        value = feature_table$value[index_out]
     )
+    res
 }

@@ -5,6 +5,7 @@ library(tidyverse)
 library(patchwork)
 library(ggrepel)
 library(grid)
+library(ggnewscale)
 source(here("R", "gene_plot.R"))
 
 parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
@@ -129,6 +130,8 @@ break_lineage <- function(lineage, maxlen=200, insert="\n") {
 #' The actual plot function
 plot_ranges <- function(reference, hits, depths, feature_tables) {
     message("Plotting ", reference$sacc)
+
+    #### CONFIG  ###
     cat(".")
     heights <- c(
         labels = 1.5,
@@ -137,7 +140,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         contig_hits = .5,
         alignments = 4,
         subject = 1,
-        annotations = 1
+        annotations = 2
     )
     ymax <- cumsum(rev(heights))
     ymin <- ymax - rev(heights)
@@ -148,8 +151,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
         contigs     = "darkblue",
         contig_hits = "darkgreen",
         alignments  = "green",
-        subject     = "darkred",
-        annotations = "orange"
+        subject     = "darkred"
     )
 
     label_tpl <- paste0(
@@ -186,7 +188,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
 
     cat(".")
     ## Make compressed X scale
-    xtrans <-
+    display_slots <-
         bind_rows(
             hits %>% mutate(start=sstart, stop=send) %>% select(start, stop),
             hits %>% mutate(start=cstart, stop=cend) %>% select(start, stop)
@@ -214,7 +216,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             axis.text.x = element_text(angle=90, hjust=1, size=6),
             axis.text.y = element_blank()
         ) +
-        scale_x_continuous(trans = xtrans)  +
+        scale_x_continuous(trans = display_slots$trans)  +
         ## Contigs
         geom_rect(
             data = contigs,
@@ -301,24 +303,72 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
     if (!is.null(feature_tables)) {
         ## Annotate subject sequences
         subject_annotations <- annotate_subjects(
-            hits$sstart, hits$send,
+            display_slots$ranges$start,
+            display_slots$ranges$end,
             reference$sacc,
             feature_tables
         )
+        ## Merge annotations spanning display ranges
+        subject_annotations <- subject_annotations %>%
+            group_by(gstart, gstop, key, value) %>%
+            summarize(
+                start=min(start),
+                stop=max(stop),
+                .groups="drop"
+            )
+        ## Compute label location
+        subject_annotations <- subject_annotations %>%
+            mutate(
+                trans_s = display_slots$trans$trans(start),
+                trans_e = display_slots$trans$trans(stop),
+                label_x =
+                    display_slots$trans$inv((
+                        display_slots$trans$trans(start) +
+                        display_slots$trans$trans(stop)
+                    ) / 2)
+            )
+        ## Remove duplicates
+        subject_annotations <- subject_annotations %>%
+            group_by(start, stop, label_x, key, value) %>%
+            summarize(.groups="drop")
+        ## Stack
+        subject_annotations <- subject_annotations %>%
+            mutate(
+                bin = IRanges::disjointBins(IRanges::IRanges(start, stop))
+            )
+
+        bins <- max(subject_annotations$bin)
+        y <- ymin$annotations
+        height <- (ymax$annotations - y)/bins
         ## Plot annotations
         p <- p +
+            new_scale_fill() +
+            scale_fill_discrete() +
             geom_rect(
                 data = subject_annotations,
-                aes(xmin=start, xmax=stop),
-                ymin=ymin$annotations, ymax=ymax$annotations, fill=fill$annotations
+                aes(
+                    xmin=start,
+                    xmax=stop,
+                    ymin=y + (bin-1) * height,
+                    ymax=y + (bin-0.1) * height,
+                    fill=key
+                ),
             ) +
-            geom_text(
+            geom_text_repel(
                 data = subject_annotations,
-                aes(x = (start+stop)/2, label = name),
-                y = (ymin$annotations + ymax$annotations)/2,
+                aes(
+                    x = label_x,
+                    label = value,
+                    y = y + (bin-0.5) * height
+                ),
                 hjust = .5,
                 vjust = .5,
-                size=3
+                size=3,
+                min.segment.length = 0.1,
+                max.overlaps=1000,
+                direction = "both",
+                ylim=c(y-1, ymax$annotations),
+                point.size = NA
             )
     }
 
