@@ -101,7 +101,8 @@ pipelines:
           hide: true
       - ref_NT:
           hide: true
-      - annotate_blastE20MegaBest:
+#      - annotate_blastE20MegaBest:
+      - annotate_blastE10Best:
           hide: true
       - ref_NcbiTaxonomy:
           hide: true
