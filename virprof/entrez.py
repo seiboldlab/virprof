@@ -22,47 +22,40 @@ from requests.exceptions import RequestException
 LOG = logging.getLogger(__name__)
 
 
-class EntrezAPI:
-    """Caller for Entrez API methods
-
-    Handles rate limiting by reacting to 429 error
-
-    Args:
-      session: Pre-prepared session. Not that the session object
-         needs to be set up to handle retries internally.
-      defaults: Additional parameters to add to the URL on each
-         API call. This is useful to e.g. set `apikey`.
-      timeout: Maximum time to wait for any ony server response.
-      retries: Outer loop retries for batch requests failing on 400, 429 and 500
-    """
-
-    #: Entrez API base URL (with tool name as `{tool}`)
-    URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/{tool}.fcgi"
-
+class BaseAPI:
+    """Base class for error-handled http API access"""
     #: Default codes assumed to be temporary server issues solveable
     #: by retrying the request.
     default_retry_codes = set(
         (
+            500,  # Generic Server error
             502,  # Bad Gateway Error
             504,  # Gateway Timeout
             429,  # Too Many Requests
-            # 500 may be caused by single entry in batch request, so
-            # simple retry does not help.
         )
     )
+
+    #: API endpoint, must be filled by inheriting classes
+    URL = ""
 
     def __init__(
         self,
         session: Optional[Session] = None,
         defaults: Optional[Dict[str, str]] = None,
-        timeout: int = 120,
-        retries: int = 3,
+        timeout: int = 120
     ) -> None:
         self._session = self.make_session() if session is None else session
         self._defaults = {} if defaults is None else defaults
         self.timeout = timeout
         self._old_loglevel: Optional[int] = None
-        self._retries = retries
+
+    def _get(self, url_params: Dict[str, str], params: Dict[str, str]) -> str:
+        url = self.URL.format(**url_params)
+        all_params = self._defaults.copy()
+        all_params.update(params)
+        response = self._session.get(url, params=all_params, timeout=self.timeout)
+        response.raise_for_status()
+        return response.text.strip()
 
     @classmethod
     def make_session(
@@ -112,16 +105,81 @@ class EntrezAPI:
         session.mount("https://", adapter)
         return session
 
+    def enable_debug(self):
+        """Enables debug logging from urllib3 library
+
+        Requires logging to be setup (e.g. via logging.basicConfig())
+        """
+        if self._old_loglevel is not None:
+            return
+        LOG.error("Configuring 'urllib3' logging: ON")
+
+        logger = logging.getLogger()
+        self._old_loglevel = logger.getEffectiveLevel()
+        logger.setLevel(logging.DEBUG)
+
+        requests_log = logging.getLogger("urllib3")
+        requests_log.setLevel(logging.DEBUG)
+        requests_log.propagate = True
+
+    def disable_debug(self):
+        """Disables debug logging from urllib3 library"""
+        if self._old_loglevel is None:
+            return
+        LOG.error("Configuring 'urllib3' logging: OFF")
+
+        logging.getLogger().setLevel(self._old_loglevel)
+        self._old_loglevel = None
+
+        requests_log = logging.getLogger("urllib3")
+        requests_log.propagate = False
+
+
+class EntrezAPI(BaseAPI):
+    """Caller for Entrez API methods
+
+    Handles rate limiting by reacting to 429 error
+
+    Args:
+      session: Pre-prepared session. Not that the session object
+         needs to be set up to handle retries internally.
+      defaults: Additional parameters to add to the URL on each
+         API call. This is useful to e.g. set `apikey`.
+      timeout: Maximum time to wait for any ony server response.
+      retries: Outer loop retries for batch requests failing on 400, 429 and 500
+    """
+
+    #: Entrez API base URL (with tool name as `{tool}`)
+    URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/{tool}.fcgi"
+
+    #: Default codes assumed to be temporary server issues solveable
+    #: by retrying the request. These have error 500 removed as we need
+    #: to handle it separately.
+    default_retry_codes = set(
+        (
+            502,  # Bad Gateway Error
+            504,  # Gateway Timeout
+            429,  # Too Many Requests
+            # 500 may be caused by single entry in batch request, so
+            # simple retry does not help.
+        )
+    )
+
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        defaults: Optional[Dict[str, str]] = None,
+        timeout: int = 120,
+        retries: int = 3,
+    ) -> None:
+        super().__init__(session=session, defaults=defaults, timeout=timeout)
+        self._retries = retries
+
     def _get(self, tool: str, params: Dict[str, str]) -> str:
         """Executes remote API call"""
-        url = self.URL.format(tool=tool)
-        all_params = self._defaults.copy()
-        all_params.update(params)
-        request = self._session.get(url, params=all_params, timeout=self.timeout)
-        request.raise_for_status()
-        text = request.text.strip()
+        text = super()._get({'tool': tool}, params)
         if text.startswith("Error:"):
-            LOG.info(
+            LOG.error(
                 "Entrez request failed with '%s'. Returning empty string instead.", text
             )
             text = ""
@@ -253,35 +311,6 @@ class EntrezAPI:
             batch_data=ids,
             batch_size=batch_size,
         )
-
-    def enable_debug(self):
-        """Enables debug logging from urllib3 library
-
-        Requires logging to be setup (e.g. via logging.basicConfig())
-        """
-        if self._old_loglevel is not None:
-            return
-        LOG.error("Configuring 'urllib3' logging: ON")
-
-        logger = logging.getLogger()
-        self._old_loglevel = logger.getEffectiveLevel()
-        logger.setLevel(logging.DEBUG)
-
-        requests_log = logging.getLogger("urllib3")
-        requests_log.setLevel(logging.DEBUG)
-        requests_log.propagate = True
-
-    def disable_debug(self):
-        """Disables debug logging from urllib3 library"""
-        if self._old_loglevel is None:
-            return
-        LOG.error("Configuring 'urllib3' logging: OFF")
-
-        logging.getLogger().setLevel(self._old_loglevel)
-        self._old_loglevel = None
-
-        requests_log = logging.getLogger("urllib3")
-        requests_log.propagate = False
 
 
 class FeatureTableParsingError(Exception):
