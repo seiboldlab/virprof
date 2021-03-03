@@ -83,6 +83,14 @@ vhdb_get_host <- function(lineages, taxids=NULL, url=NULL,
                 host_names = paste(collapse="; ", na.omit(vhdb_host_name)),
                 .groups="drop"
             ) %>%
+            # Excel cannot handle string data longer than 32767 (2^15-1)
+            # (possible because it's storing string length in an
+            # uint16). We call every host name list longer than this
+            # "UNSPECIFIC" here for simplicity.
+            mutate(
+                host_names = replace(host_names, nchar(host_names) >= 2^15,
+                                     "UNSPECIFIC")
+            ) %>%
             ungroup() %>%
             select(lineage, host_names)
         message(">    found ", length(which(nzchar(result$host_names))))
