@@ -606,30 +606,28 @@ class FeatureTables:
             writer.writerow(row)
 
 
-class GenomeSizes:
-    """Determine genome sizes for given NCBI taxonomy IDs"""
-
-    #: API endpoint for NCBI genome size check
-    GENOME_SIZE_URL = "https://api.ncbi.nlm.nih.gov/genome/v0/expected_genome_size"
+class NcbiGenomeAPI(BaseAPI):
+    #: Base URL for NCBI genome size check API
+    URL = "https://api.ncbi.nlm.nih.gov/genome/v0/{func}"
 
     def __init__(
-        self, entrez: EntrezAPI = None, cache_path: str = None, api_key=None
+            self,
+            session: Optional[Session] = None,
+            defaults: Optional[Dict[str, str]] = None,
+            timeout: int = 120,
     ) -> None:
-        if api_key is not None:
-            defaults = {"api_key": api_key}
-        else:
-            defaults = None
-        self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
-        self.cache = Cache(cache_path)
+        super().__init__(session=session, defaults=defaults, timeout=timeout)
 
-    def genome_size_check_query(self, taxid: int) -> Dict[str, str]:
-        """Queries NCBI genome size check API"""
-        response = requests.get(self.GENOME_SIZE_URL, params={"species_taxid": taxid})
-        response.raise_for_status()
-        genome_size_response = ET.fromstring(response.text)
+    def call_expected_genome_size(self, taxid: int) -> Dict[str, str]:
+        """Retrieves expected genome size for given NCBI taxid"""
+        try:
+            text = self._get({"func": "expected_genome_size"}, params={"species_taxid": taxid})
+        except RequestException as exc:
+            return {}
+        genome_size_response = ET.fromstring(text)
         return {node.tag: node.text for node in genome_size_response}
 
-    def genome_size_check(self, taxid: int) -> Optional[int]:
+    def get_genome_size(self, taxid: int) -> Optional[int]:
         """Determines the genome size using NCBI genome size check API
 
         Returns None if the API did not yield a result or if the result was malformed.
@@ -639,7 +637,7 @@ class GenomeSizes:
           the case, no single accession will ever cover the entire
           genome.
         """
-        results = self.genome_size_check_query(taxid)
+        results = self.call_expected_genome_size(taxid)
         exp_len = results.get("expected_ungapped_length")
         if not exp_len:
             # No result, usually means that there are fewer than 4 accepted reference
@@ -654,6 +652,25 @@ class GenomeSizes:
                 "NCBI genome size check API returned malformed value '%s'", exp_len
             )
             return None
+
+
+class GenomeSizes:
+    """Determine genome sizes for given NCBI taxonomy IDs"""
+
+    def __init__(
+            self,
+            entrez: EntrezAPI = None,
+            genome: NcbiGenomeAPI = None,
+            cache_path: str = None,
+            api_key=None,
+    ) -> None:
+        if api_key is not None:
+            defaults = {"api_key": api_key}
+        else:
+            defaults = None
+        self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
+        self.genome = genome if genome is not None else NcbiGenomeAPI()
+        self.cache = Cache(cache_path)
 
     def entrez_genome_search(
         self,
@@ -685,7 +702,7 @@ class GenomeSizes:
         if refseq:
             term += "AND (refseq[filter])"
         if complete:
-            term += "AND (complete genome)"
+            term += 'AND ("complete genome")'
         query = self.entrez.search("nucleotide", term)
         summaries = self.entrez.summary("nucleotide", query)
         lengths = [
@@ -700,9 +717,12 @@ class GenomeSizes:
 
     def get_one(self, taxid: int) -> Tuple[str, int]:
         """Determines genome size for a taxonomy ID using several methods. See `get`"""
-        expected_length = self.genome_size_check(taxid)
+        expected_length = self.genome.get_genome_size(taxid)
         if expected_length:
             return "genome_size_check", expected_length
+        expected_length = self.entrez_genome_search(taxid, refseq=True, complete=True)
+        if expected_length:
+            return "avg_refseq", expected_length
         expected_length = self.entrez_genome_search(taxid, refseq=True)
         if expected_length:
             return "avg_refseq", expected_length
@@ -714,7 +734,7 @@ class GenomeSizes:
             return "avg_sequence", expected_length
         return "failed", 0
 
-    def get_many(self, taxids: List[int]) -> Dict[int, Tuple[str, int]]:
+    def get_many(self, taxids: List[int], nocache: bool = False) -> Dict[int, Tuple[str, int]]:
         """Fetches the genome sizes for the NCBI taxonomy IDs passed in ``taxids``.
 
         For each taxonomy ID, four different approaches are tried. The
@@ -734,21 +754,34 @@ class GenomeSizes:
 
         `avg_sequence`: Using an Entrez search without constraints.
         """
-        result = self.cache.get("genome_sizes", taxids)
-        taxids = [taxid for taxid in taxids if taxid not in result]
+        result = {}
+        if not nocache:
+            result = self.cache.get("genome_sizes", taxids)
+            taxids = [taxid for taxid in taxids if taxid not in result]
         newresult = {taxid: self.get_one(taxid) for taxid in taxids}
         self.cache.put("genome_sizes", newresult)
         result.update(newresult)
         return result
 
-    def get(self, taxid: int) -> Tuple[str, int]:
-        return self.get_many([taxid]).get(taxid, (None, None))
+    def get(self, taxid: int, nocache: bool = False) -> Tuple[str, int]:
+        return self.get_many([taxid], nocache=nocache).get(taxid, (None, None))
 
 
 def main():
     """test main"""
-    logging.basicConfig()
+    logging.basicConfig()  # level=logging.DEBUG)
     import sys
+
+    genomes = GenomeSizes(cache_path="cache_path")
+    for taxid, exp_size in {
+            290028: 29926,
+            29832: 18844,
+    }.items():
+        method, size = genomes.get(taxid, nocache=True)
+        if exp_size * 0.9 < size < exp_size * 1.1:
+            print(f"{taxid}: OK with method '{method}' ({size} close to expected {exp_size})")
+        else:
+            print(f"{taxid}: FAIL with method '{method}' ({size} not close to expected {exp_size})")
 
     features = FeatureTables(cache_path="cache_path")
     features.entrez.enable_debug()
