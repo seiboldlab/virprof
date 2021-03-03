@@ -622,14 +622,6 @@ class GenomeSizes:
         self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
         self.cache = Cache(cache_path)
 
-    @staticmethod
-    def _trytoint(val: str) -> Union[str, int]:
-        """Tries to convert string to int, returning string on failure"""
-        try:
-            return int(val)
-        except ValueError:
-            return val
-
     def genome_size_check_query(self, taxid: int) -> Dict[str, str]:
         """Queries NCBI genome size check API"""
         response = requests.get(self.GENOME_SIZE_URL, params={"species_taxid": taxid})
