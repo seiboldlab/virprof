@@ -281,7 +281,7 @@ load_files <- function(samples, opt) {
         pident = col_double(),
         numreads = col_integer(),
         taxid = col_integer(),
-        genome_size = col_integer(),
+        genome_size = col_number(),
         taxname = col_character(),
         species = col_character(),
         lineage = col_character(),
