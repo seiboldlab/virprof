@@ -200,7 +200,7 @@ plot_ranges <- function(reference, hits, depths, feature_tables) {
             hits %>% mutate(start=cstart, stop=cend) %>% select(start, stop)
         ) %>%
         arrange(start, stop) %>%
-        compress_axis(spacing = 100)
+        compress_axis(merge_dist=200, spacing = 100)
 
     cat(".")
     ## Setup corners for trapezoid showing alignment mapping
