@@ -112,12 +112,17 @@ pipelines:
       - group_sample:
           hide: true
       - blastbin_vp
+
+  scaffold:
+    stages:
       - scaffold_vp
+      - coverage
+      - group_sample
+      - polish_pilon
+      - coverage
 
   summarize:
     stages:
-      - group_BIN
-      - format_bbmapL200
       - ref_VHDB
       - group_ALL
       - summarize_vp
@@ -151,6 +156,7 @@ pipelines:
       - assemble_meta
       - coverage
       - blastbin
+      - scaffold
       - summarize
 
 
