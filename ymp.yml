@@ -87,8 +87,11 @@ pipelines:
           hide: true
       - map_bowtie2S:
           hide: true
-      - sort_bam
+      - sort_bam:
+          hide: true
+      - markdup_sambambaRM
       - coverage_samtools
+      - basecov_bedtools
 
   # Remove human contigs and create classified bins using BLAST
   blastbin:
