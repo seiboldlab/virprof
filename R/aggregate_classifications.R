@@ -62,8 +62,10 @@ field_name_map <- list(
     "Reference Size Source" = "genome_size_source",
     "% Identity" = "pident",
     "% Identities" = "pidents",
-    "Read Count" = "numreads",
-    "Read Count(s)" = "numreadss",
+    "(old) Read Count" = "numreads",
+    "(old) Read Count(s)" = "numreadss",
+    "Read Count" = "numreads2",
+    "Read Count(s)" = "numreadss2",
     "Taxonomy ID" = "taxid",
     "Taxonomy IDs" = "taxids",
     "Taxonomic Name" = "taxname",
@@ -184,6 +186,14 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
         make_option(c("--in-list"),
                     metavar = "FILE",
                     help = "File with list of input files (alternative specification)"
+                    ),
+        make_option(c("--in-coverage-list"),
+                    metavar = "FILE",
+                    help = "File with list of coverage input files"
+                    ),
+        make_option(c("--in-basecov-list"),
+                    metavar = "FILE",
+                    help = "File with list of base coverage input files"
                     )
     )
 
@@ -267,9 +277,9 @@ locate_files <- function(opt) {
 #' Load CSVs
 #'
 #'
-load_files <- function(samples, opt) {
-    message("Loading files...")
-    cov_cols <- cols(
+load_calls <- function(samples, opt) {
+    message("Loading calls...")
+    call_cols <- cols(
         sample = col_character(),
         words = col_character(),
         log_evalue = col_double(),
@@ -289,7 +299,7 @@ load_files <- function(samples, opt) {
     )
     samples <- samples %>%
         mutate(
-            data = map(path, read_csv, col_types=cov_cols)
+            data = map(path, read_csv, col_types=call_cols)
         ) %>%
         unnest(cols=c(data)) %>%
         select(-path)
@@ -321,6 +331,38 @@ load_files <- function(samples, opt) {
     }
     message("... done")
     samples
+}
+
+load_coverages <- function(calls, coverage_filelist_file) {
+    message("Loading coverage files...")
+    call_cols <- cols(
+        "#rname" = col_character(),
+        "startpos" = col_number(),
+        "endpos" = col_number(),
+        "numreads" = col_integer(),
+        "covbases" = col_integer(),
+        "coverage" = col_double(),
+        "meandepth"  = col_double(),
+        "meanbaseq" = col_double(),
+        "meanmapq" = col_double()
+    )
+    coverages <- coverage_filelist_file %>%
+        read_table(
+            col_names='path',
+            col_types=c(col_character())
+        ) %>%
+        mutate(
+            data = map(path, read_tsv, col_types=call_cols)
+        ) %>%
+        unnest(cols=c(data)) %>%
+        select(-path) %>%
+        dplyr::rename(rname = "#rname") %>%
+        mutate(rname = gsub("_pilon$", "", rname)) %>%
+        separate(rname, c("sample", "sacc"), remove = TRUE) %>%
+        group_by(sample, sacc) %>%
+        summarize(numreads2 = sum(numreads))
+
+    left_join(calls, coverages)
 }
 
 #' Basic hit filtering
@@ -370,6 +412,7 @@ merge_species <- function(samples) {
             # minimize taxononomic names list
             taxnames  = concat(taxname, ", ", sort=TRUE, unique=TRUE),
             # sum up the read count
+            numreads2 = sum(numreads2),
             numreads = sum(numreads),
             # pick the best evalue
             min_log_evalue = min(log_evalue),
@@ -398,6 +441,7 @@ merge_samples <- function(samples) {
         arrange(desc(numreads)) %>%
         summarize(
             taxnames = concat(taxnames, " | "),
+            numreadss2 = concat(numreads2, " | "),
             numreadss = concat(numreads, " | "),
             min_log_evalues = concat(min_log_evalue, " | "),
             pidents = concat(pident, " | "),
@@ -431,13 +475,16 @@ if (!interactive()) {
         )
 
     ## Load the files
-    calls <- load_files(files, opt)
+    calls <- load_calls(files, opt)
     summary %<>%
         add_row(
             Count=nrow(calls),
             Description="Total detections",
             Tab=""
         )
+    if (!is.null(opt$options$in_coverage_list)) {
+        calls <- load_coverages(calls, opt$options$in_coverage_list)
+    }
 
     ## Compute Genome Coverage
     calls <- calls %>%
