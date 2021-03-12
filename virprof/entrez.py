@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 class BaseAPI:
     """Base class for error-handled http API access"""
+
     #: Default codes assumed to be temporary server issues solveable
     #: by retrying the request.
     default_retry_codes = set(
@@ -42,7 +43,7 @@ class BaseAPI:
         self,
         session: Optional[Session] = None,
         defaults: Optional[Dict[str, str]] = None,
-        timeout: int = 120
+        timeout: int = 120,
     ) -> None:
         self._session = self.make_session() if session is None else session
         self._defaults = {} if defaults is None else defaults
@@ -177,7 +178,7 @@ class EntrezAPI(BaseAPI):
 
     def _get(self, tool: str, params: Dict[str, str]) -> str:
         """Executes remote API call"""
-        text = super()._get({'tool': tool}, params)
+        text = super()._get({"tool": tool}, params)
         if text.startswith("Error:"):
             LOG.error(
                 "Entrez request failed with '%s'. Returning empty string instead.", text
@@ -611,17 +612,19 @@ class NcbiGenomeAPI(BaseAPI):
     URL = "https://api.ncbi.nlm.nih.gov/genome/v0/{func}"
 
     def __init__(
-            self,
-            session: Optional[Session] = None,
-            defaults: Optional[Dict[str, str]] = None,
-            timeout: int = 120,
+        self,
+        session: Optional[Session] = None,
+        defaults: Optional[Dict[str, str]] = None,
+        timeout: int = 120,
     ) -> None:
         super().__init__(session=session, defaults=defaults, timeout=timeout)
 
     def call_expected_genome_size(self, taxid: int) -> Dict[str, str]:
         """Retrieves expected genome size for given NCBI taxid"""
         try:
-            text = self._get({"func": "expected_genome_size"}, params={"species_taxid": taxid})
+            text = self._get(
+                {"func": "expected_genome_size"}, params={"species_taxid": taxid}
+            )
         except RequestException as exc:
             return {}
         genome_size_response = ET.fromstring(text)
@@ -658,11 +661,11 @@ class GenomeSizes:
     """Determine genome sizes for given NCBI taxonomy IDs"""
 
     def __init__(
-            self,
-            entrez: EntrezAPI = None,
-            genome: NcbiGenomeAPI = None,
-            cache_path: str = None,
-            api_key=None,
+        self,
+        entrez: EntrezAPI = None,
+        genome: NcbiGenomeAPI = None,
+        cache_path: str = None,
+        api_key=None,
     ) -> None:
         if api_key is not None:
             defaults = {"api_key": api_key}
@@ -734,7 +737,9 @@ class GenomeSizes:
             return "avg_sequence", expected_length
         return "failed", 0
 
-    def get_many(self, taxids: List[int], nocache: bool = False) -> Dict[int, Tuple[str, int]]:
+    def get_many(
+        self, taxids: List[int], nocache: bool = False
+    ) -> Dict[int, Tuple[str, int]]:
         """Fetches the genome sizes for the NCBI taxonomy IDs passed in ``taxids``.
 
         For each taxonomy ID, four different approaches are tried. The
@@ -774,14 +779,18 @@ def main():
 
     genomes = GenomeSizes(cache_path="cache_path")
     for taxid, exp_size in {
-            290028: 29926,
-            29832: 18844,
+        290028: 29926,
+        29832: 18844,
     }.items():
         method, size = genomes.get(taxid, nocache=True)
         if exp_size * 0.9 < size < exp_size * 1.1:
-            print(f"{taxid}: OK with method '{method}' ({size} close to expected {exp_size})")
+            print(
+                f"{taxid}: OK with method '{method}' ({size} close to expected {exp_size})"
+            )
         else:
-            print(f"{taxid}: FAIL with method '{method}' ({size} not close to expected {exp_size})")
+            print(
+                f"{taxid}: FAIL with method '{method}' ({size} not close to expected {exp_size})"
+            )
 
     features = FeatureTables(cache_path="cache_path")
     features.entrez.enable_debug()
