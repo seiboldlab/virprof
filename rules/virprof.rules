@@ -292,44 +292,39 @@ with Stage("export_vp") as S:
 
 
 with Stage("summarize_vp") as S:
-    localrules: vp_call_files
-    rule vp_call_files:
-        message:
-            "Creating list of calls for {wildcards.target} in {:this:}"
-        input:
-            calls="{:prev:}/{:target:}.virus.csv"
-        output:
-            call_files=temp("{:this:}/{target}.call_files.txt")
-        threads:
-            1
-        run:
-            with open(output.call_files, "w") as outfile:
-                for fname in input.calls:
-                    outfile.write(fname)
-                    outfile.write('\n')
-
     rule vp_aggregate_classifiations:
         message:
             "Creating virus summary for {wildcards.target} in {:this:}"
         input:
             virushostdb="{:prev:}/virushostdb.tsv",
             calls="{:prev:}/{:target:}.virus.csv",
-            call_files="{:this:}/{target}.call_files.txt",
+            coverages="{:prev:}/{:target:}.coverage",
+            basecov="{:prev:}/{:target:}.basecov.bg",
         output:
             excel="{:this:}/{target}.summary.xlsx"
         log:
             "{:this:}/{target}.summary.log"
         params:
-            csv_out="{:this:}/{target}.summary_%s.csv",
-            filter_host="Homo sapiens",
-            min_slen=200,
-            min_reads=3,
+            calls       = lambda wc, input: "\n".join(input.calls),
+            coverages   = lambda wc, input: "\n".join(input.coverages),
+            basecov     = lambda wc, input: "\n".join(input.basecov),
+            csv_out     = "{:this:}/{target}.summary_%s.csv",
+            filter_host = "Homo sapiens",
+            min_slen    = 200,
+            min_reads   = 3,
+        shadow:
+            "shallow"
         threads:
             1
         conda:
             "virprof_r"
         shell:
-            "exec >{log} 2>&1;"
+            "exec >{log} 2>&1;\n"
+            "\n"
+            "echo '{params.calls}' > call.files;\n"
+            "echo '{params.coverages}' > coverage.files;\n"
+            "echo '{params.basecov}' > basecov.files;\n"
+            "\n"
             "./R/aggregate_classifications.R"
             "  --virushostdb '{input.virushostdb}'"
             "  --filter-host '{params.filter_host}'"
@@ -337,7 +332,9 @@ with Stage("summarize_vp") as S:
             "  --min-reads '{params.min_reads}'"
             "  --excel-out '{output.excel}'"
             "  --out '{params.csv_out}'"
-            "  --in-list {input.call_files}"
+            "  --in-list call.files"
+            "  --in-coverage-list coverage.files"
+            "  --in-basecov-list basecov.files"
 
     rule vp_aggregate_genomes:
         message:
