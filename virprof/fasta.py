@@ -178,13 +178,21 @@ class Btop:
         self._send = send
         self._qstart = qstart
         self._btop = btop
-        self._length, self._ops = self._parse_btop(btop)
+        self._subject_length, self._query_length, self._ops = self._parse_btop(btop)
 
     def __str__(self):
         return self._btop
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self._btop, self._qstart})"
+        return f"{self.__class__.__name__}{self._sstart, self._send, self._qstart, self._btop}"
+
+    @property
+    def subject_length(self):
+        return self._subject_length
+
+    @property
+    def query_length(self):
+        return self._query_length
 
     def is_forward(self):
         """Check if query and subject have same orientation"""
@@ -193,19 +201,23 @@ class Btop:
     @staticmethod
     def _parse_btop(btop: str):
         ops = list()
-        length = 0
+        subject_length = 0
+        query_length = 0
         for match in re.finditer("([0-9]+)?([A-Z-]{2}|$)", btop):
             digits, letters = match.groups()
             matched = int(digits) if digits else 0
-            length += matched
+            subject_length += matched
+            query_length += matched
             if letters:
                 query, subject = letters.encode("ascii")
                 if subject != 45:  # '-':
-                    length += 1
+                    subject_length += 1
+                if query != 45:  # '-':
+                    query_length += 1
             else:
                 query, subject = None, None
             ops.append((matched, query, subject))
-        return length, ops
+        return subject_length, query_length, ops
 
     def _get_aligned(
         self,
@@ -213,7 +225,7 @@ class Btop:
         start: int = None,
         end: int = None,
         get_query: bool = True,
-    ) -> bytes:
+    ) -> Tuple[bytes, List[Tuple[int, int]], int, int]:
         """Get aligned query/subject in subject coordinates"""
         if start is None:
             start = 0
@@ -225,16 +237,17 @@ class Btop:
         sequence = sequence[self._qstart - 1 :]
 
         if end is None:
-            end = self._length
-        elif end > self._length:
+            end = self._subject_length
+        elif end > self._subject_length:
             raise IndexError(
-                f"{repr(self)}: out of bounds (end={end}) > len={self._length})"
+                f"{repr(self)}: out of bounds (end={end}) > len={self._subject_length})"
             )
 
         if start >= end:
             raise IndexError(f"{repr(self)}: empty or negative range {start} to {end}")
 
         aligned = []
+        insertions = []
         query_ptr = 0
         subject_ptr = 0
         query_first_base = None
@@ -262,6 +275,8 @@ class Btop:
             if start <= subject_ptr < end:
                 if query_first_base is None:
                     query_first_base = query_ptr
+                if subject == 45:
+                    insertions.append(subject_ptr - start)
                 if get_query:
                     aligned.append(query)
                 else:
@@ -269,6 +284,7 @@ class Btop:
             if subject != 45:  # '-'
                 subject_ptr += 1
             if query != 45:  # '-'
+                assert sequence[query_ptr] == query
                 query_ptr += 1
             if subject_ptr == end:
                 query_last_base = query_ptr
@@ -277,6 +293,7 @@ class Btop:
             raise RuntimeError("Failed to process sequence alignment")
         return (
             bytes(aligned),
+            insertions,
             query_first_base + self._qstart,
             query_last_base + self._qstart,
         )
@@ -310,22 +327,39 @@ class Btop:
             else:
                 start = start - self._send + 1
                 end = end - self._send + 1
-        aligned, left, right = self._get_aligned(sequence, start, end, get_query=True)
+        aligned, insertions, left, right = self._get_aligned(
+            sequence, start, end, get_query=True
+        )
         if subject_coordinates and not self.is_forward():
             aligned = revcomp(aligned)
-        return aligned, left, right
+            insertions = [end - start + 1 - pos for pos in reversed(insertions)]
+        return aligned, insertions, left, right
 
     def get_aligned_subject(
         self,
         sequence: bytes,
         start: int = None,
         end: int = None,
+        subject_coordinates: bool = False,
     ) -> bytes:
         """Return aligned subject sequence (with gaps)
 
         See `get_aligned_query`
         """
-        return self._get_aligned(sequence, start, end, get_query=False)
+        if subject_coordinates:
+            if self.is_forward():
+                start = start - self._sstart + 1
+                end = end - self._sstart + 1
+            else:
+                start = start - self._send + 1
+                end = end - self._send + 1
+        aligned, insertions, left, right = self._get_aligned(
+            sequence, start, end, get_query=False
+        )
+        if subject_coordinates and not self.is_forward():
+            aligned = revcomp(aligned)
+            insertions = [end - start + 1 - pos for pos in reversed(insertions)]
+        return aligned, insertions, left, right
 
 
 def revcomp(sequence: bytes) -> bytes:
@@ -334,7 +368,7 @@ def revcomp(sequence: bytes) -> bytes:
     return str(seq.reverse_complement()).encode("ASCII")
 
 
-def consensus(sequences: List[bytes]) -> bytes:
+def consensus(sequences: List[bytes], strip_gaps: bool = True) -> bytes:
     """Compute consensus for a set of sequences
 
     Uncertain bases are filled with 'n'.
@@ -342,6 +376,9 @@ def consensus(sequences: List[bytes]) -> bytes:
     Raises `ValueError` if the ``sequences`` vary in length.
     """
     if any(len(sequences[0]) != len(seq) for seq in sequences):
+        LOG.error("Consensus on sequences with differing lengths:")
+        for num, seq in enumerate(sequences):
+            LOG.error(f"  {num}: {seq}")
         raise ValueError(
             f"section sizes differ: {', '.join(str(len(seq)) for seq in sequences)}"
         )
@@ -356,9 +393,35 @@ def consensus(sequences: List[bytes]) -> bytes:
 
         if best_count == second_count:
             bases.append(110)  # 110 == 'n'
-        elif best != 45:  # '-'
+        elif best != 45 or not strip_gaps:  # '-'
             bases.append(best)
     return bytes(bases)
+
+
+def combine_inserts(inserts: List[List[int]], sequences: List[bytes]) -> List[bytes]:
+    if len(sequences) < 2 or not any(inserts):
+        return sequences
+    if len(inserts) != len(sequences):
+        raise ValueError("Must have the same number of sequences as inserts")
+    inserts = [ins.copy() for ins in inserts]
+    offsets = [0] * len(sequences)
+    result = [b""] * len(sequences)
+    last_pos = 0
+    while any(inserts):
+        pos = min(min(x) for x in inserts if x)
+        for i, (ins, seq) in enumerate(zip(inserts, sequences)):
+            result[i] += seq[offsets[i] + last_pos : offsets[i] + pos]
+            if pos in ins:
+                ins.remove(pos)
+                result[i] += seq[offsets[i] + pos : offsets[i] + pos + 1]
+                offsets[i] += 1
+            else:
+                result[i] += b"-"
+        last_pos = pos
+    for i, (ins, seq) in enumerate(zip(inserts, sequences)):
+        result[i] += seq[offsets[i] + last_pos :]
+
+    return result
 
 
 def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]:
@@ -381,15 +444,24 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
     # Iterate over each disjoined piece
     for section_num, (section_start, section_end, hits) in enumerate(regs):
         section_seqs = []
+        section_inserts = []
+        section_subjs = []
+        section_subjins = []
         current_hits = {}
 
         # Iterate over each hit overlapping piece
         for qacc, btop in hits:
             qaccs.add(qacc)
             seq = contigs.get(qacc)
-            aligned, start, end = btop.get_aligned_query(
+            aligned, inserts, start, end = btop.get_aligned_query(
                 seq, section_start, section_end, subject_coordinates=True
             )
+            section_inserts.append(inserts)
+            ref, inserts, _, _ = btop.get_aligned_subject(
+                seq, section_start, section_end, subject_coordinates=True
+            )
+            section_subjs.append(ref)
+            section_subjins.append(inserts)
             is_forward = btop.is_forward()
 
             # Handle split contig
@@ -418,16 +490,19 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
                     aligned = aligned + get_edge(False)
             section_seqs.append(aligned)
 
-        # if hits:
-        #    section_seqs.append(btop.get_aligned_subject(seq, start + 1, end))
-
         last_section_from_reference = False
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
             last_section_from_reference = True
             section_len = section_end - section_start + 1
             sequence.append(b"n" * section_len)
-        else:
+        elif len(section_seqs) == 1:
+            last_hits = current_hits
             sequence.append(consensus(section_seqs))
+        else:
+            section_subjs = combine_inserts(section_subjins, section_subjs)
+            subj = consensus(section_subjs, strip_gaps=False)
+            section_seqs = combine_inserts(section_inserts, section_seqs)
+            sequence.append(consensus(section_seqs + [subj]))
             last_hits = current_hits
     return {"+".join(qaccs): b"".join(sequence)}
