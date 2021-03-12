@@ -358,11 +358,15 @@ load_coverages <- function(calls, coverage_filelist_file) {
         select(-path) %>%
         dplyr::rename(rname = "#rname") %>%
         mutate(rname = gsub("_pilon$", "", rname)) %>%
-        separate(rname, c("sample", "sacc"), remove = TRUE) %>%
+        separate(rname, c("sample", "sacc"), sep="\\.", remove = TRUE) %>%
         group_by(sample, sacc) %>%
         summarize(numreads2 = sum(numreads))
 
-    left_join(calls, coverages)
+    left_join(calls, coverages) %>%
+        relocate(
+            numreads2,
+            .after = words
+        )
 }
 
 #' Basic hit filtering
