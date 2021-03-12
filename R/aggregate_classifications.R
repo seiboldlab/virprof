@@ -359,10 +359,11 @@ load_coverages <- function(calls, coverage_filelist_file) {
         dplyr::rename(rname = "#rname") %>%
         mutate(rname = gsub("_pilon$", "", rname)) %>%
         separate(rname, c("sample", "sacc"), sep="\\.", remove = TRUE) %>%
+        separate(sacc, c("sacc", "fragment"), sep="_", fill = "right") %>%
         group_by(sample, sacc) %>%
-        summarize(numreads2 = sum(numreads))
+        summarize(numreads2 = sum(numreads), .groups="drop")
 
-    left_join(calls, coverages) %>%
+    left_join(calls, coverages, by=c("sample", "sacc")) %>%
         relocate(
             numreads2,
             .after = words

@@ -212,6 +212,7 @@ with Stage("scaffold_vp") as S:
             filter_lineage = "^Virus",
             bin_by = "species",
             fasta_id_format = lambda wc: f"{wc.target}.{{sacc}} [bin={{bin_name}}] [contigs={{acc}}] [bp={{bp}}]",
+            max_fill_length = 50000,
         shell:
             "exec >{log} 2>&1;"
             "python -m virprof export-fasta"
@@ -220,7 +221,8 @@ with Stage("scaffold_vp") as S:
             " --in-fasta {input.fasta}"
             " --out {output.fasta}"
             " --fasta-id-format '{params.fasta_id_format}'"
-            " --merge-overlapping"
+            " --scaffold"
+            " --max-fill-length {params.max_fill_length}"
             " --bin-by {params.bin_by}"
 
     rule vp_scaffold_all:

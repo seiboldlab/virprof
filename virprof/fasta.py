@@ -424,7 +424,7 @@ def combine_inserts(inserts: List[List[int]], sequences: List[bytes]) -> List[by
     return result
 
 
-def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]:
+def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: int = -1) -> Dict[str, bytes]:
     """Scaffold sequence from BLAST hits
 
         TODO: describe exact output decisions
@@ -441,13 +441,14 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
     qaccs = set()  # seen contig names
     last_hits = {}
     last_section_from_reference = False
+    result = {}
     # Iterate over each disjoined piece
     for section_num, (section_start, section_end, hits) in enumerate(regs):
-        section_seqs = []
-        section_inserts = []
-        section_subjs = []
-        section_subjins = []
-        current_hits = {}
+        section_seqs = []  # aligned contig fragments
+        section_inserts = []  # matching insert positions
+        section_subjs = []  # aligned subject fragments
+        section_subjins = []  # matching insert positions
+        current_hits = {}  # hits with start/stop, will become last_hits for next round
 
         # Iterate over each hit overlapping piece
         for qacc, btop in hits:
@@ -505,4 +506,18 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile) -> Dict[str, bytes]
             section_seqs = combine_inserts(section_inserts, section_seqs)
             sequence.append(consensus(section_seqs + [subj]))
             last_hits = current_hits
-    return {"+".join(qaccs): b"".join(sequence)}
+
+    acc = "+".join(sorted(qaccs))
+    if max_fill_length > 0:
+        parts = []
+        for seq in sequence:
+            if len(seq) > max_fill_length and len(seq) == seq.count(b"n"):
+                result[f"{acc}.{len(result)+1}"] = b"".join(parts)
+                parts = []
+            else:
+                parts.append(seq)
+        result[f"{acc}.{len(result)+1}"] = b"".join(parts)
+    else:
+        result[f"{acc}"] = b"".join(sequence)
+
+    return result

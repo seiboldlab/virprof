@@ -216,13 +216,19 @@ def test_scaffold_contigs_overlap():
 
 def test_scaffold_gap():
     """Two contigs mapped with gap on reference in between should have
-    missing piece filled with Ns"""
+    missing piece filled with Ns or be split if too long"""
     rl = RegionList()
     rl.add(1, 10, ("first10bp", Btop(1, 10, 1, "10")))
     rl.add(16, 20, ("second10bp", Btop(16, 20, 6, "10")))
     sequence = scaffold_contigs(rl, contigs)
     assert len(sequence) == 1
     assert next(iter(sequence.values())) == subject[0:10] + b"n" * 5 + subject[15:20]
+    sequence = scaffold_contigs(rl, contigs, 5)
+    assert len(sequence) == 1
+    sequence = scaffold_contigs(rl, contigs, 4)
+    assert len(sequence) == 2
+    assert sequence["first10bp+second10bp.1"] == subject[0:10]
+    assert sequence["first10bp+second10bp.2"] == subject[15:20]
 
 
 def test_scaffold_deletion_in_contig():

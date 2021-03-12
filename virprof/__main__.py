@@ -680,10 +680,16 @@ def as_file_name(name):
 @click.option("--file-per-bin", is_flag=True, help="Create separate file for each bin")
 @click.option("--filter-lineage", type=str, help="Filter by lineage prefix")
 @click.option(
-    "--merge-overlapping/--no-merge-overlapping",
+    "--scaffold/--no-scaffold",
     is_flag=True,
     default=True,
     help="Do not merge overlapping regions",
+)
+@click.option(
+    "--max-fill-length",
+    default=50000,
+    type=int,
+    help="Break scaffolds if connecting contigs would require inserting more basepairs than this number.",
 )
 def export_fasta(
     in_bins,
@@ -695,7 +701,8 @@ def export_fasta(
     fasta_id_format,
     file_per_bin,
     filter_lineage,
-    merge_overlapping,
+    scaffold,
+    max_fill_length,
 ):
     """Exports blastbin hits in FASTA format"""
     # Check arguments
@@ -801,8 +808,8 @@ def export_fasta(
             accs = set(data[0] for _, _, datas in reglist for data in datas)
 
             # Convert call to region list
-            if merge_overlapping:
-                sequences = scaffold_contigs(reglist, contigs)
+            if scaffold:
+                sequences = scaffold_contigs(reglist, contigs, max_fill_length)
             else:
                 sequences = {acc: contigs.get(acc) for acc in accs}
 
