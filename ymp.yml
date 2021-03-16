@@ -80,6 +80,13 @@ pipelines:
           hide: true
       - format_bbmapL200
 
+  assemble_rnaviral:
+    stages:
+      - group_sample
+      - assemble_spadesRnaviral:
+          hide: true
+      - format_bbmapL200
+
   # Compute coverage and sorted bam file using bowtie2
   coverage:
     stages:
@@ -154,6 +161,17 @@ pipelines:
       - ref_hg38
       - deplete
       - assemble_meta
+      - coverage
+      - blastbin
+      - scaffold
+      - summarize
+
+  generic2:
+    stages:
+      - qc
+      - ref_hg38
+      - deplete
+      - assemble_rnaviral
       - coverage
       - blastbin
       - scaffold
