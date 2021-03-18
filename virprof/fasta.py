@@ -460,6 +460,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
             aligned, inserts, start, end = btop.get_aligned_query(
                 seq, section_start, section_end, subject_coordinates=True
             )
+            section_seqs.append(aligned)
             section_inserts.append(inserts)
             ref, inserts, _, _ = btop.get_aligned_subject(
                 seq, section_start, section_end, subject_coordinates=True
