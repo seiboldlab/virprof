@@ -439,16 +439,19 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
     """
     sequence = []  # sequence fragments
     qaccs = set()  # seen contig names
-    last_hits = {}
-    last_section_from_reference = False
     result = {}
     # Iterate over each disjoined piece
+    mappings = []
     for section_num, (section_start, section_end, hits) in enumerate(regs):
         section_seqs = []  # aligned contig fragments
         section_inserts = []  # matching insert positions
         section_subjs = []  # aligned subject fragments
         section_subjins = []  # matching insert positions
-        current_hits = {}  # hits with start/stop, will become last_hits for next round
+        mappings.append({
+            'sstart': section_start,
+            'send': section_end,
+            'parts': {}
+        })
 
         # Iterate over each hit overlapping piece
         for qacc, btop in hits:
@@ -464,11 +467,13 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
             section_subjs.append(ref)
             section_subjins.append(inserts)
             is_forward = btop.is_forward()
+            # Remember piece used
+            mappings[-1]['parts'][qacc] = (start, end, is_forward)
 
             # Handle split contig
-            current_hits[qacc] = (start, end, is_forward)
-            if last_section_from_reference and qacc in last_hits:
-                l_start, l_end, l_is_forward = last_hits[qacc]
+            if len(mappings) >= 2 and not mappings[-2]['parts'] and qacc in mappings[-3]['parts']:
+                print("  fixing split")
+                l_start, l_end, l_is_forward = mappings[-3]['parts'][qacc]
                 if is_forward and l_is_forward:
                     sequence[-1] = seq[l_end : start - 1]
                 elif not is_forward and not l_is_forward:
@@ -491,21 +496,17 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
                     aligned = aligned + get_edge(False)
             section_seqs.append(aligned)
 
-        last_section_from_reference = False
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
-            last_section_from_reference = True
             section_len = section_end - section_start + 1
             sequence.append(b"n" * section_len)
         elif len(section_seqs) == 1:
-            last_hits = current_hits
             sequence.append(consensus(section_seqs))
         else:
             section_subjs = combine_inserts(section_subjins, section_subjs)
             subj = consensus(section_subjs, strip_gaps=False)
             section_seqs = combine_inserts(section_inserts, section_seqs)
             sequence.append(consensus(section_seqs + [subj]))
-            last_hits = current_hits
 
     acc = "+".join(sorted(qaccs))
     if max_fill_length > 0:
