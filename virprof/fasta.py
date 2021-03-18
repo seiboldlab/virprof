@@ -450,7 +450,7 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
         mappings.append({
             'sstart': section_start,
             'send': section_end,
-            'parts': {}
+            'qacc': {}
         })
 
         # Iterate over each hit overlapping piece
@@ -468,16 +468,20 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
             section_subjins.append(inserts)
             is_forward = btop.is_forward()
             # Remember piece used
-            mappings[-1]['parts'][qacc] = (start, end, is_forward)
+            mappings[-1]['qacc'][qacc] = (start, end, is_forward)
 
             # Handle split contig
-            if len(mappings) >= 2 and not mappings[-2]['parts'] and qacc in mappings[-3]['parts']:
+            if len(mappings) >= 2 and not mappings[-2]['qacc'] and qacc in mappings[-3]['qacc']:
                 print("  fixing split")
-                l_start, l_end, l_is_forward = mappings[-3]['parts'][qacc]
+                l_start, l_end, l_is_forward = mappings[-3]['qacc'][qacc]
                 if is_forward and l_is_forward:
                     sequence[-1] = seq[l_end : start - 1]
+                    if sequence[-1]:
+                        mappings[-2]['qacc'][qacc] = (l_end+1, start-1, is_forward)
                 elif not is_forward and not l_is_forward:
                     sequence[-1] = revcomp(seq[end : l_start - 1])
+                    if sequence[-1]:
+                        mappings[-2]['qacc'][qacc] = (end+1, l_start-1, is_forward)
 
             # Add outside overhang:
             if len(hits) == 1:
@@ -507,6 +511,17 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
             subj = consensus(section_subjs, strip_gaps=False)
             section_seqs = combine_inserts(section_inserts, section_seqs)
             sequence.append(consensus(section_seqs + [subj]))
+    map_dicts = []
+    for mapping in mappings:
+        for qacc in mapping['qacc']:
+            map_dicts.append({
+                'sstart': mapping['sstart'],
+                'send': mapping['send'],
+                'qacc': qacc,
+                'qstart': mapping['qacc'][qacc][0],
+                'qend': mapping['qacc'][qacc][1],
+                'reversed': not mapping['qacc'][qacc][2],
+            })
 
     acc = "+".join(sorted(qaccs))
     if max_fill_length > 0:
