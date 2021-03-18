@@ -483,23 +483,6 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
                     if sequence[-1]:
                         mappings[-2]['qacc'][qacc] = (end+1, l_start-1, is_forward)
 
-            # Add outside overhang:
-            if len(hits) == 1:
-
-                def get_edge(
-                    left, seq=seq, start=start, end=end, is_forward=is_forward
-                ):
-                    res = seq[: start - 1] if left == is_forward else seq[end:]
-                    if is_forward:
-                        return res
-                    return revcomp(res)
-
-                if section_num == 0:
-                    aligned = get_edge(True) + aligned
-                if section_num == len(regs) - 1:
-                    aligned = aligned + get_edge(False)
-            section_seqs.append(aligned)
-
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
             section_len = section_end - section_start + 1
@@ -511,6 +494,21 @@ def scaffold_contigs(regs: "RegionList", contigs: FastaFile, max_fill_length: in
             subj = consensus(section_subjs, strip_gaps=False)
             section_seqs = combine_inserts(section_inserts, section_seqs)
             sequence.append(consensus(section_seqs + [subj]))
+
+    for left in (True, False):
+        mapping = mappings[0]['qacc'] if left else mappings[-1]['qacc']
+        if  len(mapping) != 1:
+            continue  # can't handle multiple contigs on edge
+        qacc, (start, end, is_forward) = next(iter(mapping.items()))
+        seq = contigs.get(qacc)
+        edge = seq[: start - 1] if left == is_forward else seq[end:]
+        if not is_forward:
+            edge = revcomp(edge)
+        if left:
+            sequence.insert(0, edge)
+        else:
+            sequence.append(edge)
+
     map_dicts = []
     for mapping in mappings:
         for qacc in mapping['qacc']:
