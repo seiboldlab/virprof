@@ -209,7 +209,6 @@ with Stage("scaffold_vp") as S:
         conda:
             "virprof_py"
         params:
-            filter_lineage = "^Virus",
             bin_by = "species",
             fasta_id_format = lambda wc: f"{wc.target}.{{sacc}} [bin={{bin_name}}] [bp={{bp}}]",
             max_fill_length = 50000,
