@@ -500,10 +500,13 @@ def scaffold_contigs(
 
     # Handle edge overhang
     for left in (True, False):
+        # Get the respective outside mapping
         mapping = mappings[0] if left else mappings[-1]
         if len(mapping["qacc"]) != 1:
             continue  # can't handle multiple contigs on edge
         qacc, (start, end, is_forward) = next(iter(mapping["qacc"].items()))
+
+        # Extract the remaining contig piece
         seq = contigs.get(qacc)
         qstart, qend = (1, start - 1) if left == is_forward else (end + 1, len(seq))
         edge = seq[qstart - 1 : qend]
@@ -511,6 +514,16 @@ def scaffold_contigs(
             continue
         if not is_forward:
             edge = revcomp(edge)
+
+        # Check if edge overlaps with any existing mapping.
+        other = [m2["qacc"][qacc] for m2 in mappings if qacc in m2["qacc"]]
+        if any(
+            ostart <= qstart <= oend or ostart <= qend <= oend
+            for ostart, oend, ois_forward in other
+        ):
+            continue
+
+        # Add and register overhang
         data = {"qacc": {qacc: (qstart, qend, is_forward)}}
         if left:
             sequence.insert(0, edge)
@@ -523,19 +536,18 @@ def scaffold_contigs(
             data["send"] = mapping["send"] + len(edge)
             mappings.append(data)
 
-    map_dicts = []
-    for mapping in mappings:
-        for qacc in mapping["qacc"]:
-            map_dicts.append(
-                {
-                    "sstart": mapping["sstart"],
-                    "send": mapping["send"],
-                    "qacc": qacc,
-                    "qstart": mapping["qacc"][qacc][0],
-                    "qend": mapping["qacc"][qacc][1],
-                    "reversed": not mapping["qacc"][qacc][2],
-                }
-            )
+    map_dicts = [
+        {
+            "sstart": mapping["sstart"],
+            "send": mapping["send"],
+            "qacc": qacc,
+            "qstart": mapping["qacc"][qacc][0],
+            "qend": mapping["qacc"][qacc][1],
+            "reversed": not mapping["qacc"][qacc][2],
+        }
+        for mapping in mappings
+        for qacc in mapping["qacc"]
+    ]
 
     acc = "+".join(sorted(qaccs))
     if max_fill_length > 0:

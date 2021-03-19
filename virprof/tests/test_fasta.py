@@ -47,6 +47,7 @@ contigs.sequences = {
     b"mutated1-revcomp": mutated1_comp[::-1],
     b"left_overhang": insert + subject,
     b"right_overhang": subject + insert,
+    b"left_revcomp": subject_comp[9::-1] + subject[10:20],
 }
 
 
@@ -315,7 +316,6 @@ def test_scaffold_replacement_in_contig_mixed():
         subject[0:5]  # first part
         + b"n" * 5  # gap not replaced
         + subject[10:]  # second part
-        + contigs.get("replacement-mixed")[10:]  # right overhang
     )
     assert sequence["replacement-mixed"] == expected
 
@@ -351,6 +351,14 @@ def test_scaffold_right_overhanging_contig():
     rl.add(1, 20, ("right_overhang", Btop(1, 20, 1, "20")))
     sequence = scaffold_contigs(rl, contigs)
     assert sequence["right_overhang"] == contigs.get("right_overhang")
+
+
+def test_scaffold_mixed():
+    rl = RegionList()
+    rl.add(1, 10, ("left_revcomp", Btop(10, 1, 1, "10")))
+    rl.add(11, 20, ("left_revcomp", Btop(11, 20, 11, "10")))
+    sequence = scaffold_contigs(rl, contigs)
+    assert sequence["left_revcomp"] == subject
 
 
 def test_scaffold_bug():
