@@ -498,19 +498,30 @@ def scaffold_contigs(
             section_seqs = combine_inserts(section_inserts, section_seqs)
             sequence.append(consensus(section_seqs + [subj]))
 
+    # Handle edge overhang
     for left in (True, False):
-        mapping = mappings[0]["qacc"] if left else mappings[-1]["qacc"]
-        if len(mapping) != 1:
+        mapping = mappings[0] if left else mappings[-1]
+        if len(mapping["qacc"]) != 1:
             continue  # can't handle multiple contigs on edge
-        qacc, (start, end, is_forward) = next(iter(mapping.items()))
+        qacc, (start, end, is_forward) = next(iter(mapping["qacc"].items()))
         seq = contigs.get(qacc)
-        edge = seq[: start - 1] if left == is_forward else seq[end:]
+        qstart, qend = (1, start - 1) if left == is_forward else (end + 1, len(seq))
+        edge = seq[qstart - 1 : qend]
+        if not edge:
+            continue
         if not is_forward:
             edge = revcomp(edge)
+        data = {"qacc": {qacc: (qstart, qend, is_forward)}}
         if left:
             sequence.insert(0, edge)
+            data["sstart"] = mapping["sstart"] - len(edge)
+            data["send"] = mapping["sstart"] - 1
+            mappings.insert(0, data)
         else:
             sequence.append(edge)
+            data["sstart"] = mapping["send"] + 1
+            data["send"] = mapping["send"] + len(edge)
+            mappings.append(data)
 
     map_dicts = []
     for mapping in mappings:
