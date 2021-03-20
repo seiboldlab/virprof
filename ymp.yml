@@ -147,11 +147,16 @@ pipelines:
 
   scaffold:
     stages:
-      - scaffold_vp
-      - coverage
+      - scaffold_vp:
+          hide: true
+      - coverage:
+          hide: true
       - group_sample
-      - polish_pilon
+      - polish_pilon:
+          hide: true
       - coverage
+      - group_ALL
+      - bin_vpSpecies
 
   summarize:
     stages:

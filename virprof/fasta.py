@@ -102,7 +102,7 @@ class FastaFile:
 
     def _try_load_all(self) -> Optional[Dict[bytes, bytes]]:
         if "r" not in self.mode:
-            return None
+            return {}
         sequences = {}
         fastafile = read_from_command(["gunzip", "-dc", self.iofile.name])
         fasta_header = b">"[0]
@@ -119,6 +119,10 @@ class FastaFile:
         if acc is not None:
             sequences[acc] = b"".join(lines)
         return sequences
+
+    def __iter__(self):
+        for acc in self.sequences:
+            yield acc.decode("utf-8")
 
     def get(self, acc: str, start: int = 1, stop: int = None) -> bytes:
         """Retrieve a sequence or a part of a sequence

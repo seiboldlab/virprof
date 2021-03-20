@@ -232,62 +232,49 @@ with Stage("scaffold_vp") as S:
         output:
             touch("{:this:}/all_targets.stamp")
 
+with Stage("bin_vp") as S:
+    S.doc("""Rearranges sequences from per-sample to per-bin fasta files""")
+    S.add_param("", typ="choice", name="bin_by",
+                value=['Species', 'Acc', 'Taxname'], default='Species')
 
-with Stage("export_vp") as S:
-    S.doc("""
-    Creates genomes from blast bins and contigs
-    """)
-    checkpoint vp_export_fasta:
+    checkpoint vp_bin_fasta:
         message:
-            "Exporting recovered genomes into bins"
+            """Sorting sequences into bins"""
         input:
-            bins  = "{:prev:}/{target}.virus.csv",
-            hits  = "{:prev:}/{target}.hits.csv",
+            calls  = "{:prev:}/{:target:}.virus.csv",
             fasta = "{:prev:}/{:target:}.fasta.gz"
         output:
-            bins =  "{:this:}/{target}.filelist.txt",
-            fasta =  "{:this:}/{target}.{:bin:}.fasta.gz"
+            bins =  "{:this:}/{target}.binlist.txt",
+            fasta =  "{:this:}/{target}.{:bin:}.fasta.gz",
+            call_flist = temp("{:this:}/{target}.call_flist"),
+            fasta_flist = temp("{:this:}/{target}.fasta_flist"),
         log:
             "{:this:}/{target}.bin.log"
         threads: 1
         conda:
             "virprof_py"
         params:
-            out_bins = "{:this:}/{target}__%s.fasta.gz",
-            out_bins_unmerged = "{:this:}/{target}__%s.unmerged.fasta.gz",
-            bin_by = "species",
+            calls = lambda wc, input: "\n".join(input.calls),
+            fastas = lambda wc, input: "\n".join(input.fasta),
+            out_bins = "{:this:}/%s.fasta.gz",
             filter_lineage = "^Virus",
-            fasta_id_format = lambda wc: f"{wc.target}.{{bin_name}} [accession={{sacc}}] [contigs={{acc}}] [bp={{bp}}]"
         shell:
             "exec >{log} 2>&1;"
-            "python -m virprof export-fasta"
-            " --in-bins {input.bins}"
-            " --in-hits {input.hits}"
-            " --in-fasta {input.fasta}"
+            "echo '{params.calls}' > {output.call_flist};\n"
+            "echo '{params.fastas}' > {output.fasta_flist};\n"
+            "python -m virprof find-bins"
+            " --in-call-files {output.call_flist}"
+            " --in-fasta-files {output.fasta_flist}"
+            " --filter-lineage {params.filter_lineage}"
+            " --bin-by {params.bin_by}"
             " --out {params.out_bins}"
             " --out-bins {output.bins}"
-            " --bin-by {params.bin_by}"
-            " --filter-lineage {params.filter_lineage}"
-            " --fasta-id-format '{params.fasta_id_format}'"
-            " --file-per-bin"
-            " --merge-overlapping"
-            ";"
-            "python -m virprof export-fasta"
-            " --in-bins {input.bins}"
-            " --in-hits {input.hits}"
-            " --in-fasta {input.fasta}"
-            " --out {params.out_bins_unmerged}"
-            " --bin-by {params.bin_by}"
-            " --filter-lineage {params.filter_lineage}"
-            " --fasta-id-format '{params.fasta_id_format}'"
-            " --file-per-bin"
-            " --no-merge-overlapping"
 
-    rule vp_export_all:
+    rule vp_bin_fasta_all:
         message:
             "Completed {:this:}"
         input:
-            bins = "{:this:}/{:targets:}.filelist.txt"
+            bins = "{:this:}/{:targets:}.binlist.txt"
         output:
             touch("{:this:}/all_targets.stamp")
 
