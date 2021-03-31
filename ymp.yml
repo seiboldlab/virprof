@@ -136,7 +136,6 @@ pipelines:
           hide: true
       - ref_NT:
           hide: true
-#      - annotate_blastE20MegaBest:
       - annotate_blastE10Best:
           hide: true
       - ref_NcbiTaxonomy:
@@ -329,7 +328,6 @@ references:
         # /data/reference/NCBI_nt/NCBI_NT_2020-05-01/
         databases/nt/
       type: path
-      id: nt
       match:
         - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
   # Subset of NT for testing
