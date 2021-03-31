@@ -72,7 +72,7 @@ with Stage("blastfilter_vp") as S:
             touch("{:this:}/all_targets.stamp")
 
 
-with icfg.references.NcbiTaxonomy:
+with ymp.get_config().references.NcbiTaxonomy:
     rule vp_index_ncbi_taxonomy:
         """This rule loads the NCBI taxonomy, compiles it into a graph_tool
         tree and stores that tree in binary format. Loading the binary
@@ -282,7 +282,7 @@ with Stage("bin_vp") as S:
 with Stage("summarize_vp") as S:
     rule vp_aggregate_classifiations:
         message:
-            "Creating virus summary for {wildcards.target} in {:this:}"
+            "Creating virus summary for {:this:}"
         input:
             virushostdb="{:prev:}/virushostdb.tsv",
             calls="{:prev:}/{:target:}.virus.csv",
@@ -300,6 +300,7 @@ with Stage("summarize_vp") as S:
             filter_host = "Homo sapiens",
             min_slen    = 200,
             min_reads   = 3,
+            reportfile  = "{:ensuredir.reports:}/{:project:}.summary.%Y-%m-%d_%H-%M.xlsx"
         shadow:
             "shallow"
         threads:
@@ -322,7 +323,9 @@ with Stage("summarize_vp") as S:
             "  --out '{params.csv_out}'"
             "  --in-list call.files"
             "  --in-coverage-list coverage.files"
-            "  --in-basecov-list basecov.files"
+            "  --in-basecov-list basecov.files;\n"
+            "\n"
+            "cp {output.excel} $(date +{params.reportfile})"
 
     rule vp_aggregate_genomes:
         message:
