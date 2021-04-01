@@ -494,13 +494,16 @@ def scaffold_contigs(
             # No contig covering this piece of reference.
             section_len = section_end - section_start + 1
             sequence.append(b"n" * section_len)
+            mappings[-1]['scaffold'] = "gap"
         elif len(section_seqs) == 1:
             sequence.append(consensus(section_seqs))
+            mappings[-1]['scaffold'] = "unique"
         else:
             section_subjs = combine_inserts(section_subjins, section_subjs)
             subj = consensus(section_subjs, strip_gaps=False)
             section_seqs = combine_inserts(section_inserts, section_seqs)
             sequence.append(consensus(section_seqs + [subj]))
+            mappings[-1]['scaffold'] = "consensus"
 
     # Handle edge overhang
     for left in (True, False):
@@ -528,7 +531,7 @@ def scaffold_contigs(
             continue
 
         # Add and register overhang
-        data = {"qacc": {qacc: (qstart, qend, is_forward)}}
+        data = {"qacc": {qacc: (qstart, qend, is_forward)}, "scaffold": "edge"}
         if left:
             sequence.insert(0, edge)
             data["sstart"] = mapping["sstart"] - len(edge)
@@ -544,9 +547,9 @@ def scaffold_contigs(
     map_dicts = {}
     parts = []
     base_acc = "+".join(sorted(qaccs))
-    acc = f"{base_acc}.{len(result)+1}"
+    acc = f"{base_acc}"
     for seq, mapping in zip(sequence, mappings):
-        if len(seq) > max_fill_length and len(seq) == seq.count(b"n"):
+        if 0 < max_fill_length < len(seq) and len(seq) == seq.count(b"n"):
             result[acc] = b"".join(parts)
             acc = f"{base_acc}.{len(result)+1}"
             parts = []
@@ -559,7 +562,11 @@ def scaffold_contigs(
                 "qacc": qacc,
                 "qstart": mapping["qacc"][qacc][0],
                 "qend": mapping["qacc"][qacc][1],
+                "qlen": len(contigs.get(qacc)),
                 "reversed": not mapping["qacc"][qacc][2],
+                "bp": sum(seq.count(base) for base in (b"A", b"G", b"C", b"T")),
+                "scaffold": mapping["scaffold"],
+
             } for qacc in mapping["qacc"]
         )
     result[acc] = b"".join(parts)

@@ -191,6 +191,10 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "FILE",
                     help = "File with list of coverage input files"
                     ),
+        make_option(c("--in-scaffold-list"),
+                    metavar = "FILE",
+                    help = "File with list of scaffold input files"
+                    ),
         make_option(c("--in-basecov-list"),
                     metavar = "FILE",
                     help = "File with list of base coverage input files"
@@ -370,6 +374,39 @@ load_coverages <- function(calls, coverage_filelist_file) {
         )
 }
 
+load_scaffolds <- function(calls, scaffold_filelist_file) {
+    message("Loading scaffold files...")
+    scaffold_cols <- cols(
+        "acc" = col_character(),
+        "bin" = col_character(),
+        "sstart" = col_integer(),
+        "send" = col_integer(),
+        "qacc" = col_character(),
+        "qstart" = col_integer(),
+        "qend" = col_integer(),
+        "reversed" = col_logical()
+    )
+    scaffolds <- scaffold_filelist_file %>%
+        read_table(
+            col_names="path",
+            col_types=c(col_character())
+        ) %>%
+        mutate(
+            data = map(path, read_csv, col_types=scaffold_cols)
+        ) %>%
+        unnest(cols=c(data)) %>%
+        select(-path) %>%
+        separate("acc", c("sample", "sacc"), sep="\\.", remove = TRUE) %>%
+        separate("sacc", c("sacc", "fragment"), sep="_", fill = "right") %>%
+        group_by(sample, sacc) %>%
+        summarize(
+            contig_bp = sum(qend-qstart+1),
+            subject_bp = sum(send-sstart+1)
+        )
+
+    left_join(calls, scaffolds, by=c("sample", "sacc"))
+}
+
 #' Basic hit filtering
 filter_hits <- function(samples, opt) {
     message("Filtering accession level bins...")
@@ -489,6 +526,9 @@ if (!interactive()) {
         )
     if (!is.null(opt$options$in_coverage_list)) {
         calls <- load_coverages(calls, opt$options$in_coverage_list)
+    }
+    if (!is.null(opt$options$in_scaffold_list)) {
+        calls <- load_scaffolds(calls, opt$options$in_scaffold_list)
     }
 
     ## Compute Genome Coverage

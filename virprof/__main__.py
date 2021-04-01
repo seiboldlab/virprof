@@ -716,7 +716,7 @@ def export_fasta(
 
     LOG.info("Writing scaffold info to '%s'", out_scaffolds.name)
     meta_writer = csv.DictWriter(out_scaffolds, [
-        "acc", "bin", "sstart", "send", "qacc", "qstart", "qend", "reversed"
+        "acc", "bin", "sstart", "send", "qacc", "qstart", "qend", "qlen", "reversed", "bp", "scaffold",
     ])
     meta_writer.writeheader()
 
@@ -917,7 +917,9 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
                 _sample, _, sacc = acc.partition(".")
                 sacc, _, _ = sacc.partition("_")
                 out = bin_to_file[acc_to_bin[sacc]]
-                out.put(acc, fasta.get(acc))
+                sequence = fasta.get(acc)
+                bp = sum(sequence.count(base) for base in (b"A", b"G", b"C", b"T"))
+                out.put(acc, fasta.get(acc), comment=f"[bp={bp}]")
 
     LOG.info("Closing output files...")
     for out in bin_to_file.values():

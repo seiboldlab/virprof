@@ -299,6 +299,7 @@ with Stage("summarize_vp") as S:
             calls       = lambda wc, input: "\n".join(input.calls),
             coverages   = lambda wc, input: "\n".join(input.coverages),
             basecov     = lambda wc, input: "\n".join(input.basecov),
+            scaffolds   = lambda wc, input: "\n".join(input.scaffolds),
             csv_out     = "{:this:}/{target}.summary_%s.csv",
             filter_host = "Homo sapiens",
             min_slen    = 200,
@@ -316,6 +317,7 @@ with Stage("summarize_vp") as S:
             "echo '{params.calls}' > call.files;\n"
             "echo '{params.coverages}' > coverage.files;\n"
             "echo '{params.basecov}' > basecov.files;\n"
+            "echo '{params.scaffolds}' > scaffold.files;\n"
             "\n"
             "./R/aggregate_classifications.R"
             "  --virushostdb '{input.virushostdb}'"
@@ -326,6 +328,7 @@ with Stage("summarize_vp") as S:
             "  --out '{params.csv_out}'"
             "  --in-list call.files"
             "  --in-coverage-list coverage.files"
+            "  --in-scaffold-list scaffold.files"
             "  --in-basecov-list basecov.files;\n"
             "\n"
             "cp {output.excel} $(date +{params.reportfile})"
