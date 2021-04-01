@@ -146,8 +146,7 @@ pipelines:
 
   scaffold:
     stages:
-      - scaffold_vp:
-          hide: true
+      - scaffold_vp
       - coverage:
           hide: true
       - group_sample

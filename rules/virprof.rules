@@ -202,7 +202,8 @@ with Stage("scaffold_vp") as S:
             hits  = "{:prev:}/{target}.hits.csv",
             fasta = "{:prev:}/{:target:}.fasta.gz"
         output:
-            fasta =  "{:this:}/{target}.fasta.gz"
+            fasta =  "{:this:}/{target}.fasta.gz",
+            scaffolds = "{:this:}/{target}.scaffolds.csv"
         log:
             "{:this:}/{target}.bin.log"
         threads: 1
@@ -219,6 +220,7 @@ with Stage("scaffold_vp") as S:
             " --in-hits {input.hits}"
             " --in-fasta {input.fasta}"
             " --out {output.fasta}"
+            " --out-scaffolds {output.scaffolds}"
             " --fasta-id-format '{params.fasta_id_format}'"
             " --scaffold"
             " --max-fill-length {params.max_fill_length}"
@@ -288,6 +290,7 @@ with Stage("summarize_vp") as S:
             calls="{:prev:}/{:target:}.virus.csv",
             coverages="{:prev:}/{:target:}.coverage",
             basecov="{:prev:}/{:target:}.basecov.bg",
+            scaffolds="{:prev:}/{:target:}.scaffolds.csv",
         output:
             excel="{:this:}/{target}.summary.xlsx"
         log:

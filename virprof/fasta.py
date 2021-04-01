@@ -540,30 +540,28 @@ def scaffold_contigs(
             data["send"] = mapping["send"] + len(edge)
             mappings.append(data)
 
-    map_dicts = [
-        {
-            "sstart": mapping["sstart"],
-            "send": mapping["send"],
-            "qacc": qacc,
-            "qstart": mapping["qacc"][qacc][0],
-            "qend": mapping["qacc"][qacc][1],
-            "reversed": not mapping["qacc"][qacc][2],
-        }
-        for mapping in mappings
-        for qacc in mapping["qacc"]
-    ]
 
-    acc = "+".join(sorted(qaccs))
-    if max_fill_length > 0:
-        parts = []
-        for seq in sequence:
-            if len(seq) > max_fill_length and len(seq) == seq.count(b"n"):
-                result[f"{acc}.{len(result)+1}"] = b"".join(parts)
-                parts = []
-            else:
-                parts.append(seq)
-        result[f"{acc}.{len(result)+1}"] = b"".join(parts)
-    else:
-        result[f"{acc}"] = b"".join(sequence)
+    map_dicts = {}
+    parts = []
+    base_acc = "+".join(sorted(qaccs))
+    acc = f"{base_acc}.{len(result)+1}"
+    for seq, mapping in zip(sequence, mappings):
+        if len(seq) > max_fill_length and len(seq) == seq.count(b"n"):
+            result[acc] = b"".join(parts)
+            acc = f"{base_acc}.{len(result)+1}"
+            parts = []
+            continue
+        parts.append(seq)
+        map_dicts.setdefault(acc, []).extend(
+            {
+                "sstart": mapping["sstart"],
+                "send": mapping["send"],
+                "qacc": qacc,
+                "qstart": mapping["qacc"][qacc][0],
+                "qend": mapping["qacc"][qacc][1],
+                "reversed": not mapping["qacc"][qacc][2],
+            } for qacc in mapping["qacc"]
+        )
+    result[acc] = b"".join(parts)
 
-    return result
+    return map_dicts, result
