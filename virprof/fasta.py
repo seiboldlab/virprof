@@ -471,24 +471,25 @@ def scaffold_contigs(
             section_subjins.append(inserts)
             is_forward = btop.is_forward()
             # Remember piece used
-            mappings[-1]["qacc"][qacc] = (start, end, is_forward)
+            mappings[-1]["qacc"].setdefault(qacc, []).append((start, end, is_forward))
 
             # Handle split contig
             if (
                 len(mappings) >= 2
                 and not mappings[-2]["qacc"]
                 and qacc in mappings[-3]["qacc"]
+                and len(mappings[-3]["qacc"][qacc]) == 1
             ):
                 print("  fixing split")
-                l_start, l_end, l_is_forward = mappings[-3]["qacc"][qacc]
+                l_start, l_end, l_is_forward = mappings[-3]["qacc"][qacc][0]
                 if is_forward and l_is_forward:
                     sequence[-1] = seq[l_end : start - 1]
                     if sequence[-1]:
-                        mappings[-2]["qacc"][qacc] = (l_end + 1, start - 1, is_forward)
+                        mappings[-2]["qacc"][qacc] = [(l_end + 1, start - 1, is_forward)]
                 elif not is_forward and not l_is_forward:
                     sequence[-1] = revcomp(seq[end : l_start - 1])
                     if sequence[-1]:
-                        mappings[-2]["qacc"][qacc] = (end + 1, l_start - 1, is_forward)
+                        mappings[-2]["qacc"][qacc] = [(end + 1, l_start - 1, is_forward)]
 
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
@@ -510,8 +511,11 @@ def scaffold_contigs(
         # Get the respective outside mapping
         mapping = mappings[0] if left else mappings[-1]
         if len(mapping["qacc"]) != 1:
-            continue  # can't handle multiple contigs on edge
-        qacc, (start, end, is_forward) = next(iter(mapping["qacc"].items()))
+            continue  # two overlapping contigs on edge, can't handle
+        qacc = next(iter(mapping["qacc"]))
+        if len(mapping["qacc"][qacc]) != 1:
+            continue  # same contig aligned twice on edge, can't handle
+        start, end, is_forward = mapping["qacc"][qacc][0]
 
         # Extract the remaining contig piece
         seq = contigs.get(qacc)
@@ -523,7 +527,12 @@ def scaffold_contigs(
             edge = revcomp(edge)
 
         # Check if edge overlaps with any existing mapping.
-        other = [m2["qacc"][qacc] for m2 in mappings if qacc in m2["qacc"]]
+        other = [
+            m3
+            for m2 in mappings
+            if qacc in m2["qacc"]
+            for m3 in m2["qacc"][qacc]
+        ]
         if any(
             ostart <= qstart <= oend or ostart <= qend <= oend
             for ostart, oend, ois_forward in other
@@ -531,7 +540,7 @@ def scaffold_contigs(
             continue
 
         # Add and register overhang
-        data = {"qacc": {qacc: (qstart, qend, is_forward)}, "scaffold": "edge"}
+        data = {"qacc": {qacc: [(qstart, qend, is_forward)]}, "scaffold": "edge"}
         if left:
             sequence.insert(0, edge)
             data["sstart"] = mapping["sstart"] - len(edge)
@@ -560,14 +569,16 @@ def scaffold_contigs(
                 "sstart": mapping["sstart"],
                 "send": mapping["send"],
                 "qacc": qacc,
-                "qstart": mapping["qacc"][qacc][0],
-                "qend": mapping["qacc"][qacc][1],
+                "qstart": qstart,
+                "qend": qend,
                 "qlen": len(contigs.get(qacc)),
-                "reversed": not mapping["qacc"][qacc][2],
+                "reversed": not is_forward,
                 "bp": sum(seq.count(base) for base in (b"A", b"G", b"C", b"T")),
                 "scaffold": mapping["scaffold"],
 
-            } for qacc in mapping["qacc"]
+            }
+            for qacc in mapping["qacc"]
+            for qstart, qend, is_forward in mapping["qacc"][qacc]
         )
     result[acc] = b"".join(parts)
 
