@@ -74,8 +74,8 @@ field_name_map <- list(
     "Lineage" = "lineage",
     "Lineage(s)" = "lineage",
     "Lineage Ranks" = "lineage_ranks",
-    "Merged BP" = "slen",
-    "Merged BP(s)" = "slens",
+    "Scaffold BP" = "bp",
+    "Scaffold BP(s)" = "bps",
     "% Genome" = "genome_coverage",
     "% Genome(s)" = "genome_coverages",
     "Positive Samples" = "positive_samples",
@@ -170,10 +170,10 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     default = "(.*)\\.virus\\.csv",
                     help = "Input file pattern (default: '%default')"
                     ),
-        make_option(c("--min-slen"),
+        make_option(c("--min-bp"),
                     metavar = "N",
                     default = 200,
-                    help = "Minimum covered subject length (default: %default)"
+                    help = "Minimum sequence length (default: %default)"
                     ),
         make_option(c("--min-reads"),
                     metavar = "N",
@@ -325,7 +325,7 @@ load_calls <- function(samples, opt) {
             unit, sample,
             words,
             numreads,
-            log_evalue, pident, slen, n_frag,
+            log_evalue, pident, n_frag,
             species, taxname, stitle,
             everything()
         )
@@ -398,24 +398,29 @@ load_scaffolds <- function(calls, scaffold_filelist_file) {
         select(-path) %>%
         separate("acc", c("sample", "sacc"), sep="\\.", remove = TRUE) %>%
         separate("sacc", c("sacc", "fragment"), sep="_", fill = "right") %>%
+        group_by(sample, sacc, sstart, send) %>%
+        mutate(bp = mean(bp)/length(bp)) %>%
         group_by(sample, sacc) %>%
         summarize(
-            contig_bp = sum(qend-qstart+1),
-            subject_bp = sum(send-sstart+1)
+            bp = sum(bp)
         )
 
-    left_join(calls, scaffolds, by=c("sample", "sacc"))
+    left_join(calls, scaffolds, by=c("sample", "sacc")) %>%
+        relocate(
+            bp,
+            .after = pident
+        )
 }
 
 #' Basic hit filtering
 filter_hits <- function(samples, opt) {
     message("Filtering accession level bins...")
-    message("... minimum `slen`: ", opt$option$min_slen)
+    message("... minimum `bp`: ", opt$option$min_bp)
     message("... minimum read count: ", opt$option$min_reads)
 
     samples <- samples %>%
         filter(
-            slen >= opt$option$min_slen,
+            bp >= opt$option$min_bp,
             numreads >= opt$option$min_reads
         )
     message("... remaining detections: ", nrow(samples))
@@ -462,7 +467,7 @@ merge_species <- function(samples) {
             pident   = round(sum(pident * slen) / sum(slen), 1),
             # collect each value for these:
             genome_coverages = concat(genome_coverage),
-            slens     = concat(slen),
+            bps       = concat(bp),
             n_frags   = concat(n_frag),
             saccs     = concat(sacc),
             # summarize these:
@@ -488,7 +493,7 @@ merge_samples <- function(samples) {
             min_log_evalues = concat(min_log_evalue, " | "),
             pidents = concat(pident, " | "),
             genome_coverages = concat(genome_coverages, " | "),
-            slens = concat(slens, " | "),
+            bps = concat(bps, " | "),
             n_frags = concat(n_frags, " | "),
             saccs = concat(saccs, " | "),
             .groups="drop"
@@ -536,13 +541,13 @@ if (!interactive()) {
         mutate(
             genome_coverage = if_else(
                 genome_size > 0,
-                round(slen / genome_size * 100),
+                round(bp / genome_size * 100),
                 NA_real_
             )
         ) %>%
         relocate(
             genome_coverage,
-            .before=slen
+            .before=bp
         )
 
     ## Filter calls and read count

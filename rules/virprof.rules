@@ -302,7 +302,7 @@ with Stage("summarize_vp") as S:
             scaffolds   = lambda wc, input: "\n".join(input.scaffolds),
             csv_out     = "{:this:}/{target}.summary_%s.csv",
             filter_host = "Homo sapiens",
-            min_slen    = 200,
+            min_bp      = 200,
             min_reads   = 3,
             reportfile  = "{:ensuredir.reports:}/{:project:}.summary.%Y-%m-%d_%H-%M.xlsx"
         shadow:
@@ -322,7 +322,7 @@ with Stage("summarize_vp") as S:
             "./R/aggregate_classifications.R"
             "  --virushostdb '{input.virushostdb}'"
             "  --filter-host '{params.filter_host}'"
-            "  --min-slen '{params.min_slen}'"
+            "  --min-bp '{params.min_bp}'"
             "  --min-reads '{params.min_reads}'"
             "  --excel-out '{output.excel}'"
             "  --out '{params.csv_out}'"
