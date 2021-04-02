@@ -78,6 +78,7 @@ field_name_map <- list(
     "Scaffold BP(s)" = "bps",
     "% Genome" = "genome_coverage",
     "% Genome(s)" = "genome_coverages",
+    "% Aligned" = "contig_coverage",
     "Positive Samples" = "positive_samples",
     "Host" = "host",
     "Known Respiratory Virus" = "respiratory"
@@ -289,6 +290,7 @@ load_calls <- function(samples, opt) {
         log_evalue = col_double(),
         slen = col_integer(),
         n_frag = col_integer(),
+        contig_coverage = col_double(),
         sacc = col_character(),
         stitle = col_character(),
         staxids = col_character(),
@@ -325,7 +327,7 @@ load_calls <- function(samples, opt) {
             unit, sample,
             words,
             numreads,
-            log_evalue, pident, n_frag,
+            log_evalue, pident, n_frag, contig_coverage,
             species, taxname, stitle,
             everything()
         )
@@ -560,7 +562,7 @@ if (!interactive()) {
             Tab="Detections"
         ) %>%
         add_row(
-            Description=paste("... Minimum subject bases covered:", opt$options$min_slen)
+            Description=paste("... Minimum scaffold bp:", opt$options$min_bp)
         ) %>%
         add_row(
             Description=paste("... Minimum read count:", opt$options$min_reads)

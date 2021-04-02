@@ -116,7 +116,14 @@ class HitChain:
             list beyond the first.
     """
 
-    __slots__ = ("hits", "chain_penalty", "_hash", "_score", "_subject_regions")
+    __slots__ = (
+        "hits",
+        "chain_penalty",
+        "_hash",
+        "_score",
+        "_subject_regions",
+        "_contig_regions",
+    )
 
     def __init__(
         self, hits: Optional[List[BlastHit]] = None, chain_penalty: int = 20
@@ -127,6 +134,7 @@ class HitChain:
         self._hash: Optional[int] = None
         self._score: Optional[float] = None
         self._subject_regions = RegionList()
+        self._contig_regions = {}
 
         if hits:
             for hit in hits:
@@ -155,6 +163,7 @@ class HitChain:
         self._hash = other._hash
         self._score = other._score
         self._subject_regions = copy.copy(other._subject_regions)
+        self._contig_regions = copy.copy(other._contig_regions)
 
     def __copy__(self) -> "HitChain":
         cpy = object.__new__(type(self))
@@ -180,6 +189,9 @@ class HitChain:
         """
         self.hits.append(hit)
         self._subject_regions.add(hit.sstart, hit.send, hit)
+        self._contig_regions.setdefault(hit.qacc, RegionList()).add(
+            hit.qstart, hit.qend, hit
+        )
         self._reset()
 
     def prune(self, accs: Set[str]) -> None:
@@ -196,10 +208,12 @@ class HitChain:
         if oldlen != len(self.hits):
             if not self.hits:
                 self._subject_regions = RegionList()
+                self._contig_regions = {}
             else:
                 for hit in oldhits:
                     if hit.qacc in accs:
                         self._subject_regions.remove(hit.sstart, hit.send, hit)
+                        self._contig_regions[hit.qacc].remove(hit.qstart, hit.qend, hit)
             self._reset()
 
     def trunc(self, sstart: int) -> None:
@@ -246,6 +260,21 @@ class HitChain:
         """
         return sum(
             stop - start + 1 for start, stop, data in self._subject_regions if data
+        )
+
+    @property
+    def contig_coverage(self) -> float:
+        """Average "usage" of the contigs"""
+        if not self.hits:
+            return 0
+        return (
+            sum(
+                stop - start + 1
+                for qacc in self._contig_regions
+                for start, stop, data in self._contig_regions[qacc]
+                if data
+            )
+            / self.qlen
         )
 
     @property
@@ -352,6 +381,7 @@ class HitChain:
             "log_evalue": self.log10_evalue,
             "slen": self.slen,
             "n_frag": len(self.hits),
+            "contig_coverage": round(self.contig_coverage * 100, 1),
             "sacc": self.sacc,
             "stitle": self.stitle,
             "staxids": ";".join((str(i) for i in self.staxids)),
