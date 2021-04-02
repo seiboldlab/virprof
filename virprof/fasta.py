@@ -329,8 +329,7 @@ class Btop:
                 start = start - self._sstart + 1
                 end = end - self._sstart + 1
             else:
-                start = start - self._send + 1
-                end = end - self._send + 1
+                start, end = self._sstart - end + 1, self._sstart - start + 1
         aligned, insertions, left, right = self._get_aligned(
             sequence, start, end, get_query=True
         )
@@ -355,8 +354,7 @@ class Btop:
                 start = start - self._sstart + 1
                 end = end - self._sstart + 1
             else:
-                start = start - self._send + 1
-                end = end - self._send + 1
+                start, end = self._sstart - end + 1, self._sstart - start + 1
         aligned, insertions, left, right = self._get_aligned(
             sequence, start, end, get_query=False
         )
