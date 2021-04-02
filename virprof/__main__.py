@@ -715,11 +715,23 @@ def export_fasta(
         sys.exit(1)
 
     LOG.info("Writing scaffold info to '%s'", out_scaffolds.name)
-    meta_writer = csv.DictWriter(out_scaffolds, [
-        "acc", "bin", "sstart", "send", "qacc", "qstart", "qend", "qlen", "reversed", "bp", "scaffold",
-    ])
+    meta_writer = csv.DictWriter(
+        out_scaffolds,
+        [
+            "acc",
+            "bin",
+            "sstart",
+            "send",
+            "qacc",
+            "qstart",
+            "qend",
+            "qlen",
+            "reversed",
+            "bp",
+            "scaffold",
+        ],
+    )
     meta_writer.writeheader()
-
 
     # Handle multi-file output options
     if file_per_bin:
@@ -819,7 +831,9 @@ def export_fasta(
 
             # Convert call to region list
             if scaffold:
-                map_dicts, sequences = scaffold_contigs(reglist, contigs, max_fill_length)
+                map_dicts, sequences = scaffold_contigs(
+                    reglist, contigs, max_fill_length
+                )
             else:
                 accs = set(data[0] for _, _, datas in reglist for data in datas)
                 sequences = {acc: contigs.get(acc) for acc in accs}
@@ -844,8 +858,8 @@ def export_fasta(
                 LOG.info("writing sequence %s %s", acc, comment)
                 outfile.put(outacc, sequence, comment)
                 for row in map_dicts[acc]:
-                    row['acc'] = outacc
-                    row['bin'] = bin_name
+                    row["acc"] = outacc
+                    row["bin"] = bin_name
                     meta_writer.writerow(row)
 
     update_outfile()
@@ -903,14 +917,16 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
                     LOG.info("Will write to %s", fasta_fname)
                     out_bins.write(bin_name + "\n")
                 acc_to_bin[row["sacc"]] = bin_name
-    LOG.info("Found %i bins for %i unique reference accs", len(bin_to_file), len(acc_to_bin))
+    LOG.info(
+        "Found %i bins for %i unique reference accs", len(bin_to_file), len(acc_to_bin)
+    )
 
     with open(in_fasta_files) as filedes:
         fasta_fnames = [line.strip() for line in filedes.readlines()]
     LOG.info("Processing %i fasta files...", len(fasta_fnames))
 
     for idx, fasta_fname in enumerate(fasta_fnames):
-        LOG.info("  (%i/%i) %s", idx+1, len(fasta_fnames), fasta_fname)
+        LOG.info("  (%i/%i) %s", idx + 1, len(fasta_fnames), fasta_fname)
         with open(fasta_fname) as filedes:
             fasta = FastaFile(filedes, "r")
             for acc in fasta:
@@ -925,6 +941,7 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
     for out in bin_to_file.values():
         out.close()
     LOG.info("FINISHED")
+
 
 if __name__ == "__main__":
     setup_logging()

@@ -485,26 +485,30 @@ def scaffold_contigs(
                 if is_forward and l_is_forward:
                     sequence[-1] = seq[l_end : start - 1]
                     if sequence[-1]:
-                        mappings[-2]["qacc"][qacc] = [(l_end + 1, start - 1, is_forward)]
+                        mappings[-2]["qacc"][qacc] = [
+                            (l_end + 1, start - 1, is_forward)
+                        ]
                 elif not is_forward and not l_is_forward:
                     sequence[-1] = revcomp(seq[end : l_start - 1])
                     if sequence[-1]:
-                        mappings[-2]["qacc"][qacc] = [(end + 1, l_start - 1, is_forward)]
+                        mappings[-2]["qacc"][qacc] = [
+                            (end + 1, l_start - 1, is_forward)
+                        ]
 
         if len(section_seqs) == 0:
             # No contig covering this piece of reference.
             section_len = section_end - section_start + 1
             sequence.append(b"n" * section_len)
-            mappings[-1]['scaffold'] = "gap"
+            mappings[-1]["scaffold"] = "gap"
         elif len(section_seqs) == 1:
             sequence.append(consensus(section_seqs))
-            mappings[-1]['scaffold'] = "unique"
+            mappings[-1]["scaffold"] = "unique"
         else:
             section_subjs = combine_inserts(section_subjins, section_subjs)
             subj = consensus(section_subjs, strip_gaps=False)
             section_seqs = combine_inserts(section_inserts, section_seqs)
             sequence.append(consensus(section_seqs + [subj]))
-            mappings[-1]['scaffold'] = "consensus"
+            mappings[-1]["scaffold"] = "consensus"
 
     # Handle edge overhang
     for left in (True, False):
@@ -527,12 +531,7 @@ def scaffold_contigs(
             edge = revcomp(edge)
 
         # Check if edge overlaps with any existing mapping.
-        other = [
-            m3
-            for m2 in mappings
-            if qacc in m2["qacc"]
-            for m3 in m2["qacc"][qacc]
-        ]
+        other = [m3 for m2 in mappings if qacc in m2["qacc"] for m3 in m2["qacc"][qacc]]
         if any(
             ostart <= qstart <= oend or ostart <= qend <= oend
             for ostart, oend, ois_forward in other
@@ -551,7 +550,6 @@ def scaffold_contigs(
             data["sstart"] = mapping["send"] + 1
             data["send"] = mapping["send"] + len(edge)
             mappings.append(data)
-
 
     map_dicts = {}
     parts = []
@@ -575,7 +573,6 @@ def scaffold_contigs(
                 "reversed": not is_forward,
                 "bp": sum(seq.count(base) for base in (b"A", b"G", b"C", b"T")),
                 "scaffold": mapping["scaffold"],
-
             }
             for qacc in mapping["qacc"]
             for qstart, qend, is_forward in mapping["qacc"][qacc]
