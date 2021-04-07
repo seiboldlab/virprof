@@ -30,6 +30,8 @@ Env(name="virprof_py", base="bioconda",
         "requests",
     ])
 
+BIN = srcdir("../bin/")
+
 
 with Stage("blastfilter_vp") as S:
     S.add_param("U", typ="int", name="min_unaligned_bp", default=0)
@@ -55,7 +57,7 @@ with Stage("blastfilter_vp") as S:
             "virprof_py"
         shell:"""
         exec >{log} 2>&1
-        python -m virprof filter-blast \
+        {BIN}/virprof filter-blast \
          --min-unaligned-bp {params.min_unaligned_bp} \
          --out {output.fasta} \
          --in-fasta {input.fasta} \
@@ -98,7 +100,7 @@ with ymp.get_config().references.NcbiTaxonomy:
             "virprof_py"
         shell:
             "exec >{log} 2>&1;"
-            "python -m virprof index-tree"
+            "{BIN}/virprof index-tree"
             "  --library graph_tool"
             "  --ncbi-taxonomy {params.taxonomy_prefix}"
             "  --out {output}"
@@ -133,7 +135,7 @@ with Stage("blastbin_vp") as S:
             "virprof_py"
         shell:
             "exec >{log} 2>&1;"
-            "python -m virprof blastbin"
+            "{BIN}/virprof blastbin"
             " --out {output.result}"
             " --out-hits {output.hits}"
             " --out-features {output.features}"
@@ -169,7 +171,7 @@ with Stage("blastbin_vp") as S:
             bamlist = lambda wc, input: input.bam if isinstance(input.bam, str) else ",".join(input.bam),
         shell:
             "exec >{log} 2>&1;"
-            "./R/show_bins.R"
+            "{BIN}/show_bins.R"
             " --input {input.calls}"
             " --input-hits {input.hits}"
             " --input-features {input.features}"
@@ -215,7 +217,7 @@ with Stage("scaffold_vp") as S:
             max_fill_length = 50000,
         shell:
             "exec >{log} 2>&1;"
-            "python -m virprof export-fasta"
+            "{BIN}/virprof export-fasta"
             " --in-bins {input.bins}"
             " --in-hits {input.hits}"
             " --in-fasta {input.fasta}"
@@ -264,7 +266,7 @@ with Stage("bin_vp") as S:
             "exec >{log} 2>&1;"
             "echo '{params.calls}' > {output.call_flist};\n"
             "echo '{params.fastas}' > {output.fasta_flist};\n"
-            "python -m virprof find-bins"
+            "{BIN}/virprof find-bins"
             " --in-call-files {output.call_flist}"
             " --in-fasta-files {output.fasta_flist}"
             " --filter-lineage {params.filter_lineage}"
@@ -319,7 +321,7 @@ with Stage("summarize_vp") as S:
             "echo '{params.basecov}' > basecov.files;\n"
             "echo '{params.scaffolds}' > scaffold.files;\n"
             "\n"
-            "./R/aggregate_classifications.R"
+            "{BIN}/aggregate_classifications.R"
             "  --virushostdb '{input.virushostdb}'"
             "  --filter-host '{params.filter_host}'"
             "  --min-bp '{params.min_bp}'"

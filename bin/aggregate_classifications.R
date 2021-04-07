@@ -1,5 +1,4 @@
 #!/usr/bin/env Rscript
-library(here)
 library(optparse)
 library(magrittr)
 suppressPackageStartupMessages(library(dplyr))
@@ -11,7 +10,16 @@ library(openxlsx)
 library(fuzzyjoin)
 library(tibble)
 
-source(here("R", "virushostdb.R"))
+libdir <- file.path(
+    dirname(dirname(
+        sub("--file=", "", grep("--file",
+                                commandArgs(trailingOnly = FALSE),
+                                value = TRUE)
+            )
+    )),
+    "R"
+)
+source(file.path(libdir, "virushostdb.R"))
 
 #' List of terms marking known respiratory viruses
 respiratory_viruses <- c(

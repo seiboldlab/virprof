@@ -1,12 +1,21 @@
 #!/usr/bin/env Rscript
-library(here)
 library(optparse)
 library(tidyverse)
 library(patchwork)
 library(ggrepel)
 library(grid)
 library(ggnewscale)
-source(here("R", "gene_plot.R"))
+
+libdir <- file.path(
+    dirname(dirname(
+        sub("--file=", "", grep("--file",
+                                commandArgs(trailingOnly = FALSE),
+                                value = TRUE)
+            )
+    )),
+    "R"
+)
+source(file.path(libdir, "gene_plot.R"))
 
 parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
     option_list <- list(
