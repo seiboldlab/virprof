@@ -294,7 +294,11 @@ with Stage("summarize_vp") as S:
             basecov="{:prev:}/{:target:}.basecov.bg",
             scaffolds="{:prev:}/{:target:}.scaffolds.csv",
         output:
-            excel="{:this:}/{target}.summary.xlsx"
+            call_files=temp("{:this:}/{target}.call_flist"),
+            coverage_files=temp("{:this:}/{target}.coverage_flist"),
+            basecov_files=temp("{:this:}/{target}.basecov_flist"),
+            scaffold_files=temp("{:this:}/{target}.scaffold_flist"),
+            excel="{:this:}/{target}.summary.xlsx",
         log:
             "{:this:}/{target}.summary.log"
         params:
@@ -307,8 +311,6 @@ with Stage("summarize_vp") as S:
             min_bp      = 200,
             min_reads   = 3,
             reportfile  = "{:ensuredir.reports:}/{:project:}.summary.%Y-%m-%d_%H-%M.xlsx"
-        shadow:
-            "shallow"
         threads:
             1
         conda:
@@ -316,10 +318,10 @@ with Stage("summarize_vp") as S:
         shell:
             "exec >{log} 2>&1;\n"
             "\n"
-            "echo '{params.calls}' > call.files;\n"
-            "echo '{params.coverages}' > coverage.files;\n"
-            "echo '{params.basecov}' > basecov.files;\n"
-            "echo '{params.scaffolds}' > scaffold.files;\n"
+            "echo '{params.calls}' > {output.call_files};\n"
+            "echo '{params.coverages}' > {output.coverage_files};\n"
+            "echo '{params.basecov}' > {output.basecov_files};\n"
+            "echo '{params.scaffolds}' > {output.scaffold_files};\n"
             "\n"
             "{BIN}/aggregate_classifications.R"
             "  --virushostdb '{input.virushostdb}'"
@@ -328,10 +330,10 @@ with Stage("summarize_vp") as S:
             "  --min-reads '{params.min_reads}'"
             "  --excel-out '{output.excel}'"
             "  --out '{params.csv_out}'"
-            "  --in-list call.files"
-            "  --in-coverage-list coverage.files"
-            "  --in-scaffold-list scaffold.files"
-            "  --in-basecov-list basecov.files;\n"
+            "  --in-list {output.call_files}"
+            "  --in-coverage-list {output.coverage_files}"
+            "  --in-scaffold-list {output.scaffold_files}"
+            "  --in-basecov-list {output.basecov_files};\n"
             "\n"
             "cp {output.excel} $(date +{params.reportfile})"
 
