@@ -1,0 +1,13 @@
+include:
+  - pipelines.yml
+  - references.yml
+
+directories:
+  rules:
+    virprof:
+      rules
+
+conda:
+  env_specs:
+    - conda_envs
+
