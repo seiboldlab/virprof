@@ -28,6 +28,14 @@ projects:
   test:
     data: test_data/test.csv
 
+directories:
+  rules:
+    virprof:
+      rules
+conda:
+  env_specs:
+    - conda_envs
+
 overrides:
   rules:
     vp_blastbin:
