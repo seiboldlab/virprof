@@ -6,6 +6,8 @@ import re
 from collections import Counter
 from typing import Iterator, Sequence, Collection, BinaryIO, Optional, Dict, Tuple, List
 
+from .regionlist import RegionList
+
 import Bio.Seq
 
 LOG = logging.getLogger(__name__)

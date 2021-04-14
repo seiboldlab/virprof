@@ -244,7 +244,7 @@ class Fmt6Parser(BlastParser):
 class Fmt7Writer(BlastWriter):
     def __init__(self, fileobj):
         self.fileobj = fileobj
-        self.toolname = "YMP writer " + ymp.version
+        self.toolname = "YMP writer"
         self.query = None
         self.database = "undefined"
         self.fields = "undefined"
