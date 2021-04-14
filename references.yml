@@ -1,9 +1,9 @@
 references:
-  # Human reference used for read and contig filtering:
+  # Human reference used for read and contig filtering.
+  # This should be the Homo_sapiens_UCSC_hg38.tar.gz unpacked
   hg38:
     # The index files for Bowtie2
-    - url:
-        databases/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
+    - url: !workdir databases/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
       type: dirx
       files:
         ALL.1.bt2: genome.1.bt2
@@ -14,8 +14,7 @@ references:
         ALL.rev.2.bt2: genome.rev.2.bt2
         ALL.fasta: genome.fa
     # The index files for Blast
-    - url:
-        databases/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
+    - url: !workdir  databases/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
       type: dirx
       files:
         ALL.nin: genome.fa.nin
@@ -27,8 +26,7 @@ references:
         ALL.nsd: genome.fa.nsd
         ALL.nog: genome.fa.nog
     # The index files for Hisat2
-    - url:
-        databases/grch38_snp_tran/
+    - url: !workdir  databases/grch38_snp_tran/
       type: dirx
       files:
         ALL.1.ht2: genome_snp_tran.1.ht2
@@ -41,8 +39,7 @@ references:
         ALL.8.ht2: genome_snp_tran.8.ht2
   # NCBI Nucleotide database for Blast
   NT:
-    - url:
-        databases/nt/
+    - url: !workdir databases/nt
       type: path
       match:
         - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
@@ -54,8 +51,7 @@ references:
       id: nt
   # NCBI Taxonomy dump for classification
   NcbiTaxonomy:
-    - url:
-        databases/NCBI_taxonomy/
+    - url: !workdir databases/NCBI_taxonomy
       type: dirx
       files:
         ALL.NCBI.nodes.dmp: nodes.dmp
