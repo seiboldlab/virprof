@@ -1,0 +1,25 @@
+name: virprof
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - snakemake-minimal >=6.0.5
+  - mamba
+  - click
+  - click-completion
+  - ruamel.yaml >0.15
+  - drmaa
+  - pandas >=0.20
+  - openpyxl
+  - coloredlogs
+  - setuptools_scm >=3.4
+  - setuptools >=42
+  - wheel
+  - xdg
+  - tqdm >=4.21
+  - aiohttp
+  - networkx >=2.0
+  - pygraphviz
+  - pip
+  - pip:
+    - git+https://github.com/epruesse/ymp@development
