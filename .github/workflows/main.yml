@@ -41,7 +41,7 @@ jobs:
     - name: Lint with black
       run: |
         mamba install black
-        black --check .
+        black --check --diff .
     - name: Test with pytest
       run: |
         ymp env install virprof_py
