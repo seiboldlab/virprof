@@ -32,23 +32,27 @@ jobs:
         conda config --add channels bioconda
         conda config --add channels conda-forge
         conda install mamba
-    - name: Install dependencies
+    - name: Lint Python with black
       run: |
-        mamba env update --file environment.yml --name base
-    - name: Lint with flake8
+        mamba install black
+        black --check --diff .
+    - name: Lint Python with flake8
       run: |
         mamba install flake8
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Lint with black
+    - name: Install YMP
       run: |
-        mamba install black
-        black --check --diff .
-    - name: Test with pytest
+        mamba env update --file environment.yml --name base
+    - name: Install Python Env
       run: |
-        ymp env install virprof_py
+        echo "include: [virprof.yml]" >> ymp.yml
+        ymp env list virprof_\*
+        ymp env install virprof_py -vvv
+    - name: Test Python with pytest
+      run: |
         $(ymp env activate virprof_py)
         mamba install pytest
         pytest
