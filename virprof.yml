@@ -11,3 +11,6 @@ conda:
   env_specs:
     - conda_envs
 
+projects:
+  test:
+    data: test_data/test.csv
