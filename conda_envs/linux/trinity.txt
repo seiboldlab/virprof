@@ -3,7 +3,7 @@
 # platform: linux-64
 @EXPLICIT
 https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2#d7c89558ba9fa0495403155b64376d81
-https://conda.anaconda.org/conda-forge/linux-64/ca-certificates-2019.11.28-hecc5488_0.tar.bz2#f38d329dae44f19be049d13345cae38e
+https://conda.anaconda.org/conda-forge/linux-64/ca-certificates-2020.6.20-hecda079_0.tar.bz2#1b1cca86e95c416a8e7eb6062af6d503
 https://conda.anaconda.org/conda-forge/linux-64/ld_impl_linux-64-2.33.1-h53a641e_8.tar.bz2#1ec2fba6adb4a40ea9a294233ae3f409
 https://conda.anaconda.org/conda-forge/linux-64/libgfortran-ng-7.3.0-hdf63c60_5.tar.bz2#9f8335e79392c5a904acad0c6f066251
 https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-ng-9.2.0-hdf63c60_2.tar.bz2#ca372846bf35fc54a853f4175ae5c776
@@ -24,7 +24,7 @@ https://conda.anaconda.org/conda-forge/linux-64/libopenblas-0.3.9-h5ec1e0e_0.tar
 https://conda.anaconda.org/conda-forge/linux-64/libuuid-2.32.1-h14c3975_1000.tar.bz2#39c6326f6ee5297632c47db6520546fe
 https://conda.anaconda.org/conda-forge/linux-64/lz4-c-1.8.3-he1b5a44_1001.tar.bz2#20cf5873cde2b4f6b7334012669b3118
 https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.1-hf484d3e_1002.tar.bz2#17f2190cdcbc753893307b4c81aff478
-https://conda.anaconda.org/conda-forge/linux-64/openssl-1.1.1d-h516909a_0.tar.bz2#38765af5203eebccfcad8177672a7f2c
+https://conda.anaconda.org/conda-forge/linux-64/openssl-1.1.1g-h516909a_1.tar.bz2#6fdcd20ec22aeffa10b6102bccc47e7f
 https://conda.anaconda.org/conda-forge/linux-64/perl-5.26.2-h516909a_1006.tar.bz2#7159f7a31fb4176bac015a35ca8f199f
 https://conda.anaconda.org/conda-forge/linux-64/pthread-stubs-0.4-h14c3975_1001.tar.bz2#e0b9987b65bba8016d21f5bdbe0a7923
 https://conda.anaconda.org/conda-forge/linux-64/tbb-2020.1-hc9558a2_0.tar.bz2#ca5543a3b0f8d62e38c5122a30f1aabd
@@ -67,14 +67,14 @@ https://conda.anaconda.org/bioconda/linux-64/htslib-1.10.2-h78d89cc_0.tar.bz2#8f
 https://conda.anaconda.org/conda-forge/linux-64/numpy-1.18.1-py37h95a1406_0.tar.bz2#175f50dfc899a082212f3120e557d92f
 https://conda.anaconda.org/conda-forge/linux-64/python_abi-3.7-1_cp37m.tar.bz2#658a5c3d766bfc6574480204b10a6f20
 https://conda.anaconda.org/conda-forge/linux-64/xorg-libxi-1.7.10-h516909a_0.tar.bz2#957f74f996633302a965cb40f4355dd0
-https://conda.anaconda.org/conda-forge/linux-64/certifi-2019.11.28-py37hc8dfbb8_1.tar.bz2#2b0af186c6cd010f4c57f72106984e9a
+https://conda.anaconda.org/conda-forge/linux-64/certifi-2020.6.20-py37hc8dfbb8_0.tar.bz2#35be2a89562ec6297c5cf9a45b1ccf2d
 https://conda.anaconda.org/bioconda/linux-64/samtools-1.10-h9402c20_2.tar.bz2#6e7af089b1adaabb5466fa552a292895
 https://conda.anaconda.org/conda-forge/linux-64/xorg-libxtst-1.2.3-h516909a_1002.tar.bz2#2676c5d475fa32bc25aaa5d677ce665b
 https://conda.anaconda.org/conda-forge/linux-64/setuptools-46.0.0-py37hc8dfbb8_2.tar.bz2#983b52ea2ee5e857307b0f81e09271d6
 https://conda.anaconda.org/conda-forge/noarch/wheel-0.34.2-py_1.tar.bz2#1a3f64dbee07e02a8f1de36b5b5e98ee
 https://conda.anaconda.org/conda-forge/noarch/pip-20.0.2-py_2.tar.bz2#70e60f1bf7c83ede9f7b2551d006db8c
 https://conda.anaconda.org/bioconda/noarch/trimmomatic-0.39-1.tar.bz2#4f50038e17e15fc5c1128971060086d7
-https://conda.anaconda.org/bioconda/linux-64/trinity-2.9.1-h8b12597_1.tar.bz2#446d475cb546ebc92251c806e4b2d0a8
+https://conda.anaconda.org/bioconda/linux-64/trinity-2.11.0-h5ef6573_0.tar.bz2#22daac3ee59b1239a42128723003ba4e
 https://conda.anaconda.org/conda-forge/linux-64/lcms2-2.9-hbd6801e_1.tar.bz2#f3810dbd624fefdb9bd3062e362077c0
 https://conda.anaconda.org/conda-forge/linux-64/openjdk-11.0.1-h600c080_1018.tar.bz2#af1752ee3a11faea60c846d246849a74
 https://conda.anaconda.org/conda-forge/linux-64/libtiff-4.1.0-hc7e4089_5.tar.bz2#9f7eb4181f9d6ea4ce72e0c1d95c455b
