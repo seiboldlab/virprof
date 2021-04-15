@@ -53,6 +53,5 @@ jobs:
         ymp env install virprof_py -vvv
     - name: Test Python with pytest
       run: |
-        $(ymp env activate virprof_py)
-        mamba install pytest
-        pytest
+        ymp env run virprof_py mamba install pytest
+        ymp env run virprof_py pytest
