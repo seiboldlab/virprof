@@ -1,0 +1,24 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: osx-64
+@EXPLICIT
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/coreutils-8.31-h1de35cc_0.tar.bz2#069a9fced26874a19ee7d8fcff899257
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/bzip2-1.0.6-h1de35cc_1002.tar.bz2#76f47e9f5f453036b7fe198af50c7b43
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/ca-certificates-2019.3.9-hecc5488_0.tar.bz2#beb1317c9adebe29f3987d9dcba933db
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/libcxxabi-8.0.0-2.tar.bz2#26cd36c97c8ee93e314b1d3fa1ce04a0
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/libdeflate-1.0-h1de35cc_1.tar.bz2#b0b37b944259c889ef69e185cc539b6d
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/xz-5.2.4-h1de35cc_1001.tar.bz2#dc8b7a1b9693da71d74823233757c527
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/zlib-1.2.11-h1de35cc_1004.tar.bz2#a675e7ae21f9b77f2afd15f78cd21b7a
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/libcxx-8.0.0-2.tar.bz2#d21ae0168b153ffde90c2312a10eb936
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/openjdk-11.0.1-h01d97ff_1016.tar.bz2#92386b19f8e7d8ab80f40152b2148f60
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/openssl-1.1.1b-h01d97ff_2.tar.bz2#76ed2f080b440d9b34a5f1b4e8eba642
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/pigz-2.3.4-0.tar.bz2#8f567d03531f11a8e43f8160ea549888
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/tk-8.6.9-ha441bb4_1001.tar.bz2#22c2818a32e33698f437d2cb32fb6e7c
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/bbmap-38.46-h1de35cc_0.tar.bz2#d306dd9298d9aa3bd1270fbe7ee6b371
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/libssh2-1.8.2-hcdc9a53_2.tar.bz2#6036ff9b89b61feda7fa7f1b01c703c3
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/ncurses-6.1-h0a44026_1002.tar.bz2#ae7e7c80e52fc72adc0113369a4ebc62
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/libedit-3.1.20170329-hcfe32e1_1001.tar.bz2#312a75f1e2115ee8467585e92f626c3e
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/krb5-1.16.3-hcfa6398_1001.tar.bz2#7ab2fb212f6af5386de6c45e7f6823bc
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/libcurl-7.64.1-h16faf7d_0.tar.bz2#5c37dbc254eff9f3dfdecdb75f6b6b23
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/curl-7.64.1-h22ea746_0.tar.bz2#e39d07b38c60b38d15815d31de417c77
+file:///Users/pruessee/.ymp/conda_archive/c5d22b3d660c665bbad33e784c77a43a/samtools-1.9-h7c4ea83_11.tar.bz2#b16021f2c30392b2126af0e780daad6a

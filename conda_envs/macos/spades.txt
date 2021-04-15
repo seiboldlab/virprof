@@ -1,0 +1,23 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: osx-64
+@EXPLICIT
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/bzip2-1.0.6-h1de35cc_1002.tar.bz2#76f47e9f5f453036b7fe198af50c7b43
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/ca-certificates-2019.3.9-hecc5488_0.tar.bz2#beb1317c9adebe29f3987d9dcba933db
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/libcxxabi-8.0.0-2.tar.bz2#26cd36c97c8ee93e314b1d3fa1ce04a0
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/xz-5.2.4-h1de35cc_1001.tar.bz2#dc8b7a1b9693da71d74823233757c527
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/zlib-1.2.11-h1de35cc_1004.tar.bz2#a675e7ae21f9b77f2afd15f78cd21b7a
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/libcxx-8.0.0-2.tar.bz2#d21ae0168b153ffde90c2312a10eb936
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/openssl-1.1.1b-h01d97ff_2.tar.bz2#76ed2f080b440d9b34a5f1b4e8eba642
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/pigz-2.3.4-0.tar.bz2#8f567d03531f11a8e43f8160ea549888
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/tk-8.6.9-ha441bb4_1001.tar.bz2#22c2818a32e33698f437d2cb32fb6e7c
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/libffi-3.2.1-h6de7cb9_1006.tar.bz2#9dc7772122378cfde802903dbf5ff593
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/ncurses-6.1-h0a44026_1002.tar.bz2#ae7e7c80e52fc72adc0113369a4ebc62
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/readline-7.0-hcfe32e1_1001.tar.bz2#4dfbb0e22ab207236cdd49e2352cecd9
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/sqlite-3.26.0-h1765d9f_1001.tar.bz2#61200795af5c0ee64c52833d73b681d7
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/python-3.7.3-h0d93f26_0.tar.bz2#36bb5d41002b52d022d57e2e088b1679
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/certifi-2019.3.9-py37_0.tar.bz2#bb0fd88f063b247b2b0a7e25b817905b
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/spades-3.13.0-0.tar.bz2#be42d0fe8aecad91d5dc77283997215e
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/setuptools-41.0.1-py37_0.tar.bz2#f1e0e3038ff3512bddf5937daaeba519
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/wheel-0.33.4-py37_0.tar.bz2#93dc40f7d513620adb32112f079bf4c7
+file:///Users/pruessee/.ymp/conda_archive/76230f186baeefbc797bea1a6be05777/pip-19.1-py37_0.tar.bz2#b1550109e2f0fb4739f2f965b60248ac
