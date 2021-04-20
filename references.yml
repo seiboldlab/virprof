@@ -13,18 +13,11 @@ references:
         ALL.rev.1.bt2: genome.rev.1.bt2
         ALL.rev.2.bt2: genome.rev.2.bt2
         ALL.fasta: genome.fa
-    # The index files for Blast
+    # The whole genome FASTA (BLAST index will be generated from this)
     - url: !workdir  databases/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
       type: dirx
       files:
-        ALL.nin: genome.fa.nin
-        ALL.nhr: genome.fa.nhr
-        ALL.nhi: genome.fa.nhi
-        ALL.nhd: genome.fa.nhd
-        ALL.nsq: genome.fa.nsq
-        ALL.nsi: genome.fa.nsi
-        ALL.nsd: genome.fa.nsd
-        ALL.nog: genome.fa.nog
+        ALL.fasta: genome.fa
     # The index files for Hisat2
     - url: !workdir  databases/grch38_snp_tran/
       type: dirx
@@ -43,6 +36,7 @@ references:
       type: path
       match:
         - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
+        - (?P<sample>[^.]+)\.(ndb|nhr|nin|nog|nos|not|nsq|ntf|nto)
   # Subset of NT for testing
   NT_test:
     - url: test_data/nt_test.tar.bz2

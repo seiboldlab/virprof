@@ -105,6 +105,34 @@ with ymp.get_config().references.NcbiTaxonomy:
             "  --ncbi-taxonomy {params.taxonomy_prefix}"
             "  --out {output}"
 
+with ymp.get_config().references.hg38:
+    rule vp_blast_index_hg38:
+        """This rule generates a BLAST index on the genome.fa from iGenomes"""
+        message:
+            "Creating BLAST index for hg38 reference"
+        input:
+            fasta = "{:prev:}/ALL.fasta"
+        output:
+            blastidx = expand("{{:this:}}/ALL.{ext}", ext="nhr nin nog nsq ntf nto nos not ndb".split())
+        log:
+            "{:this:}/ALL.makeblastdb.log"
+        params:
+            db = "{:this:}/ALL"
+        conda:
+            "blast"
+        threads:
+            1
+        shell:
+            "exec >{log} 2>&1;"
+            "makeblastdb"
+            " -in {input.fasta}"
+            " -dbtype nucl"
+            " -title hg38"
+            " -parse_seqids"
+            " -hash_index"
+            " -blastdb_version 5"
+            " -out {params.db}"
+
 
 with Stage("blastbin_vp") as S:
     S.doc("""
