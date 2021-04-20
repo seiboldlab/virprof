@@ -63,7 +63,11 @@ jobs:
       run: |
         cd ..
         ymp make test.generic -np
-    - name: Run pipeline full
+    - name: Run pipeline software install
+      run: |
+        cd ..
+        ymp env prepare test.generic
+    - name: Run pipeline analysis
       run: |
         cd ..
         ymp make test.generic -j8
