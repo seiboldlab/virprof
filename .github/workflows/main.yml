@@ -71,3 +71,9 @@ jobs:
       run: |
         cd ..
         ymp make test.generic -j8
+        ls -l test.generic/
+    - name: Save pipeline results
+      uses: actions/upload-artifact@v2
+      with:
+        name: results-${{ matrix.os }}
+        path: ../test.generic/*.xlsx
