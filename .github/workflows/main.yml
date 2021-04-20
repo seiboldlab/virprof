@@ -73,8 +73,11 @@ jobs:
       run: |
         ymp make test.generic -j8
         ls -l test.generic/
-    - name: Save pipeline results
+    - name: Save pipeline reports
       uses: actions/upload-artifact@v2
       with:
         name: results-${{ matrix.os }}
-        path: test.generic/*.xlsx
+        path: reports/
+        # Note: Not saving the actual test.generic directory because
+        # it is a symlink and actions/upload-artifact@v2 has problems
+        # with symlinks.
