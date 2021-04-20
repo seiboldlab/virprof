@@ -55,3 +55,15 @@ jobs:
       run: |
         ymp env run virprof_py mamba install pytest
         ymp env run virprof_py pytest
+    - name: Setup test data
+      run: |
+        cd ..
+        ./virprof/test_data/install_testdata.sh
+    - name: Run pipeline dry-run
+      run: |
+        cd ..
+        ymp make test.generic -np
+    - name: Run pipeline full
+      run: |
+        cd ..
+        ymp make test.generic -j8
