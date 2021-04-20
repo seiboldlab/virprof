@@ -15,14 +15,20 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          #- macos-latest
+          # - macos-latest
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
+      with:
+        path: virprof
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
+    - name: Fix Github Conda Permissions on OSX
+      if: matrix.os == 'macos-latest'
+      run: |
+        sudo chown -R $USER $CONDA
     - name: Set up Biconda & Mamba
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
@@ -40,18 +46,38 @@ jobs:
       run: |
         mamba install flake8
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 virprof --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 virprof --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Install YMP
       run: |
-        mamba env update --file environment.yml --name base
+        mamba env update --file virprof/environment.yml --name base
+    - name: Setup pipeline with test data
+      run: |
+        ./virprof/test_data/install_testdata.sh
     - name: Install Python Env
       run: |
-        echo "include: [virprof.yml]" >> ymp.yml
         ymp env list virprof_\*
         ymp env install virprof_py -vvv
     - name: Test Python with pytest
       run: |
         ymp env run virprof_py mamba install pytest
         ymp env run virprof_py pytest
+    - name: Run pipeline dry-run
+      run: |
+        ymp make test.generic -np
+    - name: Run pipeline software install
+      run: |
+        ymp env prepare test.generic
+    - name: Run pipeline analysis
+      run: |
+        ymp make test.generic -j8
+        ls -l test.generic/
+    - name: Save pipeline reports
+      uses: actions/upload-artifact@v2
+      with:
+        name: results-${{ matrix.os }}
+        path: reports/
+        # Note: Not saving the actual test.generic directory because
+        # it is a symlink and actions/upload-artifact@v2 has problems
+        # with symlinks.
