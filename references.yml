@@ -45,8 +45,8 @@ references:
       id: nt
   # NCBI Taxonomy dump for classification
   NcbiTaxonomy:
-    - url: !workdir databases/NCBI_taxonomy
-      type: dirx
+    - url: http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+      type: dir
       files:
         ALL.NCBI.nodes.dmp: nodes.dmp
         ALL.NCBI.names.dmp: names.dmp

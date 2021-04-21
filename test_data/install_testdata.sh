@@ -28,5 +28,4 @@ unpack() {
 
 unpack Homo_sapiens_UCSC_hg38_test.tar.bz2
 unpack grch38_snp_tran_test.tar.bz2
-unpack taxdump_test.tar.bz2 NCBI_taxonomy
 unpack nt_test.tar.bz2 nt
