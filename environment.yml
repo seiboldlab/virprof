@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - snakemake-minimal >=6.0.5
+  - snakemake-minimal >=6.2
   - click
   - click-completion
   - ruamel.yaml >0.15
