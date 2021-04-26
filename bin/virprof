@@ -3,7 +3,12 @@ import os.path as op
 import sys
 
 sys.path.insert(0, op.dirname(op.dirname(__file__)))
-from virprof.__main__ import cli, setup_logging
+try:
+   from virprof.__main__ import cli, setup_logging
+except ModuleNotFoundError:
+   sys.path[0] = op.dirname(op.dirname(op.dirname(op.dirname(__file__))))
+   from virprof.__main__ import cli, setup_logging
+
 
 if __name__ == "__main__":
    setup_logging()
