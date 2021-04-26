@@ -269,34 +269,46 @@ with Stage("bin_vp") as S:
     S.add_param("", typ="choice", name="bin_by",
                 value=['Species', 'Acc', 'Taxname'], default='Species')
 
+    rule vp_bin_fasta_file_lists:
+        message:
+            """Collecting input files"""
+        input:
+            calls  = "{:prev:}/{:target:}.virus.csv",
+            fasta = "{:prev:}/{:target:}.fasta.gz",
+        output:
+            call_flist = temp("{:this:}/{target}.call_flist"),
+            fasta_flist = temp("{:this:}/{target}.fasta_flist"),
+        run:
+            with open(output.call_flist, "w") as out:
+                for call in input.calls:
+                    print(call, file=out)
+            with open(output.fasta_flist, "w") as out:
+                for fasta in input.fasta:
+                    print(fasta, file=out)
+    localrules: vp_bin_fasta_file_lists
+
     checkpoint vp_bin_fasta:
         message:
             """Sorting sequences into bins"""
         input:
-            calls  = "{:prev:}/{:target:}.virus.csv",
-            fasta = "{:prev:}/{:target:}.fasta.gz"
+            call_flist = "{:this:}/{target}.call_flist",
+            fasta_flist = "{:this:}/{target}.fasta_flist",
         output:
             bins =  "{:this:}/{target}.binlist.txt",
             fasta =  "{:this:}/{target}.{:bin:}.fasta.gz",
-            call_flist = temp("{:this:}/{target}.call_flist"),
-            fasta_flist = temp("{:this:}/{target}.fasta_flist"),
         log:
             "{:this:}/{target}.bin.log"
         threads: 1
         conda:
             "virprof_py"
         params:
-            calls = lambda wc, input: "\n".join(input.calls),
-            fastas = lambda wc, input: "\n".join(input.fasta),
             out_bins = "{:this:}/%s.fasta.gz",
             filter_lineage = "^Virus",
         shell:
             "exec >{log} 2>&1;"
-            "echo '{params.calls}' > {output.call_flist};\n"
-            "echo '{params.fastas}' > {output.fasta_flist};\n"
             "{BIN}/virprof find-bins"
-            " --in-call-files {output.call_flist}"
-            " --in-fasta-files {output.fasta_flist}"
+            " --in-call-files {input.call_flist}"
+            " --in-fasta-files {input.fasta_flist}"
             " --filter-lineage {params.filter_lineage}"
             " --bin-by {params.bin_by}"
             " --out {params.out_bins}"
