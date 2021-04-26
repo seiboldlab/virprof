@@ -932,6 +932,8 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
             for acc in fasta:
                 _sample, _, sacc = acc.partition(".")
                 sacc, _, _ = sacc.partition("_")
+                if not sacc in acc_to_bin:
+                    continue
                 out = bin_to_file[acc_to_bin[sacc]]
                 sequence = fasta.get(acc)
                 bp = sum(sequence.count(base) for base in (b"A", b"G", b"C", b"T"))
