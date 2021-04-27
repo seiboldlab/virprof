@@ -29,7 +29,7 @@ from .taxonomy import load_taxonomy
 from .fasta import filter_fasta, FastaFile
 from .regionlist import RegionList
 from .fasta import scaffold_contigs, Btop
-from .entrez import FeatureTables, GenomeSizes
+from .entrez import FeatureTables, GenomeSizes, EntrezAPI
 
 LOG = logging.getLogger(__name__)
 
@@ -944,6 +944,68 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
         out.close()
     LOG.info("FINISHED")
 
+@cli.command()
+@click.option("--species", required=True)
+@click.option("--min-len", default=500)
+@click.option("--max-len", default=50000)
+@click.option(
+    "--ncbi-taxonomy",
+    "-t",
+    type=click.Path(),
+    help="Path to NCBI taxonomy (tree or raw)",
+)
+@click.option("--out-accs", type=click.File("w"))
+@click.option("--out-fasta", type=click.File("w"))
+@click.option("--out-gb", type=click.File("w"))
+def download_genomes(
+        species,
+        min_len,
+        max_len,
+        out_accs,
+        out_fasta,
+        out_gb,
+        ncbi_taxonomy,
+):
+    setup_logging()
+    LOG.info("Loading taxonomy from %s", ncbi_taxonomy)
+    taxonomy = load_taxonomy(ncbi_taxonomy)
+    LOG.info("Searching for species '%s'...", species)
+    taxid = taxonomy.get_taxid(species)
+    if taxid is None:
+        LOG.error("Species '%s' not found in taxonomy", species)
+        return 1
+    LOG.info("Found taxid %i", taxid)
+    entrez = EntrezAPI()
+    LOG.info("Querying Entrez for matching entries with len between %i and %i...", min_len, max_len)
+    query = entrez.search(
+        "nucleotide",
+        f"(txid{taxid}[Organism:exp])"
+        f"AND ({min_len}:{max_len}[SLEN])"
+    )
+    summaries = entrez.summary("nucleotide", query)
+    LOG.info("Found %i matches", len(summaries))
+
+    if out_accs:
+        LOG.info("Writing accession.version to %s", out_accs.name)
+        for tag in summaries.findall(".//*[@Name='AccessionVersion']"):
+            print(tag.text, file=out_accs)
+    ids = [tag.text for tag in summaries.findall(".//Id")]
+    if out_fasta:
+        LOG.info("Writing FASTA sequences to %s", out_fasta.name)
+        sequences = entrez.fetch(
+            "nucleotide",
+            ids=ids,
+            rettype="fasta"
+        )
+        out_fasta.write(sequences)
+    if out_gb:
+        LOG.info("Writing genbank to %s", out_fasta.name)
+        data = entrez.fetch(
+            "nucleotide",
+            ids=ids,
+            rettype="gbwithparts"
+        )
+        out_gb.write(data)
 
 if __name__ == "__main__":
     setup_logging()

@@ -317,6 +317,12 @@ class TaxonomyGT(Taxonomy):
                     return self.tree.vp.name[node]
         return "Unknown"
 
+    def get_taxid(self, name: str) -> Optional[int]:
+        vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
+        if len(vertices) != 1:
+            return
+        return vertices[0]
+
     def get_subtree_ids(self, name: str) -> Set[int]:
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
         if len(vertices) != 1:
