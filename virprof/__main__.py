@@ -61,6 +61,9 @@ class TqdmHandler(logging.Handler):
 
 def setup_logging() -> None:
     """Sets up python logging facility"""
+    if getattr(setup_logging, "done", False):
+        return
+    setup_logging.done = True
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
