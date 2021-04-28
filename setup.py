@@ -11,22 +11,20 @@ extra_package_data = {
         "R/*.R",
         "bin/*",
         "conda_envs/*/*.txt",
-        "data/*", "rules/*",
+        "data/*",
+        "rules/*",
         "test_data/*",
         "*.yml",
-        "README.md"]
-}
-extra_exclude_package_data = {
-    "virprof.pipeline": [
-        "environment.yml"
+        "README.md",
     ]
 }
-package_data = {
-    "virprof.pipeline": ["*", "**/*"]
-}
+extra_exclude_package_data = {"virprof.pipeline": ["environment.yml"]}
+package_data = {"virprof.pipeline": ["*", "**/*"]}
 for submodule in extra_package_data:
     if os.path.exists(submodule):
-        raise RuntimeError("Cannot add data submodule '%s': submodule already exists" % submodule)
+        raise RuntimeError(
+            "Cannot add data submodule '%s': submodule already exists" % submodule
+        )
 try:
     for submodule, patterns in extra_package_data.items():
         expanded = map(glob, patterns)
