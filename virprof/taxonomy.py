@@ -323,6 +323,19 @@ class TaxonomyGT(Taxonomy):
             return
         return vertices[0]
 
+    def get_siblings(self, tax_id: int) -> Set[int]:
+        target = self._get_vertex(tax_id)
+        parent = next(target.in_edges()).source()
+        rank = self.tree.vp.rank[target]
+        siblings = set()
+        # We specifically do not go through the subnodes as the NCBI taxonomy
+        # weirdly has entries below "unclassified speciesXYZ" ranked as species.
+        for edge in parent.out_edges():
+            dst = edge.target()
+            if dst != target and self.tree.vp.rank[dst] == rank:
+                siblings.add(int(dst))
+        return siblings
+
     def get_subtree_ids(self, name: str) -> Set[int]:
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
         if len(vertices) != 1:

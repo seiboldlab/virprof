@@ -949,6 +949,7 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
 
 @cli.command()
 @click.option("--species", required=True)
+@click.option("--outgroup", type=click.Choice(["yes", "no", "only"]), default="no")
 @click.option("--auto-len/--no-auto-len", default=True)
 @click.option("--min-len", default=500)
 @click.option("--max-len", default=50000)
@@ -964,6 +965,7 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
 @click.option("--out-gb", type=click.File("w"))
 def download_genomes(
         species,
+        outgroup,
         auto_len,
         min_len,
         max_len,
@@ -974,6 +976,7 @@ def download_genomes(
         ncbi_taxonomy,
 ):
     setup_logging()
+
     LOG.info("Loading taxonomy from %s", ncbi_taxonomy)
     taxonomy = load_taxonomy(ncbi_taxonomy)
     LOG.info("Searching for species '%s'...", species)
@@ -982,6 +985,7 @@ def download_genomes(
         LOG.error("Species '%s' not found in taxonomy", species)
         return 1
     LOG.info("Found taxid %i", taxid)
+
     if ncbi_api_key is not None:
         defaults = {"api_key": ncbi_api_key}
     else:
@@ -998,20 +1002,44 @@ def download_genomes(
         min_len = genome_size * 0.8
         max_len = genome_size * 1.2
 
-    LOG.info("Querying Entrez for matching entries with len between %i and %i...", min_len, max_len)
-    query = entrez.search(
-        "nucleotide",
-        f"(txid{taxid}[Organism:exp])"
-        f"AND ({min_len}:{max_len}[SLEN])"
-    )
-    summaries = entrez.summary("nucleotide", query)
-    LOG.info("Found %i matches", len(summaries))
+    ids = []
+    accs = []
+    if outgroup in ("yes", "no"):
+        LOG.info("Querying Entrez Nuccore for matching entries with len between %i and %i...", min_len, max_len)
+        query = entrez.search(
+            "nucleotide",
+            f"(txid{taxid}[Organism:exp])"
+            f"AND ({min_len}:{max_len}[SLEN])"
+        )
+        summaries = entrez.summary("nucleotide", query)
+        LOG.info("Found %i matches", len(summaries))
+        ids += [tag.text for tag in summaries.findall(".//Id")]
+        accs += [tag.text for tag in summaries.findall(".//*[@Name='AccessionVersion']")]
+
+    if outgroup in ("yes", "only"):
+        taxids = taxonomy.get_siblings(taxid)
+        LOG.info("Found %i sibling species", len(taxids))
+        for taxid in taxids:
+            LOG.info("  searching for reference for %i (%s)", taxid, taxonomy.get_name(taxid))
+            query = entrez.search(
+                "nucleotide",
+                f"(txid{taxid}[Organism:exp])"
+                f"AND (\"complete genome\") AND (refseq[filter])"
+            )
+            summaries = entrez.summary("nucleotide", query)
+            if summaries.findall("ERROR"):
+                LOG.info("    no results found")
+                continue
+            LOG.info("    found %i matches", len(summaries))
+            ids += [next(iter(summaries.findall(".//Id"))).text]
+            accs += [next(iter(summaries.findall(".//*[@Name='AccessionVersion']"))).text]
+            LOG.info("    added first match (%s)", accs[-1])
 
     if out_accs:
         LOG.info("Writing accession.version to %s", out_accs.name)
-        for tag in summaries.findall(".//*[@Name='AccessionVersion']"):
-            print(tag.text, file=out_accs)
-    ids = [tag.text for tag in summaries.findall(".//Id")]
+        for acc in accs:
+            print(acc, file=out_accs)
+
     if out_fasta:
         LOG.info("Writing FASTA sequences to %s", out_fasta.name)
         sequences = entrez.fetch(
@@ -1020,6 +1048,7 @@ def download_genomes(
             rettype="fasta"
         )
         out_fasta.write(sequences)
+
     if out_gb:
         LOG.info("Writing genbank to %s", out_fasta.name)
         data = entrez.fetch(
