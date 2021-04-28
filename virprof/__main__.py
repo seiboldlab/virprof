@@ -949,6 +949,7 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
 
 @cli.command()
 @click.option("--species", required=True)
+@click.option("--auto-len/--no-auto-len", default=True)
 @click.option("--min-len", default=500)
 @click.option("--max-len", default=50000)
 @click.option(
@@ -957,13 +958,16 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
     type=click.Path(),
     help="Path to NCBI taxonomy (tree or raw)",
 )
+@click.option("--ncbi-api-key", type=str, help="NCBI API Key")
 @click.option("--out-accs", type=click.File("w"))
 @click.option("--out-fasta", type=click.File("w"))
 @click.option("--out-gb", type=click.File("w"))
 def download_genomes(
         species,
+        auto_len,
         min_len,
         max_len,
+        ncbi_api_key,
         out_accs,
         out_fasta,
         out_gb,
@@ -978,7 +982,22 @@ def download_genomes(
         LOG.error("Species '%s' not found in taxonomy", species)
         return 1
     LOG.info("Found taxid %i", taxid)
-    entrez = EntrezAPI()
+    if ncbi_api_key is not None:
+        defaults = {"api_key": ncbi_api_key}
+    else:
+        defaults = {}
+    entrez = EntrezAPI(defaults=defaults)
+    if auto_len:
+        LOG.info("Determining genome size...")
+        genome_sizes = GenomeSizes(entrez=entrez)
+        genome_method, genome_size = genome_sizes.get(taxid)
+        if not genome_size:
+            LOG.info("Failed to determine genome size. Aborting.")
+            return 1
+        LOG.info("Found genome size %i using method %s", genome_size, genome_method)
+        min_len = genome_size * 0.8
+        max_len = genome_size * 1.2
+
     LOG.info("Querying Entrez for matching entries with len between %i and %i...", min_len, max_len)
     query = entrez.search(
         "nucleotide",
