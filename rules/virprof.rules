@@ -33,47 +33,6 @@ Env(name="virprof_py", base="bioconda",
 BIN = srcdir("../bin/")
 
 
-with Stage("blastfilter_vp") as S:
-    S.add_param("U", typ="int", name="min_unaligned_bp", default=0)
-    S.doc("""This stage filters input FASTA based on BLAST hits to a
-    contaminant database (e.g. host). Only sequences with at least
-    Unnn basepairs not aligned to any sequence in the reference are
-    passed through.""")
-
-    rule vp_filter_blast:
-        """Rule filtering individual FASTA file"""
-        message:
-            "Filtering contigs {output}"
-        input:
-            fasta  = "{:prev:}/{:target:}.fasta.gz",
-            blast7 = "{:prev:}/{:target:}.blast7.gz"
-        output:
-            fasta  = "{:this:}/{target}.fasta.gz"
-        log:
-            "{:this:}/{target}.log"
-        threads:
-            1
-        conda:
-            "virprof_py"
-        shell:"""
-        exec >{log} 2>&1
-        {BIN}/virprof filter-blast \
-         --min-unaligned-bp {params.min_unaligned_bp} \
-         --out {output.fasta} \
-         --in-fasta {input.fasta} \
-         --in-blast7 {input.blast7}
-        """
-
-    rule vp_filter_blast_all:
-        """Collection target in case this is the end of the pipeline"""
-        message:
-            "Completed {:this:}"
-        input:
-            "{:this:}/{:targets:}.fasta.gz"
-        output:
-            touch("{:this:}/all_targets.stamp")
-
-
 with ymp.get_config().references.NcbiTaxonomy:
     rule vp_index_ncbi_taxonomy:
         """This rule loads the NCBI taxonomy, compiles it into a graph_tool
@@ -84,7 +43,7 @@ with ymp.get_config().references.NcbiTaxonomy:
         The output file is added to the reference "NcbiTaxonomy".
         """
         message:
-            "Creating taxonomy index for virprof bin&classify"
+            "{:name:}: Creating graph tool binary format tree from NCBI taxonomy"
         input:
             ncbi_nodes = "{:prev:}/ALL.NCBI.nodes.dmp",
             ncbi_names = "{:prev:}/ALL.NCBI.names.dmp"
@@ -109,7 +68,7 @@ with ymp.get_config().references.hg38:
     rule vp_blast_index_hg38:
         """This rule generates a BLAST index on the genome.fa from iGenomes"""
         message:
-            "Creating BLAST index for hg38 reference"
+            "{:name:}: Creating BLAST index"
         input:
             fasta = "{:prev:}/ALL.fasta"
         output:
@@ -134,6 +93,49 @@ with ymp.get_config().references.hg38:
             " -out {params.db}"
 
 
+with Stage("blastfilter_vp") as S:
+    S.add_param("U", typ="int", name="min_unaligned_bp", default=0)
+    S.doc("""This stage filters input FASTA based on BLAST hits to a
+    contaminant database (e.g. host). Only sequences with at least
+    Unnn basepairs not aligned to any sequence in the reference are
+    passed through.""")
+
+    rule vp_filter_blast:
+        """Rule filtering individual FASTA file"""
+        message:
+            "{:name:}: Filtering contigs {output}"
+        input:
+            fasta  = "{:prev:}/{:target:}.fasta.gz",
+            blast7 = "{:prev:}/{:target:}.blast7.gz"
+        output:
+            fasta  = "{:this:}/{target}.fasta.gz"
+        log:
+            "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
+        threads:
+            1
+        conda:
+            "virprof_py"
+        shell:"""
+        exec >{log} 2>&1
+        {BIN}/virprof filter-blast \
+         --min-unaligned-bp {params.min_unaligned_bp} \
+         --out {output.fasta} \
+         --in-fasta {input.fasta} \
+         --in-blast7 {input.blast7}
+        """
+
+    rule vp_filter_blast_all:
+        """Collection target in case this is the end of the pipeline"""
+        message:
+            "Completed {:this:}"
+        input:
+            "{:this:}/{:targets:}.fasta.gz"
+        output:
+            touch("{:this:}/all_targets.stamp")
+
+
 with Stage("blastbin_vp") as S:
     S.doc("""
     Creates bins from blast hits
@@ -141,7 +143,7 @@ with Stage("blastbin_vp") as S:
 
     rule vp_blastbin:
         message:
-            "Classifying - {output.result}"
+            "{:name:}: Classifying {output.result}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
             fasta    = "{:prev:}/{:target:}.fasta.gz",
@@ -153,6 +155,8 @@ with Stage("blastbin_vp") as S:
             features = "{:this:}/{target}.features.csv",
         log:
                          "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.blastbin.txt"
         params:
             coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage)),
             cache_path = "feature_table_cache",
@@ -176,7 +180,7 @@ with Stage("blastbin_vp") as S:
 
     rule vp_show_bins:
         message:
-            "Visualizing binning"
+            "{:name:}: Visualizing bins {output}"
         input:
             calls = "{:this:}/{target}.virus.csv",
             hits  = "{:this:}/{target}.hits.csv",
@@ -186,6 +190,8 @@ with Stage("blastbin_vp") as S:
             plot =  "{:this:}/{target}.virus.pdf"
         log:
             "{:this:}/{target}.show_bins.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.show_bins.txt"
         threads:
             1
         conda:
@@ -226,7 +232,7 @@ with Stage("scaffold_vp") as S:
     """)
     rule vp_scaffold_fasta:
         message:
-            "Scaffolding genomes"
+            "{:name:}: Scaffolding {output.fasta}"
         input:
             bins  = "{:prev:}/{target}.virus.csv",
             hits  = "{:prev:}/{target}.hits.csv",
@@ -236,6 +242,8 @@ with Stage("scaffold_vp") as S:
             scaffolds = "{:this:}/{target}.scaffolds.csv"
         log:
             "{:this:}/{target}.bin.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         threads: 1
         conda:
             "virprof_py"
@@ -271,7 +279,7 @@ with Stage("bin_vp") as S:
 
     rule vp_bin_fasta_file_lists:
         message:
-            """Collecting input files"""
+            "{:name:}: Collecting input files"
         input:
             calls  = "{:prev:}/{:target:}.virus.csv",
             fasta = "{:prev:}/{:target:}.fasta.gz",
@@ -289,7 +297,7 @@ with Stage("bin_vp") as S:
 
     checkpoint vp_bin_fasta:
         message:
-            """Sorting sequences into bins"""
+            "{:name:}: Sorting sequences into bins {output.bins}"
         input:
             call_flist = "{:this:}/{target}.call_flist",
             fasta_flist = "{:this:}/{target}.fasta_flist",
@@ -298,6 +306,8 @@ with Stage("bin_vp") as S:
             fasta =  "{:this:}/{target}.{:bin:}.fasta.gz",
         log:
             "{:this:}/{target}.bin.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         threads: 1
         conda:
             "virprof_py"
@@ -326,7 +336,7 @@ with Stage("bin_vp") as S:
 with Stage("summarize_vp") as S:
     rule vp_aggregate_classifiations:
         message:
-            "Creating virus summary for {:this:}"
+            "{:name:}: Creating virus summary {output.excel}"
         input:
             virushostdb="{:prev:}/virushostdb.tsv",
             calls="{:prev:}/{:target:}.virus.csv",
@@ -339,6 +349,8 @@ with Stage("summarize_vp") as S:
             basecov_files=temp("{:this:}/{target}.basecov_flist"),
             scaffold_files=temp("{:this:}/{target}.scaffold_flist"),
             excel="{:this:}/{target}.summary.xlsx",
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         log:
             "{:this:}/{target}.summary.log"
         params:
@@ -379,7 +391,7 @@ with Stage("summarize_vp") as S:
 
     rule vp_aggregate_genomes:
         message:
-            "Copying genome files to {:this:}"
+            "{:name:}: Copying genome files to {:this:}"
         input:
             fasta = "{:prev:}/{:target:}.fasta.gz"
         output:
