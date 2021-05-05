@@ -75,7 +75,9 @@ class FastaFile:
     def __init__(self, iofile: Optional[BinaryIO] = None, mode="r") -> None:
         self.iofile = iofile
         self.mode = mode
-        self.sequences = self._try_load_all()
+        self.sequences = {}
+        self.comments = {}
+        self._try_load_all()
         self._written = set()
 
         if "w" in mode:
@@ -105,22 +107,38 @@ class FastaFile:
     def _try_load_all(self) -> Optional[Dict[bytes, bytes]]:
         if "r" not in self.mode:
             return {}
-        sequences = {}
         fastafile = read_from_command(["gunzip", "-dc", self.iofile.name])
+        self.load_fasta(fastafile)
+
+    def load_fasta(self, fastafile: str):
+        sequences = {}
+        comments = {}
         fasta_header = b">"[0]
         acc = None
+        comment = None
         lines = []
         for line in fastafile:
-            if line[0] == fasta_header:
+            if line and line[0] == fasta_header:
                 if acc is not None:
                     sequences[acc] = b"".join(lines)
+                    comments[acc] = comment
                     lines = []
-                acc = line[1:].split(maxsplit=1)[0]
+                header = line[1:].split(maxsplit=1)
+                if not header:
+                    raise IOError("Empty header in fasta")
+                if len(header) == 1:
+                    acc = header[0]
+                    comment = b""
+                else:
+                    acc, comment = header
+                comment = comment.decode("utf-8").rstrip("\n")
             else:
                 lines.append(line.strip())
         if acc is not None:
             sequences[acc] = b"".join(lines)
-        return sequences
+            comments[acc] = comment
+        self.sequences.update(sequences)
+        self.comments.update(comments)
 
     def __iter__(self):
         for acc in self.sequences:

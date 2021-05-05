@@ -1058,6 +1058,39 @@ def download_genomes(
         )
         out_gb.write(data)
 
+@cli.command()
+@click.option("--in-fasta", "-i", type=click.File("r"), help="Input FASTA file from pipeline", required=True)
+@click.option("--out-fasta", "-o", type=click.File("w"), help="Output FASTA file for alignment+treeing", required=True)
+@click.option("--min-bp", type=int, help="Minimum number of unambious base pairs", required=True)
+def prepare_phylo(in_fasta, out_fasta, min_bp):
+    setup_logging()
+    LOG.info("Output sequences must have >= %i unambigous bases", min_bp)
+    genomes = FastaFile(in_fasta)
+    out = FastaFile(out_fasta, "w")
+    LOG.info("Found %i sequences in file '%s'", len(genomes), in_fasta.name)
+    count = 0
+    references = set()
+    for acc in genomes:
+        sequence = genomes.get(acc)
+        bp = sum(sequence.count(base) for base in (b"A", b"G", b"C", b"T"))
+        if bp < min_bp:
+            continue
+        out.put(acc, sequence, genomes.comments.get(acc.encode("utf-8")))
+        count += 1
+        if acc.endswith("_pilon"):
+            acc = acc[:-len("_pilon")]
+        sample, _, acc = acc.partition(".")
+        references.add(acc)
+    LOG.info("Exported %i sequences", count)
+    LOG.info("Reference accs mentioned: %s", ", ".join(references))
+    entrez = EntrezAPI()
+    sequences = entrez.fetch("nucleotide", ids=list(references), rettype="fasta")
+    ref_fasta = FastaFile(mode="")
+    ref_fasta.load_fasta(sequences.encode('ascii').splitlines())
+    for acc in ref_fasta:
+        out.put(acc, ref_fasta.get(acc), ref_fasta.comments.get(acc.encode("utf-8")))
+
+
 if __name__ == "__main__":
     setup_logging()
     # pylint: disable=unexpected-keyword-arg, no-value-for-parameter
