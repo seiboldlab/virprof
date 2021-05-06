@@ -182,4 +182,4 @@ class WordScorer:
         staxids = [
             taxid for taxid, score in sorted(taxid_scores.items(), key=lambda k: k[1])
         ]
-        return staxids[0]
+        return next(iter(staxids), None)
