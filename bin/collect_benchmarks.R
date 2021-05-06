@@ -1,4 +1,4 @@
-#!/usr/bin/Rscript
+#!/usr/bin/env Rscript
 library(optparse)
 library(tidyverse)
 
@@ -6,8 +6,7 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
     option_list <- list(
         make_option(c("--in-folder"),
                     metavar = "DIR",
-                    help = "Load data from folder",
-                    default = "benchmarks"),
+                    help = "Load data from folder"),
         make_option(c("--in-rds"),
                     metavar = "FILE",
                     help = "Load data from RDS",
@@ -133,8 +132,8 @@ if (!is_null(opt$options$out_rds)) {
 }
     
 
-if (!is_null(opt$options$out)) {
-    message("Printing to ", opt$options$out)
+if (!is_null(opt$options$out_pdf)) {
+    message("Printing to ", opt$options$out_pdf)
     pdf(opt$options$out)
 }
 
