@@ -9,7 +9,6 @@ from typing import Set, Sequence, Any, Iterator, Dict, Tuple, Callable, Optional
 import graph_tool as gt  # type: ignore
 import graph_tool.search as gt_search  # type: ignore
 import graph_tool.util as gt_util  # type: ignore
-import networkx as nx  # type: ignore
 
 LOG = logging.getLogger(__name__)
 
@@ -17,9 +16,7 @@ LOG = logging.getLogger(__name__)
 class Taxonomy(ABC):
     """Base class holding NCBI taxonomy
 
-    The tree is implemented in subclasses TaxonomyGT and
-    TaxonomyNX, using graph-tool and networkx libraries,
-    respectively.
+    The tree is implemented in subclass TaxonomyGT using graph-tool library.
 
     Args:
       path: Either path to directory containing names.dmp and nodes.dmp or
@@ -345,48 +342,6 @@ class TaxonomyGT(Taxonomy):
         return ids
 
 
-class TaxonomyNX(Taxonomy):
-    """Implementation of Taxonomy class using NetworkX
-
-    No longer actually used.
-    """
-
-    def load_tree_binary(self) -> nx.DiGraph:
-        return nx.read_gpickle(self.path)
-
-    def save_tree_binary(self, path: str) -> None:
-        nx.write_gpickle(self.tree, path)
-
-    def load_tree(self) -> nx.DiGraph:
-        tree = nx.DiGraph()
-        tree.add_nodes_from(self.node_reader())
-        tree.add_edges_from(self.edge_reader())
-        return tree
-
-    def get_subtree_ids(self, name: str) -> Set[int]:
-        for node, data in self.tree.nodes(data=True):
-            if data.get("name") == name:
-                taxid: int = node
-                break
-        else:
-            return set()
-        ids = set(*nx.descendants(self.tree, taxid))
-        ids.add(taxid)
-        return ids
-
-    def get_lineage(self, tax_id: int) -> str:
-        if tax_id not in self.tree:
-            return "Unknown"
-        path = nx.shortest_path(self.tree, self.root, tax_id)
-        return "; ".join(self.tree.nodes[node].get("name") for node in path[1:])
-
-    def get_name(self, tax_id: int) -> str:
-        if tax_id not in self.tree:
-            return "Unknown"
-        name: str = self.tree.nodes[tax_id].get("name")
-        return name
-
-
 class TaxonomyNull(Taxonomy):
     """Implementation of Taxonomy Class not doing anything
 
@@ -437,12 +392,6 @@ def load_taxonomy(path: Optional[str], library: Optional[str] = None) -> Taxonom
     if library is None:
         if path is None:
             return TaxonomyNull(None)
-        if path.endswith(".nx"):
-            library = "networkx"
-        else:
-            library = "graph_tool"
     if path is None:
         raise RuntimeError("If taxonomy library is specified, path cannot be None")
-    if library == "networkx":
-        return TaxonomyNX(path)
     return TaxonomyGT(path)
