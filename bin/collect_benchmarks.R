@@ -55,23 +55,23 @@ stack_to_subpipeline <- function(stacks) {
 thread_map = list(
     "UNKNOWN" = -1,
     "annotate_blast" = 24,
-    "basecov_bedtools" = 1,
-    "bin_vp" = 1,          
-    "blastbin_vp" = 1,
-    "blastfilter_vp" = 1,
-    "coverage_samtools" = 1,
+    "basecov_bedtools" = 2,
+    "bin_vp" = 2,
+    "blastbin_vp" = 2,
+    "blastfilter_vp" = 2,
+    "coverage_samtools" = 2,
     "dust_bbmap" = 8,
     "extract_reads" = 4,
-    "format_bbmap" = 4,    
+    "format_bbmap" = 4,
     "index_bowtie2" = 8,
     "map_bowtie2" = 12,
-    "map_hisat2" = 16,       
+    "map_hisat2" = 16,
     "markdup_sambamba" = 8,
-    "polish_pilon" = 1, 
-    "scaffold_vp" = 1,
+    "polish_pilon" = 2,
+    "scaffold_vp" = 2,
     "sort_bam" = 8,
     "spades" = 48,
-    "summarize_vp" = 1,     
+    "summarize_vp" = 2,
     "trim_bbmap" = 16
 )
 
@@ -130,29 +130,91 @@ if (!is_null(opt$options$out_rds)) {
     message("Saving data to '", opt$options$out_rds, "' ...")
     saveRDS(object = df, file = opt$options$out_rds)
 }
-    
+
 
 if (!is_null(opt$options$out_pdf)) {
     message("Printing to ", opt$options$out_pdf)
-    pdf(opt$options$out)
+    pdf(opt$options$out, width=8, height=6)
 }
 
+
 message("Preparing plot...")
-df %>%
+
+data <- df %>%
     group_by(stage, stack, sample) %>%
-    summarize(s=sum(s), .groups="drop") %>%
+    summarize(s=sum(s), cpu_time=sum(cpu_time), .groups="drop") %>%
     mutate(
         subpipeline = stack_to_subpipeline(stack),
+        subpipeline_stage = paste(subpipeline, stage),
         threads = stage_to_threads(stage),
-        s = s * threads
+        core_hours = s * threads / 3600 / 2
     ) %>%
+    group_by(subpipeline) %>%
     mutate(
-        sample = sub("[0-9]*$", "", sample),
-        sample = sub("ALL", "Collect", sample)
+        stage_rank = subpipeline_stage %>% rank()
     ) %>%
-    ggplot(aes(x=sample, y=s, fill=subpipeline)) +
-    geom_col() +
-    theme_classic()
+    filter(
+        sample != "ALL"
+    )
+
+g<-ggplot(data, aes(x=sample, y=core_hours, fill=subpipeline, alpha=stage_rank)) +
+    scale_y_continuous(
+        name="Core Hours",
+        expand = expansion(mult = c(0, 0), add=c(.1,.1))
+    ) +
+    scale_x_discrete(name="Sample") +
+    scale_fill_discrete(name=NULL) +
+    scale_alpha_continuous(range = c(1, 1), guide=NULL) +
+    geom_col(position="stack") +
+    theme_classic() +
+    theme(
+        axis.text.x = element_text(angle=90, hjust=1, vjust=0.5)
+    ) +
+    ggtitle("Wall-Time by Sample and Step")
+if (length(unique(df$sample)) > 20) {
+    g <- g + theme(
+                 axis.text.x = element_blank(),
+                 axis.ticks.x = element_blank()
+             )
+}
+print(g)
+
+g<-data %>%
+    filter(threads > 2) %>%
+    mutate(
+        efficency = cpu_time / (s * threads),
+        stage=factor(stage)
+    ) %>%
+    ggplot(aes(x=cpu_time, y=s*threads)) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1, color="green") +
+    geom_abline(intercept = 0, slope = 2, color="orange") +
+    geom_abline(intercept = 0, slope = 4, color="red") +
+    geom_label(
+        data = data %>%
+            filter(threads > 2) %>%
+            group_by(stage) %>%
+            summarize(threads=max(threads)),
+        aes(label=threads),
+        x=-Inf, y=Inf, vjust=1, hjust=0,
+    ) +
+    theme_classic() +
+    facet_wrap(~stage, scales = "free") +
+    ggtitle("CPU Utilization (wall-clock vs CPU time)") +
+    labs(
+        x = "CPU seconds used",
+        y = "CPU seconda allocated"
+    )
+
+print(g)
+
+
+
+message("Sample processing core hour stats")
+data %>%
+    group_by(sample) %>%
+    summarize(core_hours = sum(core_hours), .groups="drop") %>%
+    summary()
 
 
 if (!is_null(opt$options$out)) {
