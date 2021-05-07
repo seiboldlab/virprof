@@ -155,7 +155,18 @@ data <- df %>%
     ) %>%
     filter(
         sample != "ALL"
-    )
+    ) %>% ungroup()
+
+data %>%
+    group_by(sample, subpipeline_stage) %>%
+    summarise(core_hours = sum(core_hours), .groups="drop") %>%
+    spread(subpipeline_stage, core_hours) %>%
+    as.matrix() %>%
+    dist() %>%
+    hclust()
+
+as.data.frame(data[c(4,5),])
+
 
 g<-ggplot(data, aes(x=sample, y=core_hours, fill=subpipeline, alpha=stage_rank)) +
     scale_y_continuous(
