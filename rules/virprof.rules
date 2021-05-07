@@ -46,7 +46,8 @@ with ymp.get_config().references.NcbiTaxonomy:
             "{:name:}: Creating graph tool binary format tree from NCBI taxonomy"
         input:
             ncbi_nodes = "{:prev:}/ALL.NCBI.nodes.dmp",
-            ncbi_names = "{:prev:}/ALL.NCBI.names.dmp"
+            ncbi_names = "{:prev:}/ALL.NCBI.names.dmp",
+            ncbi_merged = "{:prev:}/ALL.NCBI.merged.dmp",
         output:
             "{:this:}/ALL.taxonomy.gt"
         log:
