@@ -27,6 +27,8 @@ class Taxonomy(ABC):
     NODES_FN = "nodes.dmp"
     #: Name of file containing names
     NAMES_FN = "names.dmp"
+    #: Name of file containing merged nodes
+    MERGED_FN = "merged.dmp"
 
     def __init__(self, path: Optional[str]) -> None:
         self.path = path
@@ -59,6 +61,11 @@ class Taxonomy(ABC):
     def nodes_fn(self) -> Optional[str]:
         """Path to the nodes.dmp file"""
         return self._find_file(self.NODES_FN)
+
+    @property
+    def merged_fn(self) -> Optional[str]:
+        """Path to the merged.dmp file"""
+        return self._find_file(self.MERGED_FN)
 
     @abstractmethod
     def load_tree_binary(self) -> Any:
@@ -111,7 +118,7 @@ class Taxonomy(ABC):
         """Reader for NCBI nodes.dmp, listing node and parent ids
 
         Returns:
-           Generator over taxids ``(source, target)``
+           Generator over taxids ``(source, target, rank)``
         """
         if self.nodes_fn is None:
             return
@@ -124,6 +131,20 @@ class Taxonomy(ABC):
                 source_node = int(row["parent_id"])
                 target_node = int(row["tax_id"])
                 yield source_node, target_node, row["rank"]
+
+    def merged_reader(self) -> Iterator[Tuple[int, int]]:
+        """Reader for NCBI merged.dmp, listing taxids merged into another
+
+        Returns:
+           Iterator over taxids ``(old, new)``
+        """
+        if self.merged_fn is None:
+            return
+        LOG.info("Reading merged nodes from '%s'", self.merged_fn)
+        with open(self.merged_fn, "r") as merged_fd:
+            reader = csv.DictReader(merged_fd, delimiter="|", fieldnames=["old", "new"])
+            for row in reader:
+                yield int(row["old"]), int(row["new"])
 
     @abstractmethod
     def get_name(self, tax_id: int) -> str:
@@ -257,6 +278,8 @@ class TaxonomyGT(Taxonomy):
         tree.vp.rank = tree.new_vertex_property("string")
         for _, tax_id, rank in self.edge_reader():
             tree.vp.rank[tree.vertex(tax_id)] = rank.strip()
+        for src, dst in self.merged_reader():
+            tree.add_edge(dst, src)
         return tree
 
     def load_tree_binary(self) -> gt.Graph:
@@ -265,9 +288,25 @@ class TaxonomyGT(Taxonomy):
     def save_tree_binary(self, path: str) -> None:
         self.tree.save(path)
 
+    def _get_vertex(self, tax_id: int) -> Optional[gt.Vertex]:
+        # Get node and check that it's "real":
+        try:
+            vertex = self.tree.vertex(tax_id)
+        except ValueError:
+            # tax_id larger than largest in tree
+            return None
+        if not vertex.in_degree():
+            # not connected at all, empty index in the middle
+            return None
+        while not self.tree.vp.name[vertex]:
+            vertex = next(vertex.in_edges()).source()
+            if not vertex.in_degree():
+                return None
+        return vertex
+
     def get_name(self, tax_id: int) -> str:
         try:
-            return self.tree.vp.name[self.tree.vertex(tax_id)] or "Unknown"
+            return self.tree.vp.name[self._get_vertex(tax_id)]
         except ValueError:
             return "Unknown"
 
@@ -278,16 +317,6 @@ class TaxonomyGT(Taxonomy):
             res.append(target)
         res.reverse()
         return res
-
-    def _get_vertex(self, tax_id: int):
-        # Get node and check that it's "real":
-        try:
-            vertex = self.tree.vertex(tax_id)
-            # Check target has parent by tiggering StopIteration if it does not
-            next(vertex.in_edges())
-        except (ValueError, StopIteration):
-            return None
-        return vertex
 
     def get_lineage(self, tax_id: int) -> Sequence[str]:
         target = self._get_vertex(tax_id)
@@ -322,6 +351,8 @@ class TaxonomyGT(Taxonomy):
 
     def get_siblings(self, tax_id: int) -> Set[int]:
         target = self._get_vertex(tax_id)
+        if target is None:
+            return set()
         parent = next(target.in_edges()).source()
         rank = self.tree.vp.rank[target]
         siblings = set()
