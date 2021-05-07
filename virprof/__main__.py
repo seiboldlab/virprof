@@ -207,6 +207,7 @@ def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
 @click.group()
 def cli() -> None:
     """Use any of the subcommands"""
+    setup_logging()
 
 
 @cli.command()
@@ -975,8 +976,6 @@ def download_genomes(
         out_gb,
         ncbi_taxonomy,
 ):
-    setup_logging()
-
     LOG.info("Loading taxonomy from %s", ncbi_taxonomy)
     taxonomy = load_taxonomy(ncbi_taxonomy)
     LOG.info("Searching for species '%s'...", species)
@@ -1063,7 +1062,6 @@ def download_genomes(
 @click.option("--out-fasta", "-o", type=click.File("w"), help="Output FASTA file for alignment+treeing", required=True)
 @click.option("--min-bp", type=int, help="Minimum number of unambious base pairs", required=True)
 def prepare_phylo(in_fasta, out_fasta, min_bp):
-    setup_logging()
     LOG.info("Output sequences must have >= %i unambigous bases", min_bp)
     genomes = FastaFile(in_fasta)
     out = FastaFile(out_fasta, "w")
@@ -1092,6 +1090,5 @@ def prepare_phylo(in_fasta, out_fasta, min_bp):
 
 
 if __name__ == "__main__":
-    setup_logging()
     # pylint: disable=unexpected-keyword-arg, no-value-for-parameter
     cli(prog_name="python -m virprof")
