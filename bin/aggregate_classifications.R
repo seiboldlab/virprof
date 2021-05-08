@@ -372,8 +372,9 @@ load_coverages <- function(calls, coverage_filelist_file) {
         select(-path) %>%
         dplyr::rename(rname = "#rname") %>%
         mutate(rname = gsub("_pilon$", "", rname)) %>%
-        separate(rname, c("sample", "sacc"), sep="\\.", remove = TRUE) %>%
-        separate(sacc, c("sacc", "fragment"), sep="_", fill = "left") %>%
+        separate(rname, c("sample", "sacc"), sep="\\.") %>%
+        mutate(sacc = sub("(\\d)_(\\d{1,3})", "\\1:\\2", sacc)) %>%
+        separate(sacc, c("sacc", "fragment"), sep=":", fill = "right") %>%
         group_by(sample, sacc) %>%
         summarize(numreads2 = sum(numreads), .groups="drop")
 
@@ -407,7 +408,8 @@ load_scaffolds <- function(calls, scaffold_filelist_file) {
         unnest(cols=c(data)) %>%
         select(-path) %>%
         separate("acc", c("sample", "sacc"), sep="\\.", remove = TRUE) %>%
-        separate("sacc", c("sacc", "fragment"), sep="_", fill = "right") %>%
+        mutate(sacc = sub("(\\d)_(\\d{1,3})", "\\1:\\2", sacc)) %>%
+        separate(sacc, c("sacc", "fragment"), sep=":", fill = "right") %>%
         group_by(sample, sacc, sstart, send) %>%
         mutate(bp = mean(bp)/length(bp)) %>%
         group_by(sample, sacc) %>%
