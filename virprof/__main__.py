@@ -348,9 +348,6 @@ def blastbin(
         setup_debug()
 
     if out_features is not None:
-        if not ncbi_api_key:
-            # Make it so empty command line parameter equals no api key set
-            ncbi_api_key = None
         features = FeatureTables(cache_path=cache_path, api_key=ncbi_api_key)
     else:
         features = None
@@ -401,7 +398,6 @@ def blastbin(
     LOG.info("Using sample=%s", sample)
 
     wordscorer = WordScorer(keepwords=num_words)
-    LOG.info("Loading taxonomy from {}".format(ncbi_taxonomy))
     taxonomy = load_taxonomy(ncbi_taxonomy)
 
     if not no_standard_excludes:
@@ -948,6 +944,24 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
         out.close()
     LOG.info("FINISHED")
 
+def get_genome_size(taxid=None, organism_name=None, entrez=None):
+    genome_sizes = GenomeSizes(entrez=entrez)
+    if not taxid:
+        if not organism_name:
+            raise RuntimeError("Need either taxid or organism name")
+        LOG.info("Finding taxid for %s", organism_name)
+        taxid = genome_sizes.get_taxid(organism_name)
+    LOG.info("Determining genome size...")
+
+    genome_method, genome_size = genome_sizes.get(taxid)
+    if not genome_size:
+        raise RuntimeError("Failed to determine genome size.")
+        return 1
+    LOG.info("Found genome size %i using method %s", genome_size, genome_method)
+    min_len = genome_size * 0.8
+    max_len = genome_size * 1.2
+    return min_len, max_len
+
 @cli.command()
 @click.option("--species", required=True)
 @click.option("--outgroup", type=click.Choice(["yes", "no", "only"]), default="no")
@@ -976,30 +990,15 @@ def download_genomes(
         out_gb,
         ncbi_taxonomy,
 ):
-    LOG.info("Loading taxonomy from %s", ncbi_taxonomy)
+    entrez = EntrezAPI(defaults=defaults, api_key=ncbi_api_key)
+
     taxonomy = load_taxonomy(ncbi_taxonomy)
-    LOG.info("Searching for species '%s'...", species)
     taxid = taxonomy.get_taxid(species)
     if taxid is None:
-        LOG.error("Species '%s' not found in taxonomy", species)
         return 1
-    LOG.info("Found taxid %i", taxid)
 
-    if ncbi_api_key is not None:
-        defaults = {"api_key": ncbi_api_key}
-    else:
-        defaults = {}
-    entrez = EntrezAPI(defaults=defaults)
     if auto_len:
-        LOG.info("Determining genome size...")
-        genome_sizes = GenomeSizes(entrez=entrez)
-        genome_method, genome_size = genome_sizes.get(taxid)
-        if not genome_size:
-            LOG.info("Failed to determine genome size. Aborting.")
-            return 1
-        LOG.info("Found genome size %i using method %s", genome_size, genome_method)
-        min_len = genome_size * 0.8
-        max_len = genome_size * 1.2
+        min_len, max_len = get_genome_size(taxid=taxid, entrez=entrez)
 
     ids = []
     accs = []
@@ -1060,8 +1059,14 @@ def download_genomes(
 @cli.command()
 @click.option("--in-fasta", "-i", type=click.File("r"), help="Input FASTA file from pipeline", required=True)
 @click.option("--out-fasta", "-o", type=click.File("w"), help="Output FASTA file for alignment+treeing", required=True)
-@click.option("--min-bp", type=int, help="Minimum number of unambious base pairs", required=True)
+@click.option("--min-bp", type=int, help="Minimum number of unambious base pairs")
 def prepare_phylo(in_fasta, out_fasta, min_bp):
+    if not min_bp:
+        match = re.search("([^.]+)\.fasta.gz", in_fasta.name)
+        if not match:
+            LOG.error("Unable to detect organism name from input fasta file")
+        name = match.group(1).replace("_", " ")
+        min_bp, _ = get_genome_size(organism_name=name)
     LOG.info("Output sequences must have >= %i unambigous bases", min_bp)
     genomes = FastaFile(in_fasta)
     out = FastaFile(out_fasta, "w")

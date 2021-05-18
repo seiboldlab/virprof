@@ -170,9 +170,14 @@ class EntrezAPI(BaseAPI):
         self,
         session: Optional[Session] = None,
         defaults: Optional[Dict[str, str]] = None,
+        api_key: Optional[str] = None,
         timeout: int = 120,
         retries: int = 3,
     ) -> None:
+        if not defaults:
+            defaults = {}
+        if api_key:
+            defaults["api_key"] = api_key
         super().__init__(session=session, defaults=defaults, timeout=timeout)
         self._retries = retries
 
@@ -528,11 +533,9 @@ class FeatureTables:
         cache_path: str = None,
         api_key=None,
     ) -> None:
-        if api_key is not None:
-            defaults = {"api_key": api_key}
-        else:
-            defaults = None
-        self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
+        if not entrez:
+            entrez = EntrezAPI(defaults=defaults, api_key=api_key)
+        self.entrez = entrez
         self.parser = parser if parser is not None else FeatureTableParser()
         self.cache = Cache(cache_path)
 
@@ -667,11 +670,9 @@ class GenomeSizes:
         cache_path: str = None,
         api_key=None,
     ) -> None:
-        if api_key is not None:
-            defaults = {"api_key": api_key}
-        else:
-            defaults = None
-        self.entrez = entrez if entrez is not None else EntrezAPI(defaults=defaults)
+        if not entrez:
+            entrez = EntrezAPI(api_key=api_key)
+        self.entrez = entrez
         self.genome = genome if genome is not None else NcbiGenomeAPI()
         self.cache = Cache(cache_path)
 
@@ -767,6 +768,17 @@ class GenomeSizes:
         self.cache.put("genome_sizes", newresult)
         result.update(newresult)
         return result
+
+    def get_taxid(self, scientific_name: str) -> Optional[int]:
+        query = f"{scientific_name}[SCIN]"
+        result = self.entrez.search("taxonomy", query)
+        if not "idlist" in result:
+            raise RuntimeError(f"Failed to find results for taxonomy query '{query}'")
+        if len(result["idlist"]) > 1:
+            raise RuntimeError(f"Got multiple taxids for '{query}': {', '.join(result['idlist'])}")
+        if len(result["idlist"]) == 0:
+            return None
+        return result["idlist"][0]
 
     def get(self, taxid: int, nocache: bool = False) -> Tuple[str, int]:
         return self.get_many([taxid], nocache=nocache).get(taxid, (None, None))

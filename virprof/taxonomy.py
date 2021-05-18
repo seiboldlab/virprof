@@ -283,6 +283,7 @@ class TaxonomyGT(Taxonomy):
         return tree
 
     def load_tree_binary(self) -> gt.Graph:
+        LOG.info("Loading taxonomy from %s", ncbi_taxonomy)
         return gt.load_graph(self.path)
 
     def save_tree_binary(self, path: str) -> None:
@@ -344,9 +345,12 @@ class TaxonomyGT(Taxonomy):
         return "Unknown"
 
     def get_taxid(self, name: str) -> Optional[int]:
+        LOG.info("Searching for species '%s'...", species)
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
         if len(vertices) != 1:
+            LOG.error("Species '%s' not found in taxonomy", species)
             return
+        LOG.info("Found taxid %i", taxid)
         return vertices[0]
 
     def get_siblings(self, tax_id: int) -> Set[int]:
