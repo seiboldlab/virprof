@@ -45,10 +45,10 @@ stack_to_subpipeline <- function(stacks) {
     res[grepl("qc_fastqc", stacks)] <- "QC"
     res[grepl("map_hisat2", stacks)] <- "Deplete Host Reads"
     res[grepl("dust_bbmap", stacks)] <- "Assemble"
+    res[grepl("index_bowtie2", stacks)] <- "Coverage"
     res[grepl("annotate_blast", stacks)] <- "Blast & Bin"
     res[grepl("scaffold_vp", stacks)] <- "Scaffold"
     res[grepl("summarize_vp", stacks)] <- "Report"
-    res[grepl("index_bowtie2", stacks)] <- "Coverage"
     factor(res, levels=rev(c("QC", "Deplete Host Reads", "Assemble", "Coverage", "Blast & Bin", "Scaffold", "Report")))
 }
 
@@ -157,18 +157,23 @@ data <- df %>%
         sample != "ALL"
     ) %>% ungroup()
 
-data %>%
-    group_by(sample, subpipeline_stage) %>%
-    summarise(core_hours = sum(core_hours), .groups="drop") %>%
-    spread(subpipeline_stage, core_hours) %>%
-    as.matrix() %>%
-    dist() %>%
-    hclust()
+lines <- data %>%
+    group_by(sample) %>%
+    summarise(core_hours=sum(core_hours), .groups="drop") %>%
+    summarize(
+        samples = n(),
+        core_hours=mean(core_hours),
+        label = paste("average =", round(core_hours, 1), "h")
+    )
 
-as.data.frame(data[c(4,5),])
 
-
-g<-ggplot(data, aes(x=sample, y=core_hours, fill=subpipeline, alpha=stage_rank)) +
+g <- data %>%
+    ggplot(aes(
+        x=reorder(sample, -core_hours),
+        y=core_hours,
+        fill=subpipeline,
+        alpha=stage_rank)
+        ) +
     scale_y_continuous(
         name="Core Hours",
         expand = expansion(mult = c(0, 0), add=c(.1,.1))
@@ -179,9 +184,22 @@ g<-ggplot(data, aes(x=sample, y=core_hours, fill=subpipeline, alpha=stage_rank))
     geom_col(position="stack") +
     theme_classic() +
     theme(
-        axis.text.x = element_text(angle=90, hjust=1, vjust=0.5)
+        axis.text.x = element_text(angle=90, hjust=1, vjust=0.5),
+        legend.position=c(0.9,0.8)
     ) +
-    ggtitle("Wall-Time by Sample and Step")
+    ggtitle("CPU Time Consumed Per Sample") +
+    geom_hline(
+        aes(yintercept=mean(core_hours)),
+        data=lines,
+        size=.5,
+        linetype = "dashed"
+    ) +
+    geom_text(
+        aes(x=samples, y=core_hours, label=label, fill="Assemble", alpha=1),
+        data=lines,
+        hjust=1,
+        vjust=-1
+    )
 if (length(unique(df$sample)) > 20) {
     g <- g + theme(
                  axis.text.x = element_blank(),
@@ -189,6 +207,10 @@ if (length(unique(df$sample)) > 20) {
              )
 }
 print(g)
+
+
+data %>% filter(subpipeline == "Scaffold")
+data$subpipeline%>%unique
 
 g<-data %>%
     filter(threads > 2) %>%
@@ -219,18 +241,25 @@ g<-data %>%
 
 print(g)
 
-
-
-message("Sample processing core hour stats")
-data %>%
+message("Summary stats:")
+sumry <- data %>%
     group_by(sample) %>%
-    summarize(core_hours = sum(core_hours), .groups="drop") %>%
-    summary()
+    summarize(core_hours = sum(core_hours), .groups="drop")
 
+message("  Sample processing node minutes:")
+quantile(sumry$core_hours/48*60, c(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1))
+message("Average = ", mean((sumry$core_hours/48*60)))
+message("  Sample processing core hours:")
+quantile(sumry$core_hours, c(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1))
+message("Average = ", mean((sumry$core_hours)))
+
+message("Percent by component:")
+data %>% group_by(subpipeline) %>% summarize(core_hours=sum(core_hours), .groups="drop") %>% mutate(core_hours=round(core_hours/sum(core_hours)*100,1))
 
 if (!is_null(opt$options$out)) {
     message("Closing file ", opt$options$out)
     dev.off()
 }
+
 
 message("DONE")
