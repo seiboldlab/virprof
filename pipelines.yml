@@ -82,7 +82,7 @@ pipelines:
       - coverage:
           hide: true
       - group_sample
-      - polish_pilon:
+      - polish_pilonSIL:
           hide: true
       - coverage
       - group_ALL
