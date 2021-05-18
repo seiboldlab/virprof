@@ -283,7 +283,7 @@ class TaxonomyGT(Taxonomy):
         return tree
 
     def load_tree_binary(self) -> gt.Graph:
-        LOG.info("Loading taxonomy from %s", ncbi_taxonomy)
+        LOG.info("Loading taxonomy from %s", self.path)
         return gt.load_graph(self.path)
 
     def save_tree_binary(self, path: str) -> None:
