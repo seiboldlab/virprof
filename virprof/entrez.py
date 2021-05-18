@@ -270,6 +270,17 @@ class EntrezAPI(BaseAPI):
         parsed = json.loads(result)
         return parsed["esearchresult"]
 
+    def info(self, database: str):
+        result = self._get(
+            "einfo",
+            {
+                "db": database,
+                "retmode": "json",
+            }
+        )
+        parsed = json.loads(result)
+        return parsed["einforesult"]
+
     def summary(self, database: str, query):
         """Calls Entrez Search (esearch) API"""
         data = self._get(
