@@ -12,9 +12,11 @@ if sys.version_info.major < 3 or sys.version_info.minor < 6:
 def get_ymp_yml():
     try:
         import virprof.pipeline
+
         paths = virprof.pipeline.__path__
     except ModuleNotFoundError:
         import virprof
+
         paths = [os.path.dirname(modpath) for modpath in virprof.__path__]
     for path in paths:
         ymp_yml = os.path.join(path, "virprof.yml")

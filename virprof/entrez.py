@@ -276,7 +276,7 @@ class EntrezAPI(BaseAPI):
             {
                 "db": database,
                 "retmode": "json",
-            }
+            },
         )
         parsed = json.loads(result)
         return parsed["einforesult"]
@@ -786,7 +786,9 @@ class GenomeSizes:
         if not "idlist" in result:
             raise RuntimeError(f"Failed to find results for taxonomy query '{query}'")
         if len(result["idlist"]) > 1:
-            raise RuntimeError(f"Got multiple taxids for '{query}': {', '.join(result['idlist'])}")
+            raise RuntimeError(
+                f"Got multiple taxids for '{query}': {', '.join(result['idlist'])}"
+            )
         if len(result["idlist"]) == 0:
             return None
         return result["idlist"][0]

@@ -944,6 +944,7 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
         out.close()
     LOG.info("FINISHED")
 
+
 def get_genome_size(taxid=None, organism_name=None, entrez=None):
     genome_sizes = GenomeSizes(entrez=entrez)
     if not taxid:
@@ -961,6 +962,7 @@ def get_genome_size(taxid=None, organism_name=None, entrez=None):
     min_len = genome_size * 0.8
     max_len = genome_size * 1.2
     return min_len, max_len
+
 
 @cli.command()
 @click.option("--species", required=True)
@@ -980,18 +982,18 @@ def get_genome_size(taxid=None, organism_name=None, entrez=None):
 @click.option("--out-fasta", type=click.File("w"))
 @click.option("--out-gb", type=click.File("w"))
 def download_genomes(
-        species,
-        outgroup,
-        auto_len,
-        min_len,
-        max_len,
-        ncbi_api_key,
-        out_accs,
-        out_fasta,
-        out_gb,
-        ncbi_taxonomy,
+    species,
+    outgroup,
+    auto_len,
+    min_len,
+    max_len,
+    ncbi_api_key,
+    out_accs,
+    out_fasta,
+    out_gb,
+    ncbi_taxonomy,
 ):
-    entrez = EntrezAPI(defaults=defaults, api_key=ncbi_api_key)
+    entrez = EntrezAPI(api_key=ncbi_api_key)
 
     taxonomy = load_taxonomy(ncbi_taxonomy)
     taxid = taxonomy.get_taxid(species)
@@ -1004,26 +1006,33 @@ def download_genomes(
     ids = []
     accs = []
     if outgroup in ("yes", "no"):
-        LOG.info("Querying Entrez Nuccore for matching entries with len between %i and %i...", min_len, max_len)
+        LOG.info(
+            "Querying Entrez Nuccore for matching entries with len between %i and %i...",
+            min_len,
+            max_len,
+        )
         query = entrez.search(
             "nucleotide",
-            f"(txid{taxid}[Organism:exp])"
-            f"AND ({min_len}:{max_len}[SLEN])"
+            f"(txid{taxid}[Organism:exp])" f"AND ({min_len}:{max_len}[SLEN])",
         )
         summaries = entrez.summary("nucleotide", query)
         LOG.info("Found %i matches", len(summaries))
         ids += [tag.text for tag in summaries.findall(".//Id")]
-        accs += [tag.text for tag in summaries.findall(".//*[@Name='AccessionVersion']")]
+        accs += [
+            tag.text for tag in summaries.findall(".//*[@Name='AccessionVersion']")
+        ]
 
     if outgroup in ("yes", "only"):
         taxids = taxonomy.get_siblings(taxid)
         LOG.info("Found %i sibling species", len(taxids))
         for taxid in taxids:
-            LOG.info("  searching for reference for %i (%s)", taxid, taxonomy.get_name(taxid))
+            LOG.info(
+                "  searching for reference for %i (%s)", taxid, taxonomy.get_name(taxid)
+            )
             query = entrez.search(
                 "nucleotide",
                 f"(txid{taxid}[Organism:exp])"
-                f"AND (\"complete genome\") AND (refseq[filter])"
+                f'AND ("complete genome") AND (refseq[filter])',
             )
             summaries = entrez.summary("nucleotide", query)
             if summaries.findall("ERROR"):
@@ -1031,7 +1040,9 @@ def download_genomes(
                 continue
             LOG.info("    found %i matches", len(summaries))
             ids += [next(iter(summaries.findall(".//Id"))).text]
-            accs += [next(iter(summaries.findall(".//*[@Name='AccessionVersion']"))).text]
+            accs += [
+                next(iter(summaries.findall(".//*[@Name='AccessionVersion']"))).text
+            ]
             LOG.info("    added first match (%s)", accs[-1])
 
     if out_accs:
@@ -1041,25 +1052,30 @@ def download_genomes(
 
     if out_fasta:
         LOG.info("Writing FASTA sequences to %s", out_fasta.name)
-        sequences = entrez.fetch(
-            "nucleotide",
-            ids=ids,
-            rettype="fasta"
-        )
+        sequences = entrez.fetch("nucleotide", ids=ids, rettype="fasta")
         out_fasta.write(sequences)
 
     if out_gb:
         LOG.info("Writing genbank to %s", out_fasta.name)
-        data = entrez.fetch(
-            "nucleotide",
-            ids=ids,
-            rettype="gbwithparts"
-        )
+        data = entrez.fetch("nucleotide", ids=ids, rettype="gbwithparts")
         out_gb.write(data)
 
+
 @cli.command()
-@click.option("--in-fasta", "-i", type=click.File("r"), help="Input FASTA file from pipeline", required=True)
-@click.option("--out-fasta", "-o", type=click.File("w"), help="Output FASTA file for alignment+treeing", required=True)
+@click.option(
+    "--in-fasta",
+    "-i",
+    type=click.File("r"),
+    help="Input FASTA file from pipeline",
+    required=True,
+)
+@click.option(
+    "--out-fasta",
+    "-o",
+    type=click.File("w"),
+    help="Output FASTA file for alignment+treeing",
+    required=True,
+)
 @click.option("--min-bp", type=int, help="Minimum number of unambious base pairs")
 def prepare_phylo(in_fasta, out_fasta, min_bp):
     if not min_bp:
@@ -1082,7 +1098,7 @@ def prepare_phylo(in_fasta, out_fasta, min_bp):
         out.put(acc, sequence, genomes.comments.get(acc.encode("utf-8")))
         count += 1
         if acc.endswith("_pilon"):
-            acc = acc[:-len("_pilon")]
+            acc = acc[: -len("_pilon")]
         sample, _, acc = acc.partition(".")
         references.add(acc)
     LOG.info("Exported %i sequences", count)
@@ -1090,7 +1106,7 @@ def prepare_phylo(in_fasta, out_fasta, min_bp):
     entrez = EntrezAPI()
     sequences = entrez.fetch("nucleotide", ids=list(references), rettype="fasta")
     ref_fasta = FastaFile(mode="")
-    ref_fasta.load_fasta(sequences.encode('ascii').splitlines())
+    ref_fasta.load_fasta(sequences.encode("ascii").splitlines())
     for acc in ref_fasta:
         out.put(acc, ref_fasta.get(acc), ref_fasta.comments.get(acc.encode("utf-8")))
 
