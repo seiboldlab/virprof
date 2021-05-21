@@ -973,6 +973,7 @@ def get_genome_size(taxid=None, organism_name=None, entrez=None):
     "-t",
     type=click.Path(),
     help="Path to NCBI taxonomy (tree or raw)",
+    required=True,
 )
 @click.option("--ncbi-api-key", type=str, help="NCBI API Key")
 @click.option("--out-accs", type=click.File("w"))

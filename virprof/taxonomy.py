@@ -345,12 +345,12 @@ class TaxonomyGT(Taxonomy):
         return "Unknown"
 
     def get_taxid(self, name: str) -> Optional[int]:
-        LOG.info("Searching for species '%s'...", species)
+        LOG.info("Searching for species '%s'...", name)
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
         if len(vertices) != 1:
             LOG.error("Species '%s' not found in taxonomy", species)
             return
-        LOG.info("Found taxid %i", taxid)
+        LOG.info("Found taxid %i", vertices[0])
         return vertices[0]
 
     def get_siblings(self, tax_id: int) -> Set[int]:
