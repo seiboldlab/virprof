@@ -523,6 +523,8 @@ class Cache:
 
     def put(self, cache: str, data: Dict[str, str]) -> None:
         """Write to cache"""
+        if not len(data):
+            return
         LOG.info("writing %i entries to cache", len(data))
         tmpdir = tempfile.mkdtemp(dir=self._path)
         for entry in data:
