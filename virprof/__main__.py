@@ -1180,6 +1180,8 @@ def prepare_phylo(
                 if acc.endswith("_pilon"):
                     acc = acc[: -len("_pilon")]
                 sample, _, acc = acc.partition(".")
+                if bp < min_bp:
+                    sample = sample + "_partial"
                 comment += f" [ref={acc}]"
                 out.put(sample, sequence, comment)
                 count += 1
