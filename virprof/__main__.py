@@ -1074,9 +1074,12 @@ def download_genomes(
     "If given, species names will not be autodetected from input fasta file names",
     multiple=True,
 )
-@click.option("--add-outgroup", is_flag=True)
-@click.option("--add-references", is_flag=True)
-@click.option("--add-all-genomes", is_flag=True)
+@click.option("--in-filter", type=str)
+@click.option("--add-outgroup/--no-add-outgroup", is_flag=True, default=False)
+@click.option("--add-references/--no-add-references", is_flag=True, default=True)
+@click.option("--add-all-genomes/--no-add-all-genomes", is_flag=True, default=False)
+@click.option("--add-short/--no-add-short", is_flag=True, default=False)
+@click.option("--add-full/--no-add-full", is_flag=True, default=True)
 @click.option(
     "--out-fasta",
     "-o",
@@ -1095,11 +1098,14 @@ def download_genomes(
 @click.option("--ncbi-api-key", type=str, help="NCBI API Key")
 def prepare_phylo(
     in_fasta,
+    in_filter,
     species,
     out_fasta,
     add_outgroup,
     add_references,
     add_all_genomes,
+    add_short,
+    add_full,
     min_bp,
     ncbi_taxonomy,
     ncbi_api_key,
@@ -1112,6 +1118,9 @@ def prepare_phylo(
     - Sequences from Genbank for given species
     - Outgroup sequences from Genbank for given species
     """
+    if add_outgroup:
+        raise NotImplementedError()
+
     entrez = EntrezAPI(api_key=ncbi_api_key)
     taxonomy = load_taxonomy(ncbi_taxonomy)
     genome_sizes = GenomeSizes(entrez=entrez)
@@ -1155,15 +1164,17 @@ def prepare_phylo(
         LOG.info("Found genome size %i using method %s", genome_size, genome_method)
         min_bp = int(genome_size * 0.8)
         max_bp = int(genome_size * 1.2)
-        LOG.info("Output sequences must have >= %i and <=%i bases", min_bp, max_bp)
+        LOG.info("Full output sequences must have >= %i (and <=%i bases)", min_bp, max_bp)
         if infile:
             genomes = FastaFile(infile)
             LOG.info("Found %i sequences in file '%s'", len(genomes), infile.name)
             count = 0
             for acc in genomes:
+                if in_filter and not re.search(in_filter, acc):
+                    continue
                 sequence = genomes.get(acc)
                 bp = sum(sequence.count(base) for base in (b"A", b"G", b"C", b"T"))
-                if bp < min_bp:
+                if not (bp < min_bp and add_short) and not (bp >= min_bp and add_full):
                     continue
                 comment = genomes.comments.get(acc.encode("utf-8"))
                 if acc.endswith("_pilon"):
@@ -1172,7 +1183,8 @@ def prepare_phylo(
                 comment += f" [ref={acc}]"
                 out.put(sample, sequence, comment)
                 count += 1
-                references.add(acc)
+                if add_references:
+                    references.add(acc)
             LOG.info("Exported %i/%i sequences with ok length", count, len(genomes))
             total_count += count
 
@@ -1187,14 +1199,22 @@ def prepare_phylo(
             )
             LOG.info("Total accessions to fetch now %i", len(references))
 
-    LOG.info("Resolving accessions without version...")
-    query = " OR ".join(f"{acc}[ACCN]" for acc in references if not "." in acc)
+    ref_no_vers = set(acc for acc in references if not "." in acc)
     references = set(acc for acc in references if "." in acc)
-    result = entrez.search("nucleotide", f"{acc}[ACCN]")
-    summaries = entrez.summary("nucleotide", result)
-    references.update(
-        tag.text for tag in summaries.findall(".//*[@Name='AccessionVersion']")
+    LOG.info("Resolving %i accessions without version...", len(ref_no_vers))
+    ref_no_vers = set(
+        acc for acc in ref_no_vers
+        if not any(ref.startswith(acc+".") for ref in references)
     )
+    LOG.info("  .. %i after removing duplicates with versioned accs", len(ref_no_vers))
+    if ref_no_vers:
+        query = " OR ".join(f"{acc}[ACCN]" for acc in ref_no_vers)
+        result = entrez.search("nucleotide", query)
+        summaries = entrez.summary("nucleotide", result)
+        LOG.info(" .. found  %i matches", len(summaries))
+        references.update(
+            tag.text for tag in summaries.findall(".//*[@Name='AccessionVersion']")
+        )
 
     LOG.info("Fetching %i remote sequences...", len(references))
     sequences = entrez.fetch("nucleotide", ids=list(references), rettype="fasta")
