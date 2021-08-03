@@ -12,7 +12,6 @@ references:
         ALL.4.bt2: genome.4.bt2
         ALL.rev.1.bt2: genome.rev.1.bt2
         ALL.rev.2.bt2: genome.rev.2.bt2
-        ALL.fasta: genome.fa
     # The whole genome FASTA (BLAST index will be generated from this)
     - url: !workdir  databases/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
       type: dirx
