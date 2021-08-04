@@ -17,6 +17,12 @@ references:
       type: dirx
       files:
         ALL.fasta: genome.fa
+    # The annotation
+    - url: !workdir  databases/Homo_sapiens/UCSC/hg38/Annotation/Genes/
+      #url: !workdir  databases/Homo_sapiens/UCSC/hg38/Annotation/Genes.gencode/
+      type: dirx
+      files:
+        ALL.gtf: genes.gtf
     # The index files for Hisat2
     - url: !workdir  databases/grch38_snp_tran/
       type: dirx
