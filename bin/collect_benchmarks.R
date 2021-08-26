@@ -263,3 +263,9 @@ if (!is_null(opt$options$out)) {
 
 
 message("DONE")
+
+
+## read counts
+## filtered read counts
+## contigs
+## non-host contigs

@@ -35,6 +35,11 @@ references:
         ALL.6.ht2: genome_snp_tran.6.ht2
         ALL.7.ht2: genome_snp_tran.7.ht2
         ALL.8.ht2: genome_snp_tran.8.ht2
+    # The salmon index
+    - url: /Users/pruessee/genomes/alias/hg38/salmon_partial_sa_index/default/
+      type: direct
+      extension: salmon_index
+        
   # NCBI Nucleotide database for Blast
   NT:
     - url: !workdir databases/nt
