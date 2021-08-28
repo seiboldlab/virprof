@@ -1,6 +1,13 @@
 references:
   # Human reference used for read and contig filtering.
   # This should be the Homo_sapiens_UCSC_hg38.tar.gz unpacked
+  hg38g:
+    - url: http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz
+      type: gtf
+    - url: http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/GRCh38.primary_assembly.genome.fa.gz
+      type: fasta
+    - url: http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.transcripts.fa.gz
+      type: tx.fasta
   hg38:
     # The index files for Bowtie2
     - url: !workdir databases/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
