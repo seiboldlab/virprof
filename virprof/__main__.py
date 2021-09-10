@@ -1164,7 +1164,9 @@ def prepare_phylo(
         LOG.info("Found genome size %i using method %s", genome_size, genome_method)
         min_bp = int(genome_size * 0.8)
         max_bp = int(genome_size * 1.2)
-        LOG.info("Full output sequences must have >= %i (and <=%i bases)", min_bp, max_bp)
+        LOG.info(
+            "Full output sequences must have >= %i (and <=%i bases)", min_bp, max_bp
+        )
         if infile:
             genomes = FastaFile(infile)
             LOG.info("Found %i sequences in file '%s'", len(genomes), infile.name)
@@ -1205,8 +1207,9 @@ def prepare_phylo(
     references = set(acc for acc in references if "." in acc)
     LOG.info("Resolving %i accessions without version...", len(ref_no_vers))
     ref_no_vers = set(
-        acc for acc in ref_no_vers
-        if not any(ref.startswith(acc+".") for ref in references)
+        acc
+        for acc in ref_no_vers
+        if not any(ref.startswith(acc + ".") for ref in references)
     )
     LOG.info("  .. %i after removing duplicates with versioned accs", len(ref_no_vers))
     if ref_no_vers:
