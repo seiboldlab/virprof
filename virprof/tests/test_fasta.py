@@ -101,11 +101,21 @@ def test_Btop_mutation1_comp():
     for lf, ri in product(*[range(1, 6)] * 2):
         if ri < lf:
             continue
-        assert btop.get_aligned_query(query, lf, ri) == (query[lf - 1 : ri], [], lf, ri), (
+        assert btop.get_aligned_query(query, lf, ri) == (
+            query[lf - 1 : ri],
+            [],
+            lf,
+            ri,
+        ), (
             lf,
             ri,
         )
-        assert btop.get_aligned_subject(query, lf, ri) == (subj[lf - 1 : ri], [], lf, ri), (
+        assert btop.get_aligned_subject(query, lf, ri) == (
+            subj[lf - 1 : ri],
+            [],
+            lf,
+            ri,
+        ), (
             lf,
             ri,
         )
