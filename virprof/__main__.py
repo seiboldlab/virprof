@@ -465,8 +465,6 @@ def blastbin(
     best_chains = greedy_select_chains(all_chains)
 
     for chains in best_chains:
-        saccs = [chain.sacc for chain in chains]
-
         taxid = wordscorer.score_taxids(chains)
         if not taxfilter(taxid):
             taxname = taxonomy.get_name(taxid)
@@ -475,7 +473,9 @@ def blastbin(
             continue
 
         if features is not None:
+            saccs = [chain.sacc for chain in chains]
             fdata = features.get(saccs, [])
+            # FIXME: finish this - merge features from multiple references where useful
 
         selected_chain = chains[0]
 
@@ -808,7 +808,7 @@ def export_fasta(
         "  found %i bins in %i calls", len(bins), sum(len(bin) for bin in bins.items())
     )
 
-    ## Handle filtering options
+    # Handle filtering options
     if filter_lineage is not None:
         regex = re.compile(filter_lineage)
         LOG.info("Filtering bins")
@@ -817,12 +817,12 @@ def export_fasta(
         }
         LOG.info("  %i bins matched lineage", len(bins))
 
-    ## Load FASTA
+    # Load FASTA
     LOG.info("Loading FASTA from '%s'...", in_fasta.name)
     contigs = FastaFile(in_fasta)
     LOG.info("  found %i sequences", len(contigs))
 
-    ## Write FASTA
+    # Write FASTA
     for bin_name, bin_data in bins.items():
         LOG.info("writing bin %s", bin_name)
         outfile = update_outfile(bin_name)
@@ -932,7 +932,7 @@ def find_bins(in_call_files, in_fasta_files, filter_lineage, bin_by, out, out_bi
             for acc in fasta:
                 _sample, _, sacc = acc.partition(".")
                 sacc, _, _ = sacc.partition("_")
-                if not sacc in acc_to_bin:
+                if sacc not in acc_to_bin:
                     continue
                 out = bin_to_file[acc_to_bin[sacc]]
                 sequence = fasta.get(acc)
@@ -1122,10 +1122,8 @@ def prepare_phylo(
         raise NotImplementedError()
 
     entrez = EntrezAPI(api_key=ncbi_api_key)
-    taxonomy = load_taxonomy(ncbi_taxonomy)
     genome_sizes = GenomeSizes(entrez=entrez)
     out = FastaFile(out_fasta, "w")
-    taxids = []
     references = set()
     total_count = 0
 
@@ -1141,7 +1139,7 @@ def prepare_phylo(
     elif in_fasta:
         species = []
         for fd in in_fasta:
-            match = re.search("([^.]+)\.fasta.gz", fd.name)
+            match = re.search(r"([^.]+)\.fasta.gz", fd.name)
             if not match:
                 raise click.UsageError(
                     "Unable to detect organism name from input fasta file. "
@@ -1203,7 +1201,7 @@ def prepare_phylo(
             )
             LOG.info("Total accessions to fetch now %i", len(references))
 
-    ref_no_vers = set(acc for acc in references if not "." in acc)
+    ref_no_vers = set(acc for acc in references if "." not in acc)
     references = set(acc for acc in references if "." in acc)
     LOG.info("Resolving %i accessions without version...", len(ref_no_vers))
     ref_no_vers = set(

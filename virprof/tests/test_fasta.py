@@ -98,16 +98,16 @@ def test_Btop_mutation1_comp():
     subj = subject_comp[::-1]
     assert btop.get_aligned_query(query) == (query, [], 1, len(query))
     assert btop.get_aligned_subject(query) == (subj, [], 1, len(query))
-    for l, r in product(*[range(1, 6)] * 2):
-        if r < l:
+    for lf, ri in product(*[range(1, 6)] * 2):
+        if ri < lf:
             continue
-        assert btop.get_aligned_query(query, l, r) == (query[l - 1 : r], [], l, r), (
-            l,
-            r,
+        assert btop.get_aligned_query(query, lf, ri) == (query[lf - 1 : ri], [], lf, ri), (
+            lf,
+            ri,
         )
-        assert btop.get_aligned_subject(query, l, r) == (subj[l - 1 : r], [], l, r), (
-            l,
-            r,
+        assert btop.get_aligned_subject(query, lf, ri) == (subj[lf - 1 : ri], [], lf, ri), (
+            lf,
+            ri,
         )
 
 

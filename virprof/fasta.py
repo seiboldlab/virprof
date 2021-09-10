@@ -404,7 +404,7 @@ def consensus(sequences: List[bytes], strip_gaps: bool = True) -> bytes:
         raise ValueError(
             f"section sizes differ: {', '.join(str(len(seq)) for seq in sequences)}"
         )
-    ## Overlapping piece - fill with consensus
+    # Overlapping piece - fill with consensus
     bases = []
     for base_counts in map(Counter, zip(*sequences)):
         if len(base_counts) == 1:

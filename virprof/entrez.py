@@ -12,7 +12,6 @@ import xml.etree.ElementTree as ET
 from random import randint
 from typing import Optional, Set, Dict, Iterator, Union, List, Any, Tuple
 
-import requests
 from requests import Session
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -641,7 +640,7 @@ class NcbiGenomeAPI(BaseAPI):
             text = self._get(
                 {"func": "expected_genome_size"}, params={"species_taxid": taxid}
             )
-        except RequestException as exc:
+        except RequestException:
             return {}
         genome_size_response = ET.fromstring(text)
         return {node.tag: node.text for node in genome_size_response}
@@ -785,7 +784,7 @@ class GenomeSizes:
     def get_taxid(self, scientific_name: str) -> Optional[int]:
         query = f"{scientific_name}[SCIN]"
         result = self.entrez.search("taxonomy", query)
-        if not "idlist" in result:
+        if "idlist" not in result:
             raise RuntimeError(f"Failed to find results for taxonomy query '{query}'")
         if len(result["idlist"]) > 1:
             raise RuntimeError(

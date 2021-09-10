@@ -11,7 +11,6 @@ from typing import (
     Set,
     Iterator,
     Optional,
-    Tuple,
     Iterable,
     Dict,
     Any,
@@ -289,7 +288,7 @@ class HitChain:
         "Aggregated percent identity for all items in the HitChain"
         if not self.hits:
             return None
-        ## FIXME: temporary hac
+        # FIXME: temporary hac
         matches = 0
         length = 0
         for start, stop, data in self._subject_regions:

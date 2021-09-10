@@ -348,7 +348,7 @@ class TaxonomyGT(Taxonomy):
         LOG.info("Searching for species '%s'...", name)
         vertices = gt_util.find_vertex(self.tree, self.tree.vp.name, name)
         if len(vertices) != 1:
-            LOG.error("Species '%s' not found in taxonomy", species)
+            LOG.error("Species '%s' not found in taxonomy", name)
             return
         LOG.info("Found taxid %i", vertices[0])
         return vertices[0]
