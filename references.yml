@@ -8,6 +8,15 @@ references:
       type: fasta
     - url: http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.transcripts.fa.gz
       type: tx.fasta
+    - type: pipeline
+      stages:
+        - index_star
+    - type: pipeline
+      stages:
+        - index_rsem
+    - type: pipeline
+      stages:
+        - index_salmonG
   hg38:
     # The index files for Bowtie2
     - url: !workdir databases/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
