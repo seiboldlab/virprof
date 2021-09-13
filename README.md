@@ -24,8 +24,8 @@ I. Installing Virprof
    mamba install --name base git # unless you already have git installed
    git clone https://github.com/seiboldlab/virprof.git
    # Install YMP
-   mamba create --name ymp --file virprof/environment.yaml
-   conda activate ymp
+   mamba env create --name virprof --file virprof/environment.yaml
+   conda activate virprof
    # Copy basic configuration
    cp virprof/ymp.yml .
    ```

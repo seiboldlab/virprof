@@ -1,0 +1,52 @@
+# Load modules
+include:
+  - virprof/virprof.yml
+
+
+# Configure projects
+projects:
+  # Sample data sheets should be CSV or TSV with 4 columns:
+  #
+  # - A column "unit" (name unimportant) that is unique for each row
+  # and identifies each sequenced units. That is, unique names for
+  # technical replicates.
+  # - A column "sample" (name relevant!) that lists the name of each
+  #   biological sample.
+  # - One column each for the forward and reverse read files. If the
+  #   paths are relative, they are interpreted as relative to the
+  #   location of the sample sheet. (I.e., no path if you put the
+  #   sample sheet in the same folder as your read data files).
+  #
+  # myproject:
+  #   data: path/to/myproject/sample_sheet.csv
+
+# Customize rules
+overrides:
+  rules:
+    vp_blastbin:
+      params:
+        # Put your NCBI API key here
+        # ncbi_api_key: 0000000000000000000000000000000
+    pilon_polish:
+      resorces:
+        mem: 32G  # We have ample RAM, let's give Pilon a little more
+
+# Local cluster configuration
+cluster:
+  profile: slurm  # for example
+
+  profiles:
+    slurm:
+      args:
+        # Add key values for additional parameters required locally
+        queue: "-p normal"
+        comment: "--comment {output[0]}"
+
+# Adjust job resource limits to local cluster
+resource_limits:
+  mem:
+    min: 8G
+    max: 375G
+  threads:
+    min: 2
+    max: 48

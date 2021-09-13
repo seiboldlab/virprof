@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - snakemake-minimal >=6.2
+  - snakemake-minimal >=6.9
   - click
   - click-completion
   - ruamel.yaml >0.15
@@ -22,7 +22,6 @@ dependencies:
   - pip
   - pip:
     - git+https://github.com/epruesse/ymp@development
-
   - graph-tool >=2.34
   - biopython
   - click
