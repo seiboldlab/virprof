@@ -28,7 +28,7 @@ overrides:
         # Put your NCBI API key here
         # ncbi_api_key: 0000000000000000000000000000000
     pilon_polish:
-      resorces:
+      resources:
         mem: 32G  # We have ample RAM, let's give Pilon a little more
 
 # Local cluster configuration
