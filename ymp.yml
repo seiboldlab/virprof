@@ -26,7 +26,7 @@ overrides:
     vp_blastbin:
       params:
         # Put your NCBI API key here
-        # ncbi_api_key: 0000000000000000000000000000000
+        ncbi_api_key: ""
     pilon_polish:
       resources:
         mem: 32G  # We have ample RAM, let's give Pilon a little more
