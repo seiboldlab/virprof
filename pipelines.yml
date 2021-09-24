@@ -129,7 +129,7 @@ pipelines:
   rnaseq_report:
     stages:
       - group_ALL
-      - r_tximport
+      - tximport_vp
       - qc_multiqc
       - group_ALL
       - report_vp
