@@ -1,0 +1,50 @@
+with Stage("report_vp") as S:
+    rule vp_rnaseq_report:
+        input:
+            "{:prev:}/{:target:}.gene_counts.rds",
+            "{:prev:}/{:target:}.tx_counts.rds",
+            "{:prev:}/multiqc_report.html",
+            directory("{:prev:}/multiqc_report_data"),
+        output:
+            "{:this:}/{target}.gene_counts.rds",
+            "{:this:}/{target}.tx_counts.rds",
+            "{:this:}/{target}.multiqc_report.html",
+            directory("{:this:}/{target}.multiqc_report_data"),
+        output:
+        log:
+            "{:this:}/{target}.log"
+        params:
+            slack_hook = "",  # should be trailing part of form xxx/xxx/xxx
+            this = "{:this:}",
+            reporttpl  = "{:ensuredir.reports:}/{:project:}.$TYPE.%Y-%m-%d_%H-%M$EXT",
+            project = "{:project:}",
+        shell:
+            "exec >{log} 2>&1;"
+            "SRCS=({input});"
+            "DSTS=({output});"
+            "MSG=\"New RNA-Seq results for \`{params.project}\`:\n\n\";"
+            "for i in \"${{!SRCS[@]}}\"; do"
+            "  echo Copying ${{SRCS[i]}} to ${{DSTS[i]}};"
+            "  cp -a ${{SRCS[i]}} ${{DSTS[i]}};"
+            "  BASE=$(basename ${{SRCS[i]}});"
+            "  SUFFIX=${{BASE#{wildcards.target}.}};"
+            "  TYPE=${{SUFFIX%.*}};"
+            "  EXT=${{SUFFIX#*.}};"
+            "  if [ \"$TYPE\"a == \"$EXT\"a ]; then"
+            "    EXT=;"
+            "  else"
+            "    EXT=\".$EXT\";"
+            "  fi;"
+            "  REPORT=$(date +{params.reporttpl});"
+            "  echo Copying $REPORT to $REPORT;"
+            "  cp -a ${{SRCS[i]}} $REPORT;"
+            "  MSG=\"$MSG\n- \`$REPORT\`\";"
+            "done;"
+            "if [ -n \"{params.slack_hook}\" ]; then"
+            "  curl"
+            "    --silent"
+            "    --request POST"
+            "    --header 'Content-type: application/json'"
+            "    --data '{{\"text\":\"'\"$MSG\"'\"}}'"
+            "    https://hooks.slack.com/services/{params.slack_hook};"
+            "  fi;"
