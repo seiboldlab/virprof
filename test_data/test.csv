@@ -1,5 +1,7 @@
-unit,sample,fq1,fq2
-A1,A,test_cov.R1.fq.gz,test_cov.R2.fq.gz
-A2,A,test_hku.R1.fq.gz,test_hku.R2.fq.gz
-B1,B,test_cov.R1.fq.gz,test_cov.R2.fq.gz
-C,C,test_hg38.R1.fq.gz,test_hg38.R2.fq.gz
+unit,sample,fq1,fq2,virus
+A1,A,virprof/test_data/test_A1.R1.fq.gz,virprof/test_data/test_A1.R2.fq.gz,cov
+A2,A,virprof/test_data/test_A2.R1.fq.gz,virprof/test_data/test_A2.R2.fq.gz,hku
+B,B,virprof/test_data/test_B.R1.fq.gz,virprof/test_data/test_B.R2.fq.gz,cov
+C,C,virprof/test_data/test_C.R1.fq.gz,virprof/test_data/test_C.R2.fq.gz,cov+hku
+D,D,virprof/test_data/test_D.R1.fq.gz,virprof/test_data/test_D.R2.fq.gz,
+

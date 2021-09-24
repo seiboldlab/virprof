@@ -129,26 +129,26 @@ pipelines:
   rnaseq_salmon:
     stages:
       - qc
-      - ref_hg38g
       - quant_salmon_sa
       - group_ALL
       - r_tximport
+      - qc_multiqc
 
   rnaseq_star_rsem:
     stages:
       - qc
-      - ref_hg38g
       - map_star
       - quant_rsem
       - group_ALL
       - r_tximport
+      - qc_multiqc
 
   rnaseq_star_salmon:
     stages:
       - qc
-      - ref_hg38g
       - map_star
       - quant_salmonG
       - group_ALL
       - r_tximport
+      - qc_multiqc
 

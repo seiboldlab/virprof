@@ -1,0 +1,53 @@
+test_data_path = "virprof/test_data/"
+theta0 = 0.5
+num_rnaseq_reads = 1000
+
+def find_sample_parts(wildcards):
+    unit = wildcards.unit
+    pair = wildcards.pair
+    res = [f"{test_data_path}sim{unit}_{pair}.fq.gz"]
+    import csv
+    with open(test_data_path + "test.csv", "r") as fd:
+        samples = {
+            row['unit']:row
+            for row in csv.DictReader(fd)
+        }
+    viruses = samples[unit]["virus"]
+    if viruses:
+        for virus in viruses.split("+"):
+            res.append(f"{test_data_path}test_{virus}.R{pair}.fq.gz")
+    return res
+
+rule join_sample_parts:
+    message: "Creating test data file for {wildcards.unit} from {input}"
+    input:
+        find_sample_parts
+    output:
+        "virprof/test_data/test_{unit}.R{pair}.fq.gz",
+    wildcard_constraints:
+        unit = "[A-Z][^.]*",
+        pair = "[12]",
+    shell:
+        "cat {input} > {output}"
+
+rule simulate_rnaseq:
+    message: "Simulating RNA-Seq data for {wildcards.unit}"
+    input:
+        rsem_index = "ref_hg38gtest.index_rsem/ALL.rsem.seq",
+    output:
+        fq1 = test_data_path + "sim{unit}_1.fq.gz",
+        fq2 = test_data_path + "sim{unit}_2.fq.gz",
+    shadow:
+        "shallow"
+    conda:
+        "rsem"
+    shell:
+        "rsem-simulate-reads"
+        " ref_hg38gtest.index_rsem/ALL.rsem"
+        " {test_data_path}HR5366.model"
+        " {test_data_path}HR5366.isoforms.results"
+        " {theta0} {num_rnaseq_reads}"
+        " {test_data_path}sim{wildcards.unit};"
+        " gzip -9 < {test_data_path}sim{wildcards.unit}_1.fq > {output.fq1};"
+        " gzip -9 < {test_data_path}sim{wildcards.unit}_2.fq > {output.fq2};"
+

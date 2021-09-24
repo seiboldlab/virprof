@@ -1,20 +1,7 @@
 #!/bin/bash
 set -e
 
-# Create basic ymp.yml
-cat >ymp.yml <<EOF
-include:
-  - virprof/virprof.yml
-resource_limits:
-  mem:
-    max: 6G
-EOF
-echo "Created ymp.yml:"
-echo "---"
-cat ymp.yml
-echo "---"
-echo
-
+cp virprof/test_data/ymp.yml .
 
 unpack() {
     src=virprof/test_data/$1

@@ -17,6 +17,22 @@ references:
     - type: pipeline
       stages:
         - index_salmonG
+  hg38gtest:
+    - type: gtf
+      url: test_data/test.gtf
+    - type: fasta
+      url: test_data/test.fasta.gz
+    - type: tx.fasta
+      url: test_data/test.tx.fasta.gz
+    - type: pipeline
+      stages:
+        - index_star
+    - type: pipeline
+      stages:
+        - index_rsem
+    - type: pipeline
+      stages:
+        - index_salmonG
   hg38:
     # The index files for Bowtie2
     - url: !workdir databases/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
