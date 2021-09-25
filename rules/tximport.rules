@@ -23,9 +23,12 @@ with Stage("tximport_vp") as S:
             counts = "{:prev:}/{:target:}.genes.results",
             transcripts = "{:prev:}/{:target:}.isoforms.results",
             gtf = "{:prev:}/{:target:}.gtf",
+            meta = "{:project:}/qiime_mapping.tsv",
         output:
             counts = "{:this:}/{target}.gene_counts.rds",
             transcripts = "{:this:}/{target}.tx_counts.rds",
+        params:
+            input_type = "RSEM"
         log:
             "{:this:}/{target}.log",
         threads:
@@ -33,23 +36,14 @@ with Stage("tximport_vp") as S:
         conda:
             "tximport"
         script:
-            "tximport_rsem.R"
+            "tximport.R"
 
 
-    rule vp_tximport_salmon:
+    rule vp_tximport_salmon: # ymp: extends vp_tximport_rsem
         message:
             "{:name:}: Importing counts from Salmon"
         input:
             counts = "{:prev:}/{:target:}.salmon/quant.sf",
-            gtf = "{:prev:}/{:target:}.gtf",
-        output:
-            counts = "{:this:}/{target}.gene_counts.rds",
-            transcripts = "{:this:}/{target}.tx_counts.rds",
-        log:
-            "{:this:}/{target}.log"
-        threads:
-            1
-        conda:
-            "tximport"
-        script:
-            "tximport_salmon.R"
+            transcripts = [],
+        params:
+            input_type = "Salmon"
