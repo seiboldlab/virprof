@@ -19,7 +19,7 @@ references:
         - index_salmonG
   hg38gtest:
     - type: gtf
-      url: test_data/test.gtf
+      url: test_data/test.gtf.gz
     - type: fasta
       url: test_data/test.fasta.gz
     - type: tx.fasta
