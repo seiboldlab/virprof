@@ -33,7 +33,8 @@ rule join_sample_parts:
 rule simulate_rnaseq:
     message: "Simulating RNA-Seq data for {wildcards.unit}"
     input:
-        rsem_index = "ref_hg38gtest.index_rsem/ALL.rsem.seq",
+        # Build output only if missing
+        rsem_index = ancient("ref_hg38gtest.index_rsem/ALL.rsem.seq"),
     output:
         fq1 = test_data_path + "sim{unit}_1.fq.gz",
         fq2 = test_data_path + "sim{unit}_2.fq.gz",
