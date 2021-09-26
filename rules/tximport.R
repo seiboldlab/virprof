@@ -47,8 +47,9 @@ if (FALSE) {
                       'test.ref_hg38gtest.qc.quant_salmon_sa.group_ALL.tximport_vp/ALL.tx_counts.rds',
                       "counts" = 'test.ref_hg38gtest.qc.quant_salmon_sa.group_ALL.tximport_vp/ALL.gene_counts.rds',
                       "transcripts" = 'test.ref_hg38gtest.qc.quant_salmon_sa.group_ALL.tximport_vp/ALL.tx_counts.rds'),
-        params = list('input_type',
-                      input_type = "Salmon"),
+        params = list('input_type', 'version',
+                      "input_type" = 'Salmon',
+                      "version" = '0.1.0'),
         wildcards = list('test.ref_hg38gtest.qc.quant_salmon_sa.group_ALL.', 'ALL',
                          "_YMP_DIR" = 'test.ref_hg38gtest.qc.quant_salmon_sa.group_ALL.',
                          "target" = 'ALL'),
@@ -133,7 +134,10 @@ se <- SummarizedExperiment(
     rowData = txmeta,
     colData = coldata,
     metadata = list(
-        countsFromAbundance = txi$countsFromAbundance  # should be no
+        countsFromAbundance = txi$countsFromAbundance,  # should be no
+        date = date(),
+        virprof_version = snakemake@params$version,
+        pipeline = snakemake@params$label
     )
 )
 
@@ -167,7 +171,10 @@ gse <- SummarizedExperiment(
     colData = coldata,
     rowData = gmeta,
     metadata = list(
-        countsFromAbundance = txi_genes$countsFromAbundance  # should be no
+        countsFromAbundance = txi_genes$countsFromAbundance,  # should be no
+        date = date(),
+        virprof_version= snakemake@params$version,
+        pipeline = snakemake@params$label
     )
 )
 

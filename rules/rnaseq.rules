@@ -1,4 +1,10 @@
 with Stage("report_vp") as S:
+    S.add_param("_as_", typ="choice", name="label",
+                 value=[
+                     "salmon_sa",
+                     "star_salmon",
+                     "star_rsem",
+                 ])
     rule vp_rnaseq_report:
         input:
             "{:prev:}/{:target:}.gene_counts.rds",
@@ -16,13 +22,14 @@ with Stage("report_vp") as S:
         params:
             slack_hook = "",  # should be trailing part of form xxx/xxx/xxx
             this = "{:this:}",
-            reporttpl  = "{:ensuredir.reports:}/{:project:}.$TYPE.%Y-%m-%d_%H-%M$EXT",
+            reporttpl  = "{:ensuredir.reports:}/{:project:}.$LABEL.$TYPE.%Y-%m-%d_%H-%M$EXT",
             project = "{:project:}",
         shell:
             "exec >{log} 2>&1;"
             "SRCS=({input});"
             "DSTS=({output});"
             "MSG=\"New RNA-Seq results for \`{params.project}\`:\n\n\";"
+            "LABEL={params.label};"
             "for i in \"${{!SRCS[@]}}\"; do"
             "  echo Copying ${{SRCS[i]}} to ${{DSTS[i]}};"
             "  cp -a ${{SRCS[i]}} ${{DSTS[i]}};"

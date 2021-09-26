@@ -138,19 +138,19 @@ pipelines:
     stages:
       - qc
       - quant_salmon_sa
-      - rnaseq_report
+      - rnaseq_report_as_salmon_sa
 
   rnaseq_star_rsem:
     stages:
       - qc
       - map_star
       - quant_rsem
-      - rnaseq_report
+      - rnaseq_report_as_star_rsem
 
   rnaseq_star_salmon:
     stages:
       - qc
       - map_star
       - quant_salmonG
-      - rnaseq_report
+      - rnaseq_report_as_star_salmon
 

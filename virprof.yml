@@ -1,3 +1,7 @@
+userdata:
+  virprof:
+    version: 0.1.0
+
 include:
   - pipelines.yml
   - references.yml

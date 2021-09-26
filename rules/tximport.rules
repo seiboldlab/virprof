@@ -7,7 +7,12 @@ Env(name="tximport",base="bioconda", packages=[
 with Stage("tximport_vp") as S:
     S.doc("""
     """)
-
+    S.add_param("_as_", typ="choice", name="label",
+                 value=[
+                     "salmon_sa",
+                     "star_salmon",
+                     "star_rsem",
+                 ])
     S.require(
         counts = [
             ["isoforms.results", "genes.results"],  # RSEM output
@@ -28,7 +33,8 @@ with Stage("tximport_vp") as S:
             counts = "{:this:}/{target}.gene_counts.rds",
             transcripts = "{:this:}/{target}.tx_counts.rds",
         params:
-            input_type = "RSEM"
+            input_type = "RSEM",
+            version = ymp.get_config()._config.userdata.virprof.version,
         log:
             "{:this:}/{target}.log",
         threads:
