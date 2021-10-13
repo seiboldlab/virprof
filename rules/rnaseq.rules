@@ -1,9 +1,74 @@
+Env(name="tximport",base="bioconda", packages=[
+    "bioconductor-tximport",
+    "bioconductor-tximeta",
+    "r-readr"  # faster read
+    ])
+
+with Stage("tximport_vp") as S:
+    S.doc("""
+    """)
+    S.add_param("_as_", typ="choice", name="label",
+                 value=[
+                     "salmon_sa",
+                     "star_salmon",
+                     "star_rsem",
+                     "salmon_sa_test",
+                     "star_salmon_test",
+                     "star_rsem_test",
+                 ])
+    S.require(
+        counts = [
+            ["isoforms.results", "genes.results"],  # RSEM output
+            ["salmon/quant.sf"]  # Salmon output
+        ],
+        gtf = [["gtf"]],
+    )
+
+    rule vp_tximport_rsem:
+        message:
+            "{:name:}: Importing counts from RSEM"
+        input:
+            counts = "{:prev:}/{:target:}.genes.results",
+            transcripts = "{:prev:}/{:target:}.isoforms.results",
+            gtf = "{:prev:}/{:target:}.gtf",
+            meta = "{:project:}/qiime_mapping.tsv",
+        output:
+            counts = "{:this:}/{target}.gene_counts.rds",
+            transcripts = "{:this:}/{target}.tx_counts.rds",
+        params:
+            input_type = "RSEM",
+            version = ymp.get_config()._config.userdata.virprof.version,
+        log:
+            "{:this:}/{target}.log",
+        resources:
+            mem="16G"
+        threads:
+            1
+        conda:
+            "tximport"
+        script:
+            "tximport.R"
+
+
+    rule vp_tximport_salmon: # ymp: extends vp_tximport_rsem
+        message:
+            "{:name:}: Importing counts from Salmon"
+        input:
+            counts = "{:prev:}/{:target:}.salmon/quant.sf",
+            transcripts = [],
+        params:
+            input_type = "Salmon"
+
+
 with Stage("report_vp") as S:
     S.add_param("_as_", typ="choice", name="label",
                  value=[
                      "salmon_sa",
                      "star_salmon",
                      "star_rsem",
+                     "salmon_sa_test",
+                     "star_salmon_test",
+                     "star_rsem_test",
                  ])
     rule vp_rnaseq_report:
         input:
