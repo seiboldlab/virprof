@@ -33,7 +33,73 @@ Env(name="virprof_py", base="bioconda",
 BIN = srcdir("../bin/")
 
 
-with ymp.get_config().references.NcbiTaxonomy:
+with Stage("get_unmapped_vp") as S:
+    S.require(
+        data = [["bam"], ["salmon/aux_info/unmapped_names.txt"]],
+        fq = [["R1.fq.gz", "R2.fq.gz"]],
+    )
+    rule vp_unmapped_from_bam:
+        message:
+            "{:name:}: {output.pairs[0]} from BAM"
+        input:
+            bam =  "{:prev:}/{target}.bam"
+        output:
+            pairs = "{:this:}/{target}.{:pairnames:}.fq.gz"
+        log:
+            "{:this:}/{target}.log"
+        threads:
+            4
+        conda:
+            "samtools"
+        params:
+            f = 12,
+            F = 0x900,
+            G = 0,
+        shell:
+            "samtools fastq"
+            " -1 {output.pairs[0]}"
+            " -2 {output.pairs[1]}"
+            " --threads {threads}"
+            " -f {params.f}"
+            " -F {params.F}"
+            " -G {params.G}"
+            " {input}"
+            " 2>&1 >{log}"
+
+    rule vp_unmapped_from_salmon:
+        message:
+            "{:name:}: {output.fq[0]} from Salmon unmapped names"
+        input:
+            fq = "{:prev:}/{target}.{:pairnames:}.fq.gz",
+            unmapped = "{:prev:}/{target}.salmon/aux_info/unmapped_names.txt",
+        output:
+            fq = "{:this:}/{target}.{:pairnames:}.fq.gz"
+        log:
+            "{:this:}/{target}.log"
+        threads:
+            8
+        conda:
+            "bbmap"
+        resources:
+            mem="32g"
+        params:
+            pattern = "u"
+        shell:
+            "exec >{log} 2>&1;"
+            "grep '{params.pattern}$' {input.unmapped} |"
+            "  cut -d' ' -f1 |"
+            "  filterbyname.sh"
+            "    in={input.fq[0]}"
+            "    in2={input.fq[1]}"
+            "    out={output.fq[0]}"
+            "    out2={output.fq[1]}"
+            "    names=/dev/stdin"
+            "    include=t"
+            "    -Xmx{resources.mem_mb}m"
+            "    -eoom"
+
+
+with Stage("index_vp") as S:
     rule vp_index_ncbi_taxonomy:
         """This rule loads the NCBI taxonomy, compiles it into a graph_tool
         tree and stores that tree in binary format. Loading the binary
@@ -64,34 +130,6 @@ with ymp.get_config().references.NcbiTaxonomy:
             "  --library graph_tool"
             "  --ncbi-taxonomy {params.taxonomy_prefix}"
             "  --out {output}"
-
-with ymp.get_config().references.hg38:
-    rule vp_blast_index_hg38:
-        """This rule generates a BLAST index on the genome.fa from iGenomes"""
-        message:
-            "{:name:}: Creating BLAST index"
-        input:
-            fasta = "{:prev:}/ALL.fasta"
-        output:
-            blastidx = expand("{{:this:}}/ALL.{ext}", ext="nhr nin nog nsq ntf nto nos not ndb".split())
-        log:
-            "{:this:}/ALL.makeblastdb.log"
-        params:
-            db = "{:this:}/ALL"
-        conda:
-            "blast"
-        threads:
-            1
-        shell:
-            "exec >{log} 2>&1;"
-            "makeblastdb"
-            " -in {input.fasta}"
-            " -dbtype nucl"
-            " -title hg38"
-            " -parse_seqids"
-            " -hash_index"
-            " -blastdb_version 5"
-            " -out {params.db}"
 
 
 with Stage("blastfilter_vp") as S:

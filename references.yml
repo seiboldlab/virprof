@@ -1,6 +1,5 @@
 references:
   # Human reference used for read and contig filtering.
-  # This should be the Homo_sapiens_UCSC_hg38.tar.gz unpacked
   hg38g:
     - url: http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz
       type: gtf
@@ -17,6 +16,14 @@ references:
     - type: pipeline
       stages:
         - index_salmon_decoyG
+    - type: pipeline
+      stages:
+        - index_bowtie2
+    - type: pipeline
+      stages:
+        - index_blast
+
+  # Human reference for test data (contains only start of chr1)
   hg38gtest:
     - type: gtf
       url: test_data/test.gtf.gz
@@ -33,45 +40,13 @@ references:
     - type: pipeline
       stages:
         - index_salmonG
-  hg38:
-    # The index files for Bowtie2
-    - url: !workdir databases/Homo_sapiens/UCSC/hg38/Sequence/Bowtie2Index/
-      type: dirx
-      files:
-        ALL.1.bt2: genome.1.bt2
-        ALL.2.bt2: genome.2.bt2
-        ALL.3.bt2: genome.3.bt2
-        ALL.4.bt2: genome.4.bt2
-        ALL.rev.1.bt2: genome.rev.1.bt2
-        ALL.rev.2.bt2: genome.rev.2.bt2
-    # The whole genome FASTA (BLAST index will be generated from this)
-    - url: !workdir  databases/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/
-      type: dirx
-      files:
-        ALL.fasta: genome.fa
-    # The annotation
-    - url: !workdir  databases/Homo_sapiens/UCSC/hg38/Annotation/Genes/
-      #url: !workdir  databases/Homo_sapiens/UCSC/hg38/Annotation/Genes.gencode/
-      type: dirx
-      files:
-        ALL.gtf: genes.gtf
-    # The index files for Hisat2
-    - url: !workdir  databases/grch38_snp_tran/
-      type: dirx
-      files:
-        ALL.1.ht2: genome_snp_tran.1.ht2
-        ALL.2.ht2: genome_snp_tran.2.ht2
-        ALL.3.ht2: genome_snp_tran.3.ht2
-        ALL.4.ht2: genome_snp_tran.4.ht2
-        ALL.5.ht2: genome_snp_tran.5.ht2
-        ALL.6.ht2: genome_snp_tran.6.ht2
-        ALL.7.ht2: genome_snp_tran.7.ht2
-        ALL.8.ht2: genome_snp_tran.8.ht2
-    # The salmon index
-    - url: /Users/pruessee/genomes/alias/hg38/salmon_partial_sa_index/default/
-      type: direct
-      extension: salmon_index
-        
+    - type: pipeline
+      stages:
+        - index_bowtie2
+    - type: pipeline
+      stages:
+        - index_blast
+
   # NCBI Nucleotide database for Blast
   NT:
     - url: !workdir databases/nt
@@ -79,12 +54,14 @@ references:
       match:
         - (?P<sample>[^.]+)\.((nal|not|nto|ntf|nos|ndb)|[0-9]+\.(nin|nhr|nsq|nsd|nog))
         - (?P<sample>[^.]+)\.(ndb|nhr|nin|nog|nos|not|nsq|ntf|nto)
+
   # Subset of NT for testing
   NT_test:
     - url: test_data/nt_test.tar.bz2
       type: dir
       files: [nt.ndb, nt.nhr, nt.nin, nt.nog, nt.nos, nt.not, nt.nsq, nt.ntf, nt.nto]
       id: nt
+
   # NCBI Taxonomy dump for classification
   NcbiTaxonomy:
     - url: http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
@@ -93,15 +70,13 @@ references:
         ALL.NCBI.nodes.dmp: nodes.dmp
         ALL.NCBI.names.dmp: names.dmp
         ALL.NCBI.merged.dmp: merged.dmp
+    - type: pipeline
+      stages:
+        - index_vp
+
   # VirusHostDB from genome.jp
   VHDB:
     - url: ftp://ftp.genome.jp/pub/db/virushostdb/
       type: dirx
       files:
         virushostdb.tsv: virushostdb.tsv
-  hrvc:
-    - url: data/hrv_c_15.fasta.gz
-  scov2:
-    - url: data/sars_cov_2.fasta.gz
-  hrvpb:
-    - url: data/hrv_pb_unaligned.fasta.gz
