@@ -373,7 +373,7 @@ with Stage("bin_vp") as S:
 
 
 with Stage("summarize_vp") as S:
-    rule vp_aggregate_classifiations:
+    rule vp_aggregate_classifications:
         message:
             "{:name:}: Creating virus summary {output.excel}"
         input:
@@ -401,7 +401,10 @@ with Stage("summarize_vp") as S:
             filter_host = "Homo sapiens",
             min_bp      = 200,
             min_reads   = 3,
-            reportfile  = "{:ensuredir.reports:}/{:project:}.summary.%Y-%m-%d_%H-%M.xlsx"
+            reporttpl   = "{:ensuredir.reports:}/{:project:}.pathogens.summary.%Y-%m-%d_%H-%M.xlsx",
+            project = "{:project:}",
+            slack_hook  = "",  # should be trailing part of form xxx/xxx/xxx
+
         threads:
             1
         conda:
@@ -426,7 +429,20 @@ with Stage("summarize_vp") as S:
             "  --in-scaffold-list {output.scaffold_files}"
             "  --in-basecov-list {output.basecov_files};\n"
             "\n"
-            "cp {output.excel} $(date +{params.reportfile})"
+            "MSG=\"New pathogen results for \`{params.project}\`:\n\n\";"
+            "REPORT=$(date +{params.reporttpl});"
+            "MSG=\"$MSG\n- \`$REPORT\`\";"
+            "cp -v {output.excel} $REPORT;"
+            "\n"
+            "if [ -n \"{params.slack_hook}\" ]; then"
+            "  curl"
+            "    --silent"
+            "    --request POST"
+            "    --header 'Content-type: application/json'"
+            "    --data '{{\"text\":\"'\"$MSG\"'\"}}'"
+            "    https://hooks.slack.com/services/{params.slack_hook};"
+            "  fi;"
+
 
     rule vp_aggregate_genomes:
         message:
