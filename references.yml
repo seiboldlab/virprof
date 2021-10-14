@@ -16,7 +16,7 @@ references:
         - index_rsem
     - type: pipeline
       stages:
-        - index_salmonG
+        - index_salmon_decoyG
   hg38gtest:
     - type: gtf
       url: test_data/test.gtf.gz
