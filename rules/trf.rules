@@ -1,0 +1,74 @@
+Env(name="trf", base="bioconda", packages=[
+    "trf",
+    "parallel",
+])
+
+with Stage("filter_trf") as S:
+    rule trf_match:
+        message:
+            "{:name:}: {output.matches}"
+        input:
+            fq = "{:prev:}/{:target:}.{:pairnames:}.fq.gz",
+        output:
+            matches = temp("{:this:}/{target}.trf_matches.txt.gz"),
+        log:
+            "{:this:}/{target}.trf.log"
+        params:
+            match = 2,
+            mismatch = 7,
+            delta = 7,
+            match_probability = 80,
+            indel_probability = 10,
+            minscore = 50,
+            maxperiod = 500,
+            opts = "-h --ngs",
+        conda:
+            "trf"
+        threads:
+            32
+        resources:
+            mem = "8g"
+        shadow: "shallow"
+        shell:
+            "exec >{log} 2>&1;"
+            "gzip -dc {input.fq[0]} |"
+            "  sed -n '1~4s/^@/>/p;2~4p' |"
+            "  parallel --pipe -L2 -j {threads} trf - "
+            "    {params.match}"
+            "    {params.mismatch}"
+            "    {params.delta}"
+            "    {params.match_probability}"
+            "    {params.indel_probability}"
+            "    {params.minscore}"
+            "    {params.maxperiod}"
+            "    {params.opts} |"
+            "  grep ^@ |"
+            "  cut -c 2- |"
+            "  gzip -c >{output.matches}"
+
+    rule trf_filter:
+        message:
+            "{:name:}: {output.fq[0]}"
+        input:
+            fq = "{:prev:}/{:target:}.{:pairnames:}.fq.gz",
+            matches = "{:this:}/{target}.trf_matches.txt.gz",
+        output:
+            fq = "{:this:}/{target}.{:pairnames:}.fq.gz",
+        log:
+            "{:this:}/{target}.log"
+        conda:
+            "bbmap"
+        resources:
+            mem = "32g"
+        shell:
+            "exec >{log} 2>&1;"
+            "gzip -dc {input.matches} |"
+            "  filterbyname.sh"
+            "    in={input.fq[0]}"
+            "    in2={input.fq[1]}"
+            "    out={output.fq[0]}"
+            "    out2={output.fq[1]}"
+            "    names=/dev/stdin"
+            "    -Xmx{resources.mem_mb}m"
+            "    -eoom"
+  

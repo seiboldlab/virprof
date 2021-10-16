@@ -152,3 +152,15 @@ pipelines:
       - blastbin
       - scaffold
       - summarize
+
+  pathogen:
+    stages:
+      - get_unmapped_vp
+      - map_bowtie2
+      - extract_readsf12
+      - filter_trf
+      - assemble_meta
+      - coverage
+      - blastbin
+      - scaffold
+      - summarize
