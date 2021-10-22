@@ -17,13 +17,20 @@ pipelines:
   # Remove reads matching last bowtie2 and hisat2 indicies (from ref)
   deplete:
     stages:
-      - map_hisat2:
-          hide: true
-      - extract_readsf12:
+      - get_unmapped_vp:
           hide: true
       - map_bowtie2:
           hide: true
       - extract_readsf12
+
+  deplete2:
+    stages:
+      - get_unmapped_vp:
+          hide: true
+      - map_bowtie2:
+          hide: true
+      - extract_readsf12
+      - filter_trf
 
   # Assemble (by sample) using Spades Single Cell mode and remove short contigs
   assemble_single:
@@ -144,9 +151,7 @@ pipelines:
 
   virus:
     stages:
-      - get_unmapped_vp
-      - map_bowtie2
-      - extract_readsf12
+      - deplete
       - assemble_meta
       - coverage
       - blastbin
@@ -155,10 +160,7 @@ pipelines:
 
   pathogen:
     stages:
-      - get_unmapped_vp
-      - map_bowtie2
-      - extract_readsf12
-      - filter_trf
+      - deplete2
       - assemble_meta
       - coverage
       - blastbin
