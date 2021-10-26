@@ -74,6 +74,13 @@ if (FALSE) {
     )
 }
 
+
+read_json_nolist <- function(fname, ...) {
+    tmp<-jsonlite::read_json(fname, ...)
+    tmp[sapply(tmp, function(x) length(x) == 1)]
+}
+
+
 message("Importing ", snakemake@params$input_type, " data into R using tximport")
 
 message("1. ----------- Loading packages ----------")
@@ -84,6 +91,14 @@ library(rtracklayer)
 library(SummarizedExperiment)
 library(dplyr)
 library(magrittr)
+library(purrr)
+library(jsonlite)
+
+metadata <- list(
+    date = date(),
+    virprof_version = snakemake@params$version,
+    pipeline = snakemake@params$label
+)
 
 message("2. ----------- Loading files ----------")
 message("2.1. ----------- Loading Sample Sheet ----------")
@@ -96,15 +111,34 @@ message("Filename = ", snakemake@input$gtf)
 gr <- rtracklayer::import.gff(snakemake@input$gtf)
 
 if (snakemake@params$input_type == "Salmon") {
-    message("3. ----------- Loading quant.sf files ----------")
+    message("3.1. ----------- Loading quant.sf files ----------")
     files <- snakemake@input$counts
     names(files) <- gsub(".salmon", "", basename(dirname(snakemake@input$counts)))
     files <- files[order(names(files))]
     txi <- tximport(files, type="salmon", txOut=TRUE)
+
+    message("3.2. ----------- Loading meta_info.json files ----------")
+    salmon_all_meta <-
+        files %>%
+        gsub("/quant.sf", "/aux_info/meta_info.json", .) %>%
+        purrr::map_df(read_json_nolist, simplifyVector = TRUE, .id = "idcolumn")
+
+    # Extract data varying per sample
+    extra_coldata <- salmon_all_meta %>%
+        select(where(~ length(unique(.x)) != 1)) %>%
+        select(-start_time, -end_time)
+
+    # Extract data constant across dataset
+    metadata$salmon <- salmon_all_meta %>%
+        summarize(
+            across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1])
+        ) %>%
+        as.list()
 } else if (snakemake@params$input_type == "RSEM") {
     files <- snakemake@input$transcripts
     names(files) <- gsub(".isoforms.results", "", basename(files))
     txi <- tximport(files, type = "rsem", txIn = TRUE, txOut = TRUE)
+    extra_coldata <- data.frame(idcolumn = character())
 }
 
 message("4. ----------- Assembling SummarizedExperiment ----------")
@@ -119,7 +153,12 @@ coldata <- samples %>%
         num_units=n(),
         .groups="drop"
     ) %>%
-    arrange(across(all_of(idcolumn)))
+    arrange(across(all_of(idcolumn))) %>%
+    left_join(
+        extra_coldata,
+        by = set_names("idcolumn", idcolumn[[1]])
+    )
+
 
 message("4.2. ----------- Preparing rowData (samples sheet) ----------")
 txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]  # only transcript rows
@@ -133,11 +172,11 @@ se <- SummarizedExperiment(
     assays = txi[c("counts", "abundance", "length")],
     rowData = txmeta,
     colData = coldata,
-    metadata = list(
-        countsFromAbundance = txi$countsFromAbundance,  # should be no
-        date = date(),
-        virprof_version = snakemake@params$version,
-        pipeline = snakemake@params$label
+    metadata = c(
+        metadata,
+        list(
+            countsFromAbundance = txi$countsFromAbundance  # should be no
+        )
     )
 )
 
@@ -170,11 +209,11 @@ gse <- SummarizedExperiment(
     assays = txi_genes[c("counts", "abundance", "length")],
     colData = coldata,
     rowData = gmeta,
-    metadata = list(
-        countsFromAbundance = txi_genes$countsFromAbundance,  # should be no
-        date = date(),
-        virprof_version= snakemake@params$version,
-        pipeline = snakemake@params$label
+    metadata = c(
+        metadata,
+        list(
+            countsFromAbundance = txi_genes$countsFromAbundance  # should be no
+        )
     )
 )
 
