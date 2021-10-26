@@ -7,15 +7,6 @@ Env(name="tximport",base="bioconda", packages=[
 with Stage("tximport_vp") as S:
     S.doc("""
     """)
-    S.add_param("_as_", typ="choice", name="label",
-                 value=[
-                     "salmon_sa",
-                     "star_salmon",
-                     "star_rsem",
-                     "salmon_sa_test",
-                     "star_salmon_test",
-                     "star_rsem_test",
-                 ])
     S.require(
         counts = [
             ["isoforms.results", "genes.results"],  # RSEM output
@@ -38,10 +29,11 @@ with Stage("tximport_vp") as S:
         params:
             input_type = "RSEM",
             version = ymp.get_config()._config.userdata.virprof.version,
+            label = "{:this:}",
         log:
             "{:this:}/{target}.log",
         resources:
-            mem="16G"
+            mem = "16G"
         threads:
             1
         conda:
@@ -61,16 +53,22 @@ with Stage("tximport_vp") as S:
 
 
 with Stage("report_vp") as S:
-    S.add_param("_as_", typ="choice", name="label",
-                 value=[
-                     "salmon_sa",
-                     "star_salmon",
-                     "star_rsem",
-                     "salmon_sa_test",
-                     "star_salmon_test",
-                     "star_rsem_test",
-                 ])
+    def make_label(wildcards):
+        prefix = wildcards._YMP_DIR
+        if "quant_salmon_sa" in prefix:
+            return "salmon_sa"
+        if "map_star" in prefix:
+            if "quant_rsem" in prefix:
+                return "star_rsem"
+            if "quant_salmon" in prefix:
+                return "star_salmon"
+            return "star"
+        return "unknown"
+
+    localrules: vp_rnaseq_report
     rule vp_rnaseq_report:
+        message:
+            "Copying results to reports directory"
         input:
             "{:prev:}/{:target:}.gene_counts.rds",
             "{:prev:}/{:target:}.tx_counts.rds",
@@ -81,14 +79,18 @@ with Stage("report_vp") as S:
             "{:this:}/{target}.tx_counts.rds",
             "{:this:}/{target}.multiqc_report.html",
             directory("{:this:}/{target}.multiqc_report_data"),
-        output:
         log:
             "{:this:}/{target}.log"
+        threads:
+            1
+        resources:
+            mem = "50m"
         params:
             slack_hook = "",  # should be trailing part of form xxx/xxx/xxx
             this = "{:this:}",
             reporttpl  = "{:ensuredir.reports:}/{:project:}.$LABEL.$TYPE.%Y-%m-%d_%H-%M$EXT",
             project = "{:project:}",
+            label = make_label
         shell:
             "exec >{log} 2>&1;"
             "SRCS=({input});"
