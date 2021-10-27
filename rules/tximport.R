@@ -128,6 +128,27 @@ if (snakemake@params$input_type == "Salmon") {
         select(where(~ length(unique(.x)) != 1)) %>%
         select(-start_time, -end_time)
 
+    must_be_identical <- c(
+        "index_decoy_seq_hash",
+        "index_decoy_name_hash",
+        "num_decoy_targets",
+        "index_seq_hash",
+        "index_name_hash",
+        "num_valid_targets",
+        "seq_bias_correct",
+        "gc_bias_correct",
+        "salmon_version"
+    )
+
+    if (length(intersect(colnames(extra_coldata), must_be_identical)) > 0) {
+        errorfn = paste0(logfile, ".error.csv")
+        message("Samples were run with multiple references or varried parameters.",
+                "Refusing to aggregate.",
+                "Writing coldata to ", errorfn)
+        readr::write_csv(extra_coldata, errorfn)
+        stop()
+    }
+
     # Extract data constant across dataset
     metadata$salmon <- salmon_all_meta %>%
         summarize(
