@@ -54,16 +54,18 @@ with Stage("tximport_vp") as S:
 
 with Stage("report_vp") as S:
     def make_label(wildcards):
+        version = str(ymp.get_config()._config.userdata.virprof.version)
         prefix = wildcards._YMP_DIR
-        if "quant_salmon_sa" in prefix:
-            return "salmon_sa"
+        pipeline = []
         if "map_star" in prefix:
-            if "quant_rsem" in prefix:
-                return "star_rsem"
-            if "quant_salmon" in prefix:
-                return "star_salmon"
-            return "star"
-        return "unknown"
+            pipeline += ["star"]
+        if "quant_salmon_sa" in prefix:
+            pipeline += ["salmon_sa"]
+        if "quant_rsem" in prefix:
+            pipeline += ["rsem"]
+        if "quant_salmon" in prefix:
+            pipeline += ["salmon"]
+        return "_".join(pipeline or ["unknown"]) + "." + version
 
     localrules: vp_rnaseq_report
     rule vp_rnaseq_report:
@@ -90,12 +92,13 @@ with Stage("report_vp") as S:
             this = "{:this:}",
             reporttpl  = "{:ensuredir.reports:}/{:project:}.$LABEL.$TYPE.%Y-%m-%d_%H-%M$EXT",
             project = "{:project:}",
-            label = make_label
+            label = make_label,
+            version = ymp.get_config()._config.userdata.virprof.version,
         shell:
             "exec >{log} 2>&1;"
             "SRCS=({input});"
             "DSTS=({output});"
-            "MSG=\"New RNA-Seq results for \`{params.project}\`:\n\n\";"
+            "MSG=\"New RNA-Seq (v{params.version}) results for \`{params.project}\`:\n\n\";"
             "LABEL={params.label};"
             "for i in \"${{!SRCS[@]}}\"; do"
             "  echo Copying ${{SRCS[i]}} to ${{DSTS[i]}};"
