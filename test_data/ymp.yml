@@ -1,0 +1,6 @@
+include:
+  - virprof/virprof.yml
+
+resource_limits:
+  mem:
+    max: 6G  # We don't have more on the CI
