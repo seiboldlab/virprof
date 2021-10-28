@@ -65,14 +65,14 @@ jobs:
         ymp env run virprof_py pytest
     - name: Run pipeline dry-run
       run: |
-        ymp make test.generic -np
+        ymp make test.rnaseq_salmon test.rnaseq_salmon.pathogen -np
     - name: Run pipeline software install
       run: |
-        ymp env prepare test.generic
+        ymp env prepare test.rnaseq_salmon test.rnaseq_salmon.pathogen
     - name: Run pipeline analysis
       run: |
-        ymp make test.generic -j8
-        ls -l test.generic/
+        ymp make test.rnaseq_salmon test.rnaseq_salmon.pathogen -j8
+        ls -l test.rnaseq_salmon test.rnaseq_salmon.pathogen
     - name: Save pipeline reports
       uses: actions/upload-artifact@v2
       with:
