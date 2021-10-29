@@ -18,6 +18,7 @@ jobs:
           # - macos-latest
     runs-on: ${{ matrix.os }}
     steps:
+    ## SETUP ##
     - uses: actions/checkout@v2
       with:
         path: virprof
@@ -38,6 +39,8 @@ jobs:
         conda config --add channels bioconda
         conda config --add channels conda-forge
         conda install mamba
+
+    ## LINT ##
     - name: Lint Python with black
       run: |
         mamba install black
@@ -49,6 +52,8 @@ jobs:
         flake8 virprof --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 virprof --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    ## INSTALL ##
     - name: Install YMP
       run: |
         mamba env update --file virprof/environment.yml --name base
@@ -63,16 +68,49 @@ jobs:
       run: |
         ymp env run virprof_py mamba install pytest
         ymp env run virprof_py pytest
-    - name: Run pipeline dry-run
+
+    ## DRY RUNS ##
+    - name: Run pipeline dry-run rnaseq salmon selective alignment
       run: |
-        ymp make test.rnaseq_salmon test.rnaseq_salmon.pathogen -np
+        ymp make test.ref_hg38gtest.rnaseq_salmon
+    - name: Run pipeline dry-run rnaseq star + salmon
+      run: |
+        ymp make test.ref_hg38gtest.rnaseq_star_salmon
+    - name: Run pipeline dry-run rnaseq star + rsem
+      run: |
+        ymp make test.ref_hg38gtest.rnaseq_star_rsem
+    - name: Run pipeline dry-run pathogen
+      run: |
+        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen
+
+    ## INSTALL ENVS ##
     - name: Run pipeline software install
       run: |
-        ymp env prepare test.rnaseq_salmon test.rnaseq_salmon.pathogen
-    - name: Run pipeline analysis
+        ymp env prepare \
+        test.ref_hg38gtest.rnaseq_salmon \
+        test.ref_hg38gtest.rnaseq_star_salmon \
+        test.ref_hg38gtest.rnaseq_star_rsem \
+        test.ref_hg38gtest.rnaseq_salmon.pathogen
+
+    ## RUN ##
+    - name: Run pipeline analysis rnaseq salmon selective alignment
       run: |
-        ymp make test.rnaseq_salmon test.rnaseq_salmon.pathogen -j8
+        ymp make test.ref_hg38gtest.rnaseq_salmon -j8
+        ls -l test.rnaseq_salmon test.rnaseq_salmon
+    - name: Run pipeline analysis rnaseq star + salmon
+      run: |
+        ymp make test.ref_hg38gtest.rnaseq_star_salmon -j8
+        ls -l test.rnaseq_salmon test.rnaseq_star_salmon
+    - name: Run pipeline analysis rnaseq star + rsem
+      run: |
+        ymp make test.ref_hg38gtest.rnaseq_star_rsem -j8
+        ls -l test.rnaseq_salmon test.rnaseq_star_rsem
+    - name: Run pipeline analysis pathogen
+      run: |
+        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen -j8
         ls -l test.rnaseq_salmon test.rnaseq_salmon.pathogen
+
+    ## LOG ##
     - name: Save pipeline reports
       uses: actions/upload-artifact@v2
       with:
