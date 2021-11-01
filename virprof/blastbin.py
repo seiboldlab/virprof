@@ -622,7 +622,7 @@ def greedy_select_chains(
         extra_chains = [
             chain
             for chain in chains
-            and chain.score > alt * best_chain.score
+            if chain.score > alt * best_chain.score
             and chain.log10_evalue < alt * best_chain.log10_evalue
             and chain.slen > alt * best_chain.slen
             and chain.qlen > alt * best_chain.qlen
