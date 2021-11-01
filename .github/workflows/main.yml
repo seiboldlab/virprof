@@ -72,16 +72,16 @@ jobs:
     ## DRY RUNS ##
     - name: Run pipeline dry-run rnaseq salmon selective alignment
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon
+        ymp make -n test.ref_hg38gtest.rnaseq_salmon
     - name: Run pipeline dry-run rnaseq star + salmon
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_star_salmon
+        ymp make -n test.ref_hg38gtest.rnaseq_star_salmon
     - name: Run pipeline dry-run rnaseq star + rsem
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_star_rsem
+        ymp make -n test.ref_hg38gtest.rnaseq_star_rsem
     - name: Run pipeline dry-run pathogen
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen
+        ymp make -n test.ref_hg38gtest.rnaseq_salmon.pathogen
 
     ## INSTALL ENVS ##
     - name: Run pipeline software install
