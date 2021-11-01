@@ -148,7 +148,7 @@ class HitChain:
         return len(self.hits)
 
     def __str__(self) -> str:
-        return f"acc={self.sacc} e={self.log10_evalue} " f"l={self.qlens}"
+        return f"acc={self.sacc} e={self.log10_evalue} l={self.qlen} n={len(self)}"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self)})"
@@ -507,7 +507,7 @@ class CheckOverlaps(HitChain):
         if len(hitset) > 50:
             hitset = tqdm.tqdm(hitset, desc=hitset[0].sacc)
 
-        # iterate over hits in order of range on target
+        # iterate over hits in order of range on subject
         for hit in hitset:
             newchains = set()
             sstart = min(hit.sstart, hit.send)
@@ -622,7 +622,6 @@ def greedy_select_chains(
         extra_chains = [
             chain
             for chain in chains
-            if chain != best_chain
             and chain.score > alt * best_chain.score
             and chain.log10_evalue < alt * best_chain.log10_evalue
             and chain.slen > alt * best_chain.slen
