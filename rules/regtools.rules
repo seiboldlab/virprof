@@ -1,0 +1,39 @@
+Env(name="regtools", base="bioconda", packages=[
+    "regtools"
+])
+
+with Stage("extract_junctions_regtools") as S:
+    S.add_param("S", typ="choice", name="strandedness", value=['r','f','u'], default='r')
+    rule regtools_junctions_extract:
+        message: "{:name:}: Extracting exon-exon junctions from {input.bam}"
+        input:
+            bam = "{:prev:}/{:target:}.sorted.bam"
+        output:
+            junc = "{:this:}/{target}.junc"
+        log:
+            "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt",
+        params:
+            min_anchor_len = 8,
+            min_intron_size = 70,
+            max_intron_size = 500000,
+        resources:
+            mem = "8g",
+        conda:
+            "regtools"
+        shell:
+            "exec >{log} 2>&1;"
+            "case {params.strandedness} in"
+            "  r) STRAND=1;;"
+            "  f) STRAND=2;;"
+            "  u) STRAND=0;;"
+            "  *) echo Unkown strandedness {params.strandedness}; exit 1;;"
+            "esac;"
+            "regtools junctions extract"
+            "  -a {params.min_anchor_len}"
+            "  -m {params.min_intron_size}"
+            "  -M {params.max_intron_size}"
+            "  -o {output.junc}"
+            "  -s $STRAND"
+            "  {input.bam}"
