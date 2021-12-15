@@ -72,6 +72,8 @@ with Stage("tximport_vp") as S:
         input:
             counts = "{:prev:}/{:target:}.exon.se.rds",
             transcripts = [],
+        resources:
+            mem = "200G",
         params:
             input_type = "ExonSE"
 
@@ -95,7 +97,7 @@ with Stage("quant_exon_vp") as S:
         threads:
             2
         resources:
-            mem = "12G",
+            mem = "12g"
         conda:
             "vp_rnaseq_r"
         script:
