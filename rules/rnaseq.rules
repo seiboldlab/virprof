@@ -1,8 +1,19 @@
-Env(name="tximport",base="bioconda", packages=[
+Env(name="vp_rnaseq_r", base="bioconda", packages=[
     "bioconductor-tximport",
     "bioconductor-tximeta",
-    "r-readr"  # faster read
-    ])
+    "r-readr",  # faster read
+    "bioconductor-genomicfeatures",
+    "bioconductor-genomicranges",
+    "bioconductor-genomicalignments",
+    "bioconductor-biocparallel",
+    "r-jsonlite",
+    "r-purrr",
+    "r-dplyr",
+    "r-magrittr",
+    "bioconductor-rtracklayer",
+    "bioconductor-summarizedexperiment",
+])
+
 
 with Stage("tximport_vp") as S:
     S.doc("""
@@ -10,7 +21,8 @@ with Stage("tximport_vp") as S:
     S.require(
         counts = [
             ["isoforms.results", "genes.results"],  # RSEM output
-            ["salmon/quant.sf"]  # Salmon output
+            ["salmon/quant.sf"],  # Salmon output
+            ["exon.se.rds"],  # our own exon counting
         ],
         gtf = [["gtf"]],
     )
@@ -32,12 +44,14 @@ with Stage("tximport_vp") as S:
             label = "{:this:}",
         log:
             "{:this:}/{target}.log",
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         resources:
             mem = "16G"
         threads:
             1
         conda:
-            "tximport"
+            "vp_rnaseq_r"
         script:
             "tximport.R"
 
@@ -52,6 +66,42 @@ with Stage("tximport_vp") as S:
             input_type = "Salmon"
 
 
+    rule vp_tximport_exon: # ymp: extends vp_tximport_rsem
+        message:
+            "{:name:}: Importing exon counts"
+        input:
+            counts = "{:prev:}/{:target:}.exon.se.rds",
+            transcripts = [],
+        params:
+            input_type = "ExonSE"
+
+
+with Stage("quant_exon_vp") as S:
+    rule vp_quant_exon:
+        message:
+            "{:name:}: Counting exon overlaps for {input.bam}"
+        input:
+            bam = "{:prev:}/{:target:}.bam",
+            gtf = "{:prev:}/{:target:}.gtf",
+        output:
+            se = "{:this:}/{target}.exon.se.rds",
+        log:
+            "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
+        params:
+            single_gene_only = True,
+            # DEXSeq will fail if set to False
+        threads:
+            2
+        resources:
+            mem = "12G",
+        conda:
+            "vp_rnaseq_r"
+        script:
+            "quant_exon.R"
+
+
 with Stage("report_vp") as S:
     def make_label(wildcards):
         version = str(ymp.get_config()._config.userdata.virprof.version)
@@ -61,10 +111,12 @@ with Stage("report_vp") as S:
             pipeline += ["star"]
         if "quant_salmon_sa" in prefix:
             pipeline += ["salmon_sa"]
+        elif "quant_salmon" in prefix:
+            pipeline += ["salmon"]
         if "quant_rsem" in prefix:
             pipeline += ["rsem"]
-        if "quant_salmon" in prefix:
-            pipeline += ["salmon"]
+        if "quant_exon_vp" in prefix:
+            pipeline += ["exon"]
         return "_".join(pipeline or ["unknown"]) + "." + version
 
     localrules: vp_rnaseq_report
@@ -83,6 +135,8 @@ with Stage("report_vp") as S:
             directory("{:this:}/{target}.multiqc_report_data"),
         log:
             "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         threads:
             1
         resources:

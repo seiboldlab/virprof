@@ -1,5 +1,7 @@
 CHANGELOG
 ---------
+v0.5.0:
+ - added pipeline for extracting exon counts (with R GenomicAlignments)
 
 v0.4.0:
  - changed RNA-seq pipelines to use STAR "twopassMode Basic"

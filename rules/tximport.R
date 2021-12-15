@@ -81,7 +81,7 @@ read_json_nolist <- function(fname, ...) {
 }
 
 
-message("Importing ", snakemake@params$input_type, " data into R using tximport")
+message("Importing ", snakemake@params$input_type, " data into R")
 
 message("1. ----------- Loading packages ----------")
 library(tximport)
@@ -160,12 +160,27 @@ if (snakemake@params$input_type == "Salmon") {
     names(files) <- gsub(".isoforms.results", "", basename(files))
     txi <- tximport(files, type = "rsem", txIn = TRUE, txOut = TRUE)
     extra_coldata <- data.frame(idcolumn = character())
+} else if (snakemake@params$input_type == "ExonSE") {
+    files <- snakemake@input$counts
+    names(files) <- gsub(".exon.se.rds", "", basename(files))
+    sel <- vector("list", length(files))
+    for (i in seq_along(files)) {
+        message("Reading ", files[[i]], " ...")
+        sel[[i]] <- readRDS(files[[i]])
+    }
+    extra_coldata <- data.frame(idcolumn = character())
+    se <- do.call("cbind", sel)
+    colnames(se) <- names(files)
 }
 
 message("4. ----------- Assembling SummarizedExperiment ----------")
 
 message("4.1. ----------- Preparing colData (sample sheet) -----------")
 idcolumn <- names(which(sapply(samples, function(x) all(sort(x)==names(files)))))
+if (length(idcolumn) == 0) {
+    stop("The sample sheet columns and file names didn't match up. Something is wrong. Bailing out.")
+}
+
 coldata <- samples %>%
     group_by(across(all_of(idcolumn))) %>%
     summarize(
@@ -180,8 +195,17 @@ coldata <- samples %>%
         by = set_names("idcolumn", idcolumn[[1]])
     )
 
+if (snakemake@params$input_type == "ExonSE") {
+    stopifnot(all(colnames(se) == coldata[idcolumn[[1]]]))
+    colData(se) <- as(coldata, "DataFrame")
+    message("5. ----------- Writing RDS with exon se object ----------")
+    message("Filename = ", snakemake@output$counts)
+    saveRDS(se, snakemake@output$counts)
+    message("done")
+    q()
+}
 
-message("4.2. ----------- Preparing rowData (samples sheet) ----------")
+message("4.2. ----------- Preparing rowData (gene sheet) ----------")
 txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]  # only transcript rows
 txmeta <- subset(txmeta, select = -type)
 rownames(txmeta) <- txmeta$transcript_id  # set names

@@ -47,14 +47,18 @@ with Stage("get_unmapped_vp") as S:
             pairs = "{:this:}/{target}.{:pairnames:}.fq.gz"
         log:
             "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         threads:
             4
-        conda:
-            "samtools"
+        resources:
+            mem = "8g"
         params:
             f = 12,
             F = 0x900,
             G = 0,
+        conda:
+            "samtools"
         shell:
             "samtools fastq"
             " -1 {output.pairs[0]}"
@@ -76,14 +80,16 @@ with Stage("get_unmapped_vp") as S:
             fq = "{:this:}/{target}.{:pairnames:}.fq.gz"
         log:
             "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         threads:
             8
-        conda:
-            "bbmap"
         resources:
             mem="32g"
         params:
             pattern = "u"
+        conda:
+            "bbmap"
         shell:
             "exec >{log} 2>&1;"
             "grep '{params.pattern}$' {input.unmapped} |"
@@ -118,6 +124,8 @@ with Stage("index_vp") as S:
             "{:this:}/ALL.taxonomy.gt"
         log:
             "{:this:}/ALL.taxonomy.gt.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/ALL.txt"
         threads:
             1
         params:

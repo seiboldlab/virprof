@@ -148,6 +148,13 @@ pipelines:
       - quant_salmonG
       - rnaseq_report
 
+  rnaseq_star_exon:
+    stages:
+      - qc
+      - map_starT
+      - quant_exon_vp
+      - rnaseq_report
+
   virus:
     stages:
       - deplete
