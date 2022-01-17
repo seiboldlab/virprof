@@ -201,9 +201,8 @@ if (snakemake@params$input_type == "ExonSE") {
     message("5. ----------- Writing RDS with exon se object ----------")
     message("Filename = ", snakemake@output$counts)
     saveRDS(se, snakemake@output$counts)
-    message("done")
-    q()
-}
+    saveRDS(se, snakemake@output$transcripts)
+    } else {
 
 message("4.2. ----------- Preparing rowData (gene sheet) ----------")
 txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]  # only transcript rows
@@ -280,4 +279,5 @@ message("8. ----------- Writing RDS with gene se object ----------")
 message("Filename = ", snakemake@output$transcripts)
 saveRDS(gse, snakemake@output$counts)
 
+}
 message("done")

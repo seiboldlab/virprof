@@ -1,7 +1,8 @@
 CHANGELOG
 ---------
 v0.5.0:
- - added pipeline for extracting exon counts (with R GenomicAlignments)
+ - added workflow for extracting exon counts (with R GenomicAlignments)
+ - added workflows for handling UMIs on bulk RNA-seq data
 
 v0.4.0:
  - changed RNA-seq pipelines to use STAR "twopassMode Basic"

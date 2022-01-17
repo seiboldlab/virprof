@@ -1,0 +1,98 @@
+Env(name="vp_umi_tools", base="bioconda", packages=[
+    "umi_tools"
+])
+
+with Stage("extract_umi_vp"):
+    rule vp_umi_tools_extract:
+        message:
+            "{:name:}: Extracting UMI from reads"
+        input:
+            fq1 = "{:prev:}/{:target:}.R1.fq.gz",
+            fq2 = "{:prev:}/{:target:}.R2.fq.gz",
+        output:
+            fq1 = "{:this:}/{target}.R1.fq.gz",
+            fq2 = "{:this:}/{target}.R2.fq.gz",
+        log:
+            "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
+        params:
+            extract_method = "regex",
+            bc_pattern = "",
+            bc_pattern2 = "(?P<umi_1>........)(?P<discard_1>......)",
+        resources:
+            mem = "16G"
+        threads:
+            1
+        conda:
+            "vp_umi_tools"
+        shell:
+            "exec >{log} 2>&1;"
+            "umi_tools extract"
+            " -I {input.fq1}"
+            " --read2-in={input.fq2}"
+            " -S {output.fq1}"
+            " --read2-out={output.fq2}"
+            " --extract-method={params.extract_method}"
+            " --bc-pattern '{params.bc_pattern}'"
+            " --bc-pattern2 '{params.bc_pattern2}'"
+
+
+with Stage("dedup_umi_vp"):
+    rule vp_umi_tools_dedup:
+        message:
+            "{:name:}: Dedup'ing based on UMI"
+        input:
+            bam = "{:prev:}/{:target:}.sorted.tx.bam",
+        output:
+            bam = "{:this:}/{target}.sorted.tx.bam",
+        log:
+            "{:this:}/{target}.log",
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
+        params:
+            prefix = "{:this:}/{target}",
+        resources:
+            mem = "16G",
+        threads:
+            8
+        conda:
+            "vp_umi_tools"
+        shell:
+            "exec >{log} 2>&1;"
+            "umi_tools dedup"
+            "  --stdin={input.bam}"
+            "  --stdout={output.bam}"
+            "  --random-seed=12345"
+            "  --output-stats={params.prefix}"
+            "  --paired"
+            "  --unpaired-reads discard"
+            "  --chimeric-pairs discard"
+            "  --unmapped-reads discard"
+
+
+with Stage("fix_umi_vp"):
+    rule vp_umi_tools_prepare_for_rsem:
+        message:
+            "{:name:}: Fixing UMI-deduped BAM for RSEM/Salmon"
+        input:
+            bam = "{:prev:}/{:target:}.tx.bam",
+        output:
+            bam = "{:this:}/{target}.tx.bam",
+        log:
+            "{:this:}/{target}.log",
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
+        params:
+            prefix = "{:this:}/{target}",
+        resources:
+            mem = "8G",
+        threads:
+            1
+        conda:
+            "vp_umi_tools"
+        shell:
+            "exec >{log} 2>&1;"
+            "umi_tools prepare-for-rsem"
+            "  --stdin={input.bam}"
+            "  --stdout={output.bam}"

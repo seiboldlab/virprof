@@ -148,6 +148,30 @@ pipelines:
       - quant_salmonG
       - rnaseq_report
 
+  umimap_starT:
+    stages:
+      - map_starT
+      - sort_txbam
+      - dedup_umi_vp
+      - collate_txbam
+      - fix_umi_vp
+
+  rnaseq_umi_star_salmon:
+    stages:
+      - extract_umi_vp
+      - qc
+      - umimap_starT
+      - quant_salmonG
+      - rnaseq_report
+
+  rnaseq_umi_star_rsem:
+    stages:
+      - extract_umi_vp
+      - qc
+      - umimap_starT
+      - quant_rsem
+      - rnaseq_report
+
   rnaseq_star_exon:
     stages:
       - qc

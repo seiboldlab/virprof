@@ -119,6 +119,8 @@ with Stage("report_vp") as S:
             pipeline += ["rsem"]
         if "quant_exon_vp" in prefix:
             pipeline += ["exon"]
+        if "dedup_umi_vp" in prefix:
+            pipeline += ["umi"]
         return "_".join(pipeline or ["unknown"]) + "." + version
 
     localrules: vp_rnaseq_report
