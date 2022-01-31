@@ -283,3 +283,54 @@ annotate_subjects <- function(starts, ends, acc_, feature_table) {
     )
     res
 }
+
+#' Execute bedtools genomecov
+#'
+#' @param strand +/- to get stranded coverage (-du -strand +)
+#' @param split If true, don't count gaps (-split)
+#' @param fragment Count coverage for full fragment length (-fs)
+run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
+    message(
+        "Running bedtools genomecov on ", fname,
+        if (!is.null(strand)) paste(" counting", strand, "strand"),
+        if (split) " not counting gaps",
+        if (fragment) " counting whole fragment",
+        "..."
+    )
+    proc <- pipe(paste(
+        "bedtools", "genomecov",
+        "-ibam", fname,
+        "-d",
+        if (is.null(strand)) "" else paste("-du -strand", strand),
+        if (split) "-split" else "",
+        if (fragment) "-fs" else ""
+    ))
+    read_tsv(proc,
+             col_types = "cii",
+             col_names = c("contig", "pos", "depth"),
+             skip = 1)
+}
+
+
+#' Get depth from BAM file
+#'
+#' @param fname Path to sorted BAM file
+coverage_depth <- function(fname) {
+    plus <- run_bedtools(fname, strand="+", split=TRUE) %>% rename(plus=depth)
+    minus <- run_bedtools(fname, strand="-", split=TRUE) %>% rename(minus=depth)
+    result <- full_join(plus, minus, by=c("contig", "pos"))
+    result$total = result$plus + result$minus
+    result
+}
+
+
+#' Sum depths from multiple BAM files, summing
+#'
+load_coverage <- function(fname) {
+    strsplit(fname, ",") %>%
+        unlist() %>%
+        map_dfr(coverage_depth) %>%
+        group_by(contig, pos) %>%
+        summarize_all(sum)
+}
+

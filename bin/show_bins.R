@@ -94,37 +94,6 @@ parse_options<- function(args = commandArgs(trailingOnly = TRUE)) {
 }
 
 
-#' Get depth from BAM file
-coverage_depth <- function(fname) {
-    run_bedtools <- function(strand=NULL, split=FALSE, fragment=FALSE) {
-        message(
-            "Running bedtools genomecov on ", fname,
-            if (!is.null(strand)) paste(" counting", strand, "strand"),
-            if (split) " not counting gaps",
-            if (fragment) " counting whole fragment",
-            "..."
-        )
-        proc <- pipe(paste(
-            "bedtools", "genomecov",
-            "-ibam", fname,
-            "-d",
-            if (is.null(strand)) "" else paste("-du -strand", strand),
-            if (split) "-split" else "",
-            if (fragment) "-fs" else ""
-        ))
-        read_tsv(proc,
-                 col_types = "cii",
-                 col_names = c("contig", "pos", "depth"),
-                 skip = 1)
-    }
-
-    plus <- run_bedtools(strand="+", split=TRUE) %>% rename(plus=depth)
-    minus <- run_bedtools(strand="-", split=TRUE) %>% rename(minus=depth)
-    result <- full_join(plus, minus, by=c("contig", "pos"))
-    result$total = result$plus + result$minus
-    result
-}
-
 #' Linewrap lineage string
 break_lineage <- function(lineage, maxlen=200, insert="\n") {
     lineage %>%
@@ -503,12 +472,7 @@ run <- function() {
 
     if (!is.null(opt$options$input_bam)) {
         message("Getting coverages...")
-        depths <- opt$options$input_bam %>%
-            strsplit(",") %>%
-            unlist() %>%
-            map_dfr(coverage_depth) %>%
-            group_by(contig, pos) %>%
-            summarize_all(sum)
+        depths <- load_coverage(opt$options$input_bam)
     } else {
         depths <- NULL
     }
