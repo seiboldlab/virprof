@@ -471,7 +471,7 @@ run <- function() {
 
     if (!is.null(opt$options$input_bam)) {
         message("Getting coverages...")
-        depths <- load_coverage(opt$options$input_bam)
+        depths <- coverage_depth(opt$options$input_bam)
     } else {
         depths <- NULL
     }

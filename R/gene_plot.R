@@ -287,20 +287,21 @@ annotate_subjects <- function(starts, ends, acc_, feature_table) {
 
 #' Execute bedtools genomecov
 #'
-#' @param strand +/- to get stranded coverage (-du -strand +)
+#' @param strand +/- to get stranded coverage (-du -strand +, du makes
+#'     it so mates are counted towards same strand).
 #' @param split If true, don't count gaps (-split)
 #' @param fragment Count coverage for full fragment length (-fs)
 run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
     message(
         "Running bedtools genomecov on ", fname,
         if (!is.null(strand)) paste(" counting", strand, "strand"),
-        if (split) " not counting gaps",
+        if (split) " not counting gaps between spliced alignments",
         if (fragment) " counting whole fragment",
         "..."
     )
     proc <- pipe(paste(
         "bedtools", "genomecov",
-        "-ibam", fname,
+        paste("-ibam", strsplit(fname, ",")[[1]]),
         "-d",
         if (is.null(strand)) "" else paste("-du -strand", strand),
         if (split) "-split" else "",
@@ -325,13 +326,5 @@ coverage_depth <- function(fname) {
 }
 
 
-#' Sum depths from multiple BAM files, summing
-#'
-load_coverage <- function(fname) {
-    strsplit(fname, ",") %>%
-        unlist() %>%
-        map_dfr(coverage_depth) %>%
-        group_by(contig, pos) %>%
-        summarize_all(sum)
 }
 
