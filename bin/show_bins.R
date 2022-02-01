@@ -452,8 +452,7 @@ run <- function() {
     }
 
     message("Placing contigs ...")
-    contigs <- place_contigs(alignments)  %>% select(sacc, qacc, cstart, cend)
-    alignments <- alignments %>% left_join(contigs, by=c("sacc", "qacc"))
+    alignments <- place_contigs(alignments)
 
     message("Ordering calls ...")
     saccs <- calls %>%

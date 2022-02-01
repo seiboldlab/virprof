@@ -150,7 +150,7 @@ center_spread_ranges <- function(contigs, spacing, max_iter = 100) {
 #' Create offsets for qacc positions in plot
 #'
 #' @param alignments data.frame with columns sacc, qacc, sstart, send, qstart, qend, qlen
-#' @return data.frame with columns sacc, qacc, cstart, cend
+#' @return alignments with added columns cstart, cend
 place_contigs <- function(alignments, spacing = 10) {
     if (nrow(alignments) == 0) {
         empty_res <- data.frame(
@@ -172,9 +172,10 @@ place_contigs <- function(alignments, spacing = 10) {
         )  %>%
         group_by(sacc) %>%
         group_modify(~ center_spread_ranges(., spacing)) %>%
-        ungroup()
+        ungroup() %>%
+        select(sacc, qacc, cstart, cend)
 
-    contigs
+    alignments %>% left_join(contigs, by=c("sacc", "qacc"))
 }
 
 
