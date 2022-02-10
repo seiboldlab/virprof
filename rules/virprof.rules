@@ -225,53 +225,6 @@ with Stage("blastbin_vp") as S:
             " --cache-path {params.cache_path}"
             " --ncbi-api-key '{params.ncbi_api_key}'"
 
-    rule vp_show_bins:
-        message:
-            "{:name:}: Visualizing bins {output}"
-        input:
-            calls = "{:this:}/{target}.virus.csv",
-            hits  = "{:this:}/{target}.hits.csv",
-            features  = "{:this:}/{target}.features.csv",
-            bam   = "{:prev:}/{:target:}.sorted.bam"
-        output:
-            plot =  "{:this:}/{target}.virus.pdf"
-        log:
-            "{:this:}/{target}.show_bins.log"
-        benchmark:
-            "benchmarks/{:name:}/{:this:}/{target}.show_bins.txt"
-        threads:
-            1
-        conda:
-            "virprof_r"
-        params:
-            page_width = 22,
-            page_height = 18,
-            plots_per_page = 5,
-            min_slen = 200,
-            min_reads = 3,
-            bamlist = lambda wc, input: input.bam if isinstance(input.bam, str) else ",".join(input.bam),
-        shell:
-            "exec >{log} 2>&1;"
-            "{BIN}/show_bins.R"
-            " --input {input.calls}"
-            " --input-hits {input.hits}"
-            " --input-features {input.features}"
-            " --input-bam {params.bamlist}"
-            " --output {output.plot}"
-            " --page-width {params.page_width}"
-            " --page-height {params.page_height}"
-            " --plots-per-page {params.plots_per_page}"
-            " --min-slen {params.min_slen}"
-            " --min-reads {params.min_reads}"
-
-    rule vp_classify_all:
-        message:
-            "Completed {:this:}"
-        input:
-            plots = "{:this:}/{:targets:}.virus.pdf",
-        output:
-            touch("{:this:}/all_targets.stamp")
-
 
 with Stage("scaffold_vp") as S:
     S.doc("""
@@ -318,6 +271,52 @@ with Stage("scaffold_vp") as S:
             bins = "{:this:}/{:targets:}.fasta.gz"
         output:
             touch("{:this:}/all_targets.stamp")
+
+with Stage("collect_vp") as S:
+    S.doc("""
+    Collects pipeline data into RDS format files
+    """)
+    rule vp_show_bins:
+        message:
+            "{:name:}: Visualizing bins {output}"
+        input:
+            calls = "{:this:}/{target}.virus.csv",
+            hits  = "{:this:}/{target}.hits.csv",
+            features  = "{:this:}/{target}.features.csv",
+            bam   = "{:prev:}/{:target:}.sorted.bam"
+        output:
+            plot =  "{:this:}/{target}.virus.pdf",
+            data = "{:this:}/{target}.vp.rds",
+        log:
+            "{:this:}/{target}.show_bins.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.show_bins.txt"
+        threads:
+            1
+        conda:
+            "virprof_r"
+        params:
+            page_width = 15,
+            page_height = 4,
+            plots_per_page = 1,
+            min_slen = 200,
+            min_reads = 2,
+            bamlist = lambda wc, input: input.bam if isinstance(input.bam, str) else ",".join(input.bam),
+        shell:
+            "exec >{log} 2>&1;"
+            "{BIN}/show_bins.R"
+            " --input {input.calls}"
+            " --input-hits {input.hits}"
+            " --input-features {input.features}"
+            " --input-bam {params.bamlist}"
+            " --output {output.plot}"
+            " --output-rds {output.data}"
+            " --page-width {params.page_width}"
+            " --page-height {params.page_height}"
+            " --plots-per-page {params.plots_per_page}"
+            " --min-slen {params.min_slen}"
+            " --min-reads {params.min_reads}"
+
 
 with Stage("bin_vp") as S:
     S.doc("""Rearranges sequences from per-sample to per-bin fasta files""")
@@ -390,6 +389,7 @@ with Stage("summarize_vp") as S:
             coverages="{:prev:}/{:target:}.coverage",
             basecov="{:prev:}/{:target:}.basecov.bg",
             scaffolds="{:prev:}/{:target:}.scaffolds.csv",
+            data="{:prev:}/{:target:}.vp.rds",
         output:
             call_files=temp("{:this:}/{target}.call_flist"),
             coverage_files=temp("{:this:}/{target}.coverage_flist"),
@@ -412,7 +412,6 @@ with Stage("summarize_vp") as S:
             reporttpl   = "{:ensuredir.reports:}/{:project:}.pathogens.summary.%Y-%m-%d_%H-%M.xlsx",
             project = "{:project:}",
             slack_hook  = "",  # should be trailing part of form xxx/xxx/xxx
-
         threads:
             1
         conda:

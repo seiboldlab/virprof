@@ -96,6 +96,7 @@ pipelines:
   summarize:
     stages:
       - ref_VHDB
+      - collect_vp
       - group_ALL
       - summarize_vp
 

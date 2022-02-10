@@ -2,6 +2,20 @@ requireNamespace("IRanges", quietly = TRUE)
 requireNamespace("rentrez", quietly = TRUE)
 requireNamespace("rlang", quietly = TRUE)
 
+
+#' Linewrap lineage string
+break_lineage <- function(lineage, maxlen=200, insert="\n") {
+    lineage %>%
+        gsub(" ", "_", .) %>%
+        gsub(";_", " ", .) %>%
+        strwrap(maxlen) %>%
+        gsub(" ", ";_", .) %>%
+        gsub("_", " ", .) %>%
+        paste(collapse=paste0(";", insert))
+}
+
+
+
 #' Conditionally swap contents of columns
 #'
 #' For use with \code{mutate}
@@ -147,37 +161,6 @@ center_spread_ranges <- function(contigs, spacing, max_iter = 100) {
 }
 
 
-#' Create offsets for qacc positions in plot
-#'
-#' @param alignments data.frame with columns sacc, qacc, sstart, send, qstart, qend, qlen
-#' @return alignments with added columns cstart, cend
-place_contigs <- function(alignments, spacing = 10) {
-    if (nrow(alignments) == 0) {
-        empty_res <- data.frame(
-            sacc = character(),
-            qacc = character(),
-            cstart = numeric(),
-            cend = numeric()
-            )
-        return(empty_res)
-    }
-
-    ## Align each contig to have leftmost qstart be above sstart
-    contigs <- alignments %>%
-        group_by(sacc, qacc) %>%
-        slice_min(qstart, n = 1, with_ties = FALSE) %>%
-        mutate(
-            cstart = (sstart+send)/2 - (qstart+qend)/2 + 1,
-            cend = cstart + qlen
-        )  %>%
-        group_by(sacc) %>%
-        group_modify(~ center_spread_ranges(., spacing)) %>%
-        ungroup() %>%
-        select(sacc, qacc, cstart, cend)
-
-    alignments %>% left_join(contigs, by=c("sacc", "qacc"))
-}
-
 
 #' Caching wrapper around \code{rentrez::entrez_fetch}
 #'
@@ -314,17 +297,435 @@ run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
 }
 
 
+
+
+#' VP data class
+
+setClass(
+    "VirProf",
+    slots = list(
+        calls = "data.frame",
+        alignments = "data.frame",
+        depths = "data.frame",
+        scaffold_depths = "data.frame",
+        features = "data.frame"
+    )
+)
+
+
+VirProfFromCSV <- function
+(
+    calls_fname,  # base filename  (.virus.csv)
+    hits_fname = NULL,   # individual hits (.hits.csv),
+    features_fname = NULL,  # feature table
+    min_slen = 0,
+    min_reads = 0
+) {
+    res <- new("VirProf")
+    stopifnot(file.exists(calls_fname))
+    if (is.null(hits_fname)) {
+        hits_fname <- gsub("virus\\.csv$", "hits.csv", calls_fname)
+    }
+    stopifnot(file.exists(hits_fname))
+    if (is.null(features_fname)) {
+        fname <- gsub("virus\\.csv$", "features.csv", calls_fname)
+        if (file.exists(fname)) {
+            features_fname <- fname
+        }
+    } else {
+        stopifnot(file.exists(features_fname))
+    }
+    message("Loading calls...")
+    calls <- read_csv(calls_fname, col_types = cols())
+    message("... ", nrow(calls), " calls found")
+    calls <- filter(calls, slen >= opt$options$min_slen)
+    message("... ", nrow(calls), " calls left after removing calls with <",
+            opt$options$min_slen, " bp on subject")
+    calls <- filter(calls, numreads >= opt$options$min_reads)
+    message("... ", nrow(calls), " calls left after removing calls with <",
+            opt$options$min_reads, " mapped reads")
+    if (nrow(calls) == 0) {
+        message("No calls left, exiting")
+        return(res)
+    }
+    calls <- calls %>%
+        mutate(
+            genome_coverage = if_else(genome_size > 0,
+                                      round(slen / genome_size * 100, 1),
+                                      NA_real_)
+        )
+    res@calls <- calls
+    message("Loading alignments...")
+    alignments <- read_csv(hits_fname, col_types = cols())
+    message("... ", nrow(alignments), " alignments found")
+    alignments <- filter(alignments, sacc %in% calls$sacc)
+    message("... ", nrow(alignments), " alignments matching filtered calls")
+    alignments <- alignments %>%
+        mutate(
+            ## Abbreviate spades contig names
+            contig = sub("^NODE_([0-9]+)_.*", "\\1", qacc),
+            ## Mark reversed contigs
+            reversed = sstart > send,
+            ## Alwaus have sstart > send
+            swap_if(reversed, qstart, qend),
+            swap_if(reversed, sstart, send)
+        ) %>%
+        ## Check if we should flip contig to have majority alignments lined up
+        group_by(qacc) %>%
+        mutate(flip = as.logical(median(reversed))) %>%
+        ungroup() %>%
+        ## Flip contigs
+        mutate(
+            qstart = if_else(flip, qlen - qstart + 1, qstart),
+            qend = if_else(flip, qlen - qend + 1, qend)
+        ) %>%
+        select(-reversed)
+    res@alignments <- alignments
+    if (is.null(features_fname)) {
+        message("Not loading feature tables")
+    } else {
+        message("Loading feature tables...")
+        feature_tables <- read_csv(opt$options$input_features, col_types = cols())
+        message("... ", nrow(feature_tables), " feature annotations found")
+        res@features <- feature_tables
+    }
+    return(res)
+}
+
+
+setMethod("show", "VirProf", function(object) {
+    cat("# VirProf Results\n")
+    cat("# ", nrow(object@calls), " calls\n")
+    cat("# ", nrow(object@alignments), " alignments\n")
+    cat("# ", nrow(object@features), " features\n")
+})
+
+
+
+
+#' Create offsets for qacc positions in plot
+#'
+#' @param alignments data.frame with columns sacc, qacc, sstart, send, qstart, qend, qlen
+#' @return alignments with added columns cstart, cend
+setGeneric("place_contigs", function(object, ...) {
+    standardGeneric("place_contigs")
+})
+setMethod(
+    "place_contigs",
+    signature("VirProf"),
+    function(object, spacing = 10) {
+        alignments <- object@alignments
+        if (nrow(alignments) == 0) {
+            empty_res <- data.frame(
+                sacc = character(),
+                qacc = character(),
+                cstart = numeric(),
+                cend = numeric()
+            )
+            return(empty_res)
+        }
+        ## Align each contig to have leftmost qstart be above sstart
+        contigs <- alignments %>%
+            group_by(sacc, qacc) %>%
+            slice_min(qstart, n = 1, with_ties = FALSE) %>%
+            mutate(
+                cstart = (sstart+send)/2 - (qstart+qend)/2 + 1,
+                cend = cstart + qlen
+            )  %>%
+            group_by(sacc) %>%
+            group_modify(~ center_spread_ranges(., spacing)) %>%
+            ungroup() %>%
+            select(sacc, qacc, cstart, cend)
+        object@alignments <- alignments %>% left_join(contigs, by=c("sacc", "qacc"))
+        return(object)
+    })
+
+
 #' Get depth from BAM file
 #'
 #' @param fname Path to sorted BAM file
-coverage_depth <- function(fname) {
+setGeneric("coverage_depth", function(object, ...) standardGeneric("coverage_depth"))
+setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffold=FALSE) {
     plus <- run_bedtools(fname, strand="+", split=TRUE) %>% rename(plus=depth)
     minus <- run_bedtools(fname, strand="-", split=TRUE) %>% rename(minus=depth)
     result <- full_join(plus, minus, by=c("contig", "pos"))
     result$total = result$plus + result$minus
-    result
-}
+    if (scaffold) {
+        object@scaffold_depths <- result
+    } else {
+        object@depths <- result
+    }
+    return(object)
+})
 
 
-}
+##plot_ranges <- function(reference, hits, depths, featureshowMethods("plot")
+#' The actual plot function
+setMethod("plot", signature("VirProf"), function(x, accession) {
+    message("Plotting ", accession)
+    reference <- filter(x@calls, sacc == accession)
+    hits <- filter(x@alignments, sacc == accession)
+    depths <- x@depths
+    feature_tables <- x@features
 
+    #### CONFIG  ###
+    cat(".")
+    heights <- c(
+        coverage = 5,
+        contigs = 1,
+        alignments = 3,
+        subject = 1,
+        annotations = 1
+    )
+    ymax <- cumsum(rev(heights))
+    ymin <- ymax - rev(heights)
+    ymax <- ymax - ymin[["coverage"]]
+    ymin <- ymin - ymin[["coverage"]]
+    heights <- as.list(heights)
+    ymax <- as.list(ymax)
+    ymin <- as.list(ymin)
+    box_colors <- c(
+        "Contig" = "darkblue",
+        "Reference" = "darkred",
+        "gene" = "orange",
+        "product" = "darkorange"
+    )
+    label_colors <- c(
+        "Contig" = "white",
+        "Reference" = "white",
+        "gene" = "black",
+        "product" = "black"
+    )
+
+    label_tpl <- paste0(
+        "Keywords: {reference$words}\n",
+        "{reference$sacc}: \"{reference$stitle}\"\n",
+        "{lineage}\n",
+        "Read Count: {reference$numreads}, ",
+        "log E-Value: {reference$log_evalue}, ",
+        "Identity: {reference$pident}%, ",
+        "Genome Coverage {reference$slen}bp ({reference$genome_coverage}%)"
+    )
+    ylabel_tpl <- paste0(
+        "{reference$species}\n",
+        "{reference$sacc}"
+    )
+    lineage <- break_lineage(reference$lineage)
+
+    cat(".")
+    ## Calculate alignment positions for hits
+    hits <- hits %>%
+        mutate(flip = sstart > send) %>%
+        select(sacc, qacc, qstart, qend, sstart, send, cstart, cend, flip, contig, pident) %>%
+        mutate(
+            aleft  = cstart + qstart - 1,
+            aright = cstart + qend - 1
+        )
+
+
+    cat(".")
+    ## Get unique contigs from hits
+    contigs <- hits %>%
+        group_by(qacc, flip, cstart, cend, contig) %>%
+        summarize(.groups="drop")
+
+    cat(".")
+    ## Make compressed X scale
+    display_slots <-
+        bind_rows(
+            hits %>% mutate(start=sstart, stop=send) %>% select(start, stop),
+            hits %>% mutate(start=cstart, stop=cend) %>% select(start, stop)
+        ) %>%
+        arrange(start, stop) %>%
+        compress_axis(merge_dist=200, spacing = 100)
+
+    cat(".")
+    ## Setup corners for trapezoid showing alignment mapping
+    alignment_boxes <- bind_rows(
+        hits %>% mutate(y = ymax$alignments, x = aleft),
+        hits %>% mutate(y = ymax$alignments, x = aright),
+        hits %>% mutate(y = ymin$alignments, x = send),
+        hits %>% mutate(y = ymin$alignments, x = sstart)
+    ) %>%
+        mutate(
+            alignment = paste(qacc, aleft, aright, send, sstart)
+        )
+
+    contig_boxes <- data.frame(
+        xmin = contigs$cstart,
+        xmax = contigs$cend,
+        ymin = ymin$contigs,
+        ymax = ymax$contigs - 0.1,
+        type = "Contig",
+        label = contigs$contig
+    )
+
+    subject_boxes<- data.frame(
+        xmin = hits$sstart,
+        xmax = hits$send,
+        ymin = ymin$subject,
+        ymax= ymax$subject,
+        type = "Reference",
+        label = NA
+    )
+
+    boxes <- rbind(
+        contig_boxes,
+        subject_boxes
+    )
+
+    polygons <- alignment_boxes
+
+    cat(".")
+    p <- ggplot() +
+        theme_minimal() +
+        theme(
+            axis.text.x = element_text(angle=90, hjust=1, size=6)
+        ) +
+        scale_y_continuous() +
+        scale_x_continuous(trans = display_slots$trans)  +
+        coord_cartesian(
+            ylim = c(NA, max(unlist(ymax))),
+            xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
+                     max(hits$cstart, hits$sstart, hits$cend, hits$send)),
+            )
+
+    cat(".")
+    if(!is.null(depths)) {
+        label_tpl <- paste0(label_tpl, ", Average Read Depth: {mean_depth}")
+
+        depths <- depths %>%
+            rename(qacc=contig) %>%
+            inner_join(contigs, by="qacc")
+
+        mean_depth <- round(mean(depths$total), 1)
+        sd_depth <- sd(depths$total)
+        max_depth <- max(depths$total)
+        cap_depth <- min(max_depth, mean_depth + 3 * sd_depth)
+
+        depth_data <- depths %>%
+            mutate(
+                y = total / cap_depth * heights$coverage,
+                x = if_else(flip, cend - pos, cstart + pos),
+                swap_if(flip, minus, plus),
+                fplus = if_else(total == 0, 0.5, plus / total),
+            ) %>%
+            select(
+                qacc, x, y
+            )
+
+        ## Plot depths above contigs
+        p <- p +
+            stat_summary_bin(
+                geom="bar",
+                orientation="x",
+                fun="median",
+                bins=min(2000, nrow(depth_data)),
+                data = depth_data,
+                aes(x = x, y = y)
+            )
+    }
+
+    cat(".")
+    if (!is.null(feature_tables)) {
+        ## Annotate subject sequences
+        subject_annotations <- annotate_subjects(
+            display_slots$ranges$start,
+            display_slots$ranges$end,
+            reference$sacc,
+            feature_tables
+        )
+        ## Remove gene for now
+        subject_annotations <- subject_annotations %>%
+            filter(key == "product") %>%
+            mutate(key == "Annotation")
+
+        ## Merge annotations spanning display ranges
+        subject_annotations <- subject_annotations %>%
+            group_by(gstart, gstop, key, value) %>%
+            summarize(
+                start=min(start),
+                stop=max(stop),
+                .groups="drop"
+            )
+        ## Compute label location
+        subject_annotations <- subject_annotations %>%
+            mutate(
+                trans_s = display_slots$trans$trans(start),
+                trans_e = display_slots$trans$trans(stop),
+            )
+        ## Remove duplicates
+        subject_annotations <- subject_annotations %>%
+            group_by(start, stop, key, value) %>%
+            summarize(.groups="drop")
+        ## Stack
+        subject_annotations <- subject_annotations %>%
+            mutate(
+                bin = IRanges::disjointBins(IRanges::IRanges(start, stop))
+            )
+
+        bins <- max(subject_annotations$bin)
+        y <- ymax$annotations
+        #height <- bins ##(ymax$annotations - y)/bins
+
+        annotation_boxes <- data.frame(
+            xmin = subject_annotations$start,
+            xmax = subject_annotations$stop,
+            ymin = y - subject_annotations$bin + 0.9,
+            ymax = y - subject_annotations$bin,
+            type = subject_annotations$key,
+            label = subject_annotations$value
+        )
+        boxes <- rbind(boxes, annotation_boxes)
+
+        ## Plot annotations
+    }
+
+    boxes <- boxes %>%
+        mutate(
+            xmid = display_slots$trans$inv((
+                display_slots$trans$trans(xmin) +
+                display_slots$trans$trans(xmax)
+            ) / 2),
+            ymid = (ymin+ymax)/2
+        )
+
+    p <- p +
+        new_scale_fill() +
+        scale_fill_manual(values = box_colors) +
+        ## Boxes
+        geom_rect(
+            data = boxes,
+            aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill=type)
+        ) +
+        new_scale_color() +
+        scale_color_manual(values = label_colors) +
+        geom_text_repel(
+            data = boxes,
+            aes(x=xmid, ymid, label=label, color=type),
+            size = 3,
+            vjust = .5,
+            hjust = .5,
+            min.segment.length = 0.1,
+            point.size = NA,  # don't shift around center
+            max.overlaps = 100,
+        ) +
+        new_scale_fill() +
+        scale_fill_continuous(limits = c(70, 100)) +
+        new_scale_color() +
+        geom_polygon(
+            data = polygons,
+            aes(x = x, y = y, group = alignment, fill = pident),
+            color="lightblue", alpha=.5
+        )
+
+    cat(".")
+    ## Add labels
+    p <- p +
+        xlab(str_glue(label_tpl)) +
+        ylab(str_glue(ylabel_tpl))
+
+    cat(".")
+    message(" [DONE]")
+    p
+})
