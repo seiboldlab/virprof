@@ -461,7 +461,45 @@ setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffo
 
 ##plot_ranges <- function(reference, hits, depths, featureshowMethods("plot")
 #' The actual plot function
-setMethod("plot", signature("VirProf"), function(x, accession) {
+setMethod("plot", signature("VirProf"), function
+(
+    x,
+    accession,
+    box_colors = c(
+        "Contig" = "darkblue",
+        "Reference" = "darkred",
+        "gene" = "orange",
+        "product" = "darkorange"
+    ),
+    label_colors = c(
+        "Contig" = "white",
+        "Reference" = "white",
+        "gene" = "black",
+        "product" = "black"
+    ),
+    heights = c(
+        scaffold_coverage=5,
+        coverage = 5,
+        contigs = 1,
+        alignments = 3,
+        subject = 1,
+        annotations = 1
+    ),
+    label_tpl = paste0(
+        "Keywords: {reference$words}\n",
+        "{reference$sacc}: \"{reference$stitle}\"\n",
+        "{lineage}\n",
+        "Read Count: {reference$numreads}, ",
+        "log E-Value: {reference$log_evalue}, ",
+        "Identity: {reference$pident}%, ",
+        "Genome Coverage {reference$slen}bp ({reference$genome_coverage}%)"
+    ),
+    ylabel_tpl = paste0(
+        "{reference$species}\n",
+        "{reference$sacc}"
+    )
+)
+{
     message("Plotting ", accession)
     reference <- filter(x@calls, sacc == accession)
     hits <- filter(x@alignments, sacc == accession)
@@ -470,13 +508,6 @@ setMethod("plot", signature("VirProf"), function(x, accession) {
 
     #### CONFIG  ###
     cat(".")
-    heights <- c(
-        coverage = 5,
-        contigs = 1,
-        alignments = 3,
-        subject = 1,
-        annotations = 1
-    )
     ymax <- cumsum(rev(heights))
     ymin <- ymax - rev(heights)
     ymax <- ymax - ymin[["coverage"]]
@@ -484,32 +515,7 @@ setMethod("plot", signature("VirProf"), function(x, accession) {
     heights <- as.list(heights)
     ymax <- as.list(ymax)
     ymin <- as.list(ymin)
-    box_colors <- c(
-        "Contig" = "darkblue",
-        "Reference" = "darkred",
-        "gene" = "orange",
-        "product" = "darkorange"
-    )
-    label_colors <- c(
-        "Contig" = "white",
-        "Reference" = "white",
-        "gene" = "black",
-        "product" = "black"
-    )
 
-    label_tpl <- paste0(
-        "Keywords: {reference$words}\n",
-        "{reference$sacc}: \"{reference$stitle}\"\n",
-        "{lineage}\n",
-        "Read Count: {reference$numreads}, ",
-        "log E-Value: {reference$log_evalue}, ",
-        "Identity: {reference$pident}%, ",
-        "Genome Coverage {reference$slen}bp ({reference$genome_coverage}%)"
-    )
-    ylabel_tpl <- paste0(
-        "{reference$species}\n",
-        "{reference$sacc}"
-    )
     lineage <- break_lineage(reference$lineage)
 
     cat(".")
@@ -605,7 +611,7 @@ setMethod("plot", signature("VirProf"), function(x, accession) {
 
         depth_data <- depths %>%
             mutate(
-                y = total / cap_depth * heights$coverage,
+                y = total / cap_depth * heights$coverage + ymin$coverage,
                 x = if_else(flip, cend - pos, cstart + pos),
                 swap_if(flip, minus, plus),
                 fplus = if_else(total == 0, 0.5, plus / total),
@@ -624,6 +630,42 @@ setMethod("plot", signature("VirProf"), function(x, accession) {
                 data = depth_data,
                 aes(x = x, y = y)
             )
+    }
+    if (!is.null(x@scaffold_depths)) {
+        message("Showing scaffold depths")
+        depths <- x@scaffold_depths %>%
+            filter(sacc == accession)
+#        %>%
+#            mutate(contig=gsub("_pilon", "", contig)) %>%
+#            separate(contig, into=c("sample", "sacc"), sep=".")
+#            rename(qacc=contig) %>%
+#            inner_join(contigs, by="qacc")
+
+        sd_depth <- sd(depths$total)
+        max_depth <- max(depths$total)
+        cap_depth <- min(max_depth, mean_depth + 3 * sd_depth)
+
+        depth_data <- depths %>%
+            mutate(
+                y = total / cap_depth * heights$scaffold_coverage + ymin$scaffold_coverage,
+                x = pos
+            ) %>%
+            select(
+                sacc, x, y
+            )
+        message("1")
+
+        ## Plot depths above contigs
+        p <- p +
+            stat_summary_bin(
+                geom="bar",
+                orientation="x",
+                fun="median",
+                bins=min(2000, nrow(depth_data)),
+                data = depth_data,
+                aes(x = x, y = y)
+            )
+        message("2")
     }
 
     cat(".")
