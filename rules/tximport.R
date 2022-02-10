@@ -178,7 +178,12 @@ message("4. ----------- Assembling SummarizedExperiment ----------")
 message("4.1. ----------- Preparing colData (sample sheet) -----------")
 idcolumn <- names(which(sapply(samples, function(x) all(sort(x)==names(files)))))
 if (length(idcolumn) == 0) {
-    stop("The sample sheet columns and file names didn't match up. Something is wrong. Bailing out.")
+    message("The sample sheet columns and file names didn't match up. Something is wrong. Bailing out.")
+    message("samples:")
+    print(as.data.frame(samples))
+    message("files:")
+    print(as.data.frame(files))
+    stop("Unable to determine id columns")
 }
 
 coldata <- samples %>%
