@@ -230,9 +230,9 @@ with Stage("blastbin_vp") as S:
             "{:name:}: Exporting bins to RDS"
         input:
             calls = "{:this:}/{target}.virus.csv",
-            hits  = "{:this:}/{target}.hits.csv",
+            hits = "{:this:}/{target}.hits.csv",
             features  = "{:this:}/{target}.features.csv",
-            bam   = "{:prev:}/{:target:}.sorted.bam"
+            bam = "{:prev:}/{:target:}.sorted.bam",
         output:
             rds = "{:this:}/{target}.vp.rds",
         log:
@@ -243,6 +243,8 @@ with Stage("blastbin_vp") as S:
             1
         conda:
             "virprof_r"
+        params:
+            task = "create"
         script:
             "vpimport.R"
 
@@ -293,23 +295,21 @@ with Stage("scaffold_vp") as S:
         output:
             touch("{:this:}/all_targets.stamp")
 
+
 with Stage("collect_vp") as S:
     S.doc("""
     Collects pipeline data into RDS format files
     """)
-    rule vp_show_bins:
+    rule vp_add_covdepth:
         message:
-            "{:name:}: Visualizing bins {output}"
+            "{:name:}: Adding scaffold coverage to RDS"
         input:
-            calls = "{:prev:}/{:target:}.virus.csv",
-            hits  = "{:prev:}/{:target:}.hits.csv",
-            features  = "{:prev:}/{:target:}.features.csv",
+            rds = "{:prev:}/{target}.vp.rds",
             bam   = "{:prev:}/{:target:}.sorted.bam"
         output:
-            plot =  "{:this:}/{target}.virus.pdf",
-            data = "{:this:}/{target}.vp.rds",
+            rds = "{:this:}/{target}.vp.rds",
         log:
-            "{:this:}/{target}.show_bins.log"
+            "{:this:}/{target}.log"
         benchmark:
             "benchmarks/{:name:}/{:this:}/{target}.show_bins.txt"
         threads:
@@ -317,26 +317,9 @@ with Stage("collect_vp") as S:
         conda:
             "virprof_r"
         params:
-            page_width = 15,
-            page_height = 4,
-            plots_per_page = 1,
-            min_slen = 200,
-            min_reads = 2,
-            bamlist = lambda wc, input: input.bam if isinstance(input.bam, str) else ",".join(input.bam),
-        shell:
-            "exec >{log} 2>&1;"
-            "{BIN}/show_bins.R"
-            " --input {input.calls}"
-            " --input-hits {input.hits}"
-            " --input-features {input.features}"
-            " --input-bam {params.bamlist}"
-            " --output {output.plot}"
-            " --output-rds {output.data}"
-            " --page-width {params.page_width}"
-            " --page-height {params.page_height}"
-            " --plots-per-page {params.plots_per_page}"
-            " --min-slen {params.min_slen}"
-            " --min-reads {params.min_reads}"
+            task = "scaffold_depth"
+        script:
+            "vpimport.R"
 
 
 with Stage("bin_vp") as S:
