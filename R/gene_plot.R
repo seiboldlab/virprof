@@ -1,7 +1,12 @@
 requireNamespace("IRanges", quietly = TRUE)
 requireNamespace("rentrez", quietly = TRUE)
 requireNamespace("rlang", quietly = TRUE)
-
+requireNamespace("readr", quietly = TRUE)
+requireNamespace("stringr", quietly = TRUE)
+requireNamespace("tibble", quietly = TRUE)
+requireNamespace("tidyr", quietly = TRUE)
+library(dplyr)
+library(magrittr)
 
 #' Linewrap lineage string
 break_lineage <- function(lineage, maxlen=200, insert="\n") {
@@ -34,10 +39,10 @@ break_lineage <- function(lineage, maxlen=200, insert="\n") {
 swap_if <- function(cond, x, y) {
     out_x <- if_else(cond, y, x)
     out_y <- if_else(!cond, y, x)
-    setNames(
-        tibble::tibble(out_x, out_y),
-        c(substitute(x), substitute(y))
-    )
+    stats::setNames(
+               tibble::tibble(out_x, out_y),
+               c(substitute(x), substitute(y))
+           )
 }
 
 
@@ -168,7 +173,7 @@ center_spread_ranges <- function(contigs, spacing, max_iter = 100) {
 cached_entrez_fetch <- function(db, id, rettype, path, retmode = "") {
     if (!nzchar(path)) {
         return(
-            rentrez_entrez_fetch(
+            rentrez::entrez_fetch(
                 db = db, id = id,
                 rettype = rettype, retmode = retmode
             )
@@ -198,9 +203,9 @@ load_feature_table <- function(accs, cache_path) {
     feature_tables <-
         cached_entrez_fetch(db = "nucleotide", id=accs, rettype = 'ft', path = cache_path) %>%
         gsub("\n$", "", .) %>%
-        str_split("(^|\n)>") %>%
+        stringr::str_split("(^|\n)>") %>%
         unlist() %>%
-        str_split("\n", n = 2)
+        stringr::str_split("\n", n = 2)
     feature_tables <- feature_tables[-1]
     tables <- vector("list", length(feature_tables))
     for (i in seq_along(feature_tables)) {
@@ -219,11 +224,11 @@ load_feature_table <- function(accs, cache_path) {
             tables[[i]] <- df
         }
     }
-    df <- do.call("bind_rows", tables) %>% as_tibble()
+    df <- do.call("bind_rows", tables) %>% tibble::as_tibble()
     if (nrow(df) > 0) {
         df$type[df$type == ""] <- NA
         df <- df %>%
-            fill(c(start, end, type), .direction = 'down') %>%
+            tidyr::fill(c(start, end, type), .direction = 'down') %>%
             filter(key!="")
     }
     df
@@ -246,7 +251,7 @@ annotate_subjects <- function(starts, ends, acc_, feature_table) {
         IRanges::reduce()
 
     ft <- feature_table %>%
-        rowid_to_column() %>%
+        tibble::rowid_to_column() %>%
         filter(acc == acc_) %>%
         mutate(swap_if(start > end, start, end)) %>%
         {IRanges::IRanges(.$start, .$end, name = .$rowid)} %>%
@@ -290,10 +295,12 @@ run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
         if (split) "-split" else "",
         if (fragment) "-fs" else ""
     ))
-    read_tsv(proc,
-             col_types = "cii",
-             col_names = c("contig", "pos", "depth"),
-             skip = 1)
+    readr::read_tsv(
+               proc,
+               col_types = "cii",
+               col_names = c("contig", "pos", "depth"),
+               skip = 1
+           )
 }
 
 
@@ -336,27 +343,30 @@ VirProfFromCSV <- function
         stopifnot(file.exists(features_fname))
     }
     message("Loading calls...")
-    calls <- read_csv(calls_fname, col_types = cols())
+    calls <- readr::read_csv(calls_fname, col_types = readr::cols())
     message("... ", nrow(calls), " calls found")
-    calls <- filter(calls, slen >= opt$options$min_slen)
+    calls <- filter(calls, slen >= min_slen)
     message("... ", nrow(calls), " calls left after removing calls with <",
-            opt$options$min_slen, " bp on subject")
-    calls <- filter(calls, numreads >= opt$options$min_reads)
+            min_slen, " bp on subject")
+    calls <- filter(calls, numreads >= min_reads)
     message("... ", nrow(calls), " calls left after removing calls with <",
-            opt$options$min_reads, " mapped reads")
+            min_reads, " mapped reads")
     if (nrow(calls) == 0) {
         message("No calls left, exiting")
         return(res)
     }
     calls <- calls %>%
         mutate(
-            genome_coverage = if_else(genome_size > 0,
-                                      round(slen / genome_size * 100, 1),
-                                      NA_real_)
+                   genome_coverage =
+                       if_else(
+                                  genome_size > 0,
+                                  round(slen / genome_size * 100, 1),
+                                  NA_real_
+                              )
         )
     res@calls <- calls
     message("Loading alignments...")
-    alignments <- read_csv(hits_fname, col_types = cols())
+    alignments <- readr::read_csv(hits_fname, col_types = readr::cols())
     message("... ", nrow(alignments), " alignments found")
     alignments <- filter(alignments, sacc %in% calls$sacc)
     message("... ", nrow(alignments), " alignments matching filtered calls")
@@ -385,7 +395,7 @@ VirProfFromCSV <- function
         message("Not loading feature tables")
     } else {
         message("Loading feature tables...")
-        feature_tables <- read_csv(opt$options$input_features, col_types = cols())
+        feature_tables <- readr::read_csv(features_fname, col_types = readr::cols())
         message("... ", nrow(feature_tables), " feature annotations found")
         res@features <- feature_tables
     }
@@ -583,14 +593,14 @@ setMethod("plot", signature("VirProf"), function
     polygons <- alignment_boxes
 
     cat(".")
-    p <- ggplot() +
-        theme_minimal() +
-        theme(
-            axis.text.x = element_text(angle=90, hjust=1, size=6)
+    p <- ggplot2::ggplot() +
+        ggplot2::theme_minimal() +
+        ggplot2::theme(
+            axis.text.x = ggplot2::element_text(angle=90, hjust=1, size=6)
         ) +
-        scale_y_continuous() +
-        scale_x_continuous(trans = display_slots$trans)  +
-        coord_cartesian(
+        ggplot2::scale_y_continuous() +
+        ggplot2::scale_x_continuous(trans = display_slots$trans)  +
+        ggplot2::coord_cartesian(
             ylim = c(NA, max(unlist(ymax))),
             xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
                      max(hits$cstart, hits$sstart, hits$cend, hits$send)),
@@ -622,7 +632,7 @@ setMethod("plot", signature("VirProf"), function
 
         ## Plot depths above contigs
         p <- p +
-            stat_summary_bin(
+            ggplot2::stat_summary_bin(
                 geom="bar",
                 orientation="x",
                 fun="median",
@@ -631,11 +641,12 @@ setMethod("plot", signature("VirProf"), function
                 aes(x = x, y = y)
             )
     }
-    if (!is.null(x@scaffold_depths)) {
+    if (!is.null(x@scaffold_depths) && FALSE) {
         message("Showing scaffold depths")
         depths <- x@scaffold_depths %>%
             filter(sacc == accession)
-#        %>%
+                                        #        %>%
+
 #            mutate(contig=gsub("_pilon", "", contig)) %>%
 #            separate(contig, into=c("sample", "sacc"), sep=".")
 #            rename(qacc=contig) %>%
@@ -657,7 +668,7 @@ setMethod("plot", signature("VirProf"), function
 
         ## Plot depths above contigs
         p <- p +
-            stat_summary_bin(
+            ggplot2::stat_summary_bin(
                 geom="bar",
                 orientation="x",
                 fun="median",
@@ -733,16 +744,16 @@ setMethod("plot", signature("VirProf"), function
         )
 
     p <- p +
-        new_scale_fill() +
-        scale_fill_manual(values = box_colors) +
+        ggnewscale::new_scale_fill() +
+        ggplot2::scale_fill_manual(values = box_colors) +
         ## Boxes
-        geom_rect(
+        ggplot2::geom_rect(
             data = boxes,
             aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill=type)
         ) +
-        new_scale_color() +
-        scale_color_manual(values = label_colors) +
-        geom_text_repel(
+        ggnewscale::new_scale_color() +
+        ggplot2::scale_color_manual(values = label_colors) +
+        ggrepel::geom_text_repel(
             data = boxes,
             aes(x=xmid, ymid, label=label, color=type),
             size = 3,
@@ -752,10 +763,10 @@ setMethod("plot", signature("VirProf"), function
             point.size = NA,  # don't shift around center
             max.overlaps = 100,
         ) +
-        new_scale_fill() +
-        scale_fill_continuous(limits = c(70, 100)) +
-        new_scale_color() +
-        geom_polygon(
+        ggnewscale::new_scale_fill() +
+        ggplot2::scale_fill_continuous(limits = c(70, 100)) +
+        ggnewscale::new_scale_color() +
+        ggplot2::geom_polygon(
             data = polygons,
             aes(x = x, y = y, group = alignment, fill = pident),
             color="lightblue", alpha=.5

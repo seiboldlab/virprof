@@ -225,6 +225,27 @@ with Stage("blastbin_vp") as S:
             " --cache-path {params.cache_path}"
             " --ncbi-api-key '{params.ncbi_api_key}'"
 
+    rule vp_bins_to_rds:
+        message:
+            "{:name:}: Exporting bins to RDS"
+        input:
+            calls = "{:this:}/{target}.virus.csv",
+            hits  = "{:this:}/{target}.hits.csv",
+            features  = "{:this:}/{target}.features.csv",
+            bam   = "{:prev:}/{:target:}.sorted.bam"
+        output:
+            rds = "{:this:}/{target}.vp.rds",
+        log:
+            "{:this:}/{target}.vp.rds.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.vp.rds.txt"
+        threads:
+            1
+        conda:
+            "virprof_r"
+        script:
+            "vpimport.R"
+
 
 with Stage("scaffold_vp") as S:
     S.doc("""
@@ -280,9 +301,9 @@ with Stage("collect_vp") as S:
         message:
             "{:name:}: Visualizing bins {output}"
         input:
-            calls = "{:this:}/{target}.virus.csv",
-            hits  = "{:this:}/{target}.hits.csv",
-            features  = "{:this:}/{target}.features.csv",
+            calls = "{:prev:}/{:target:}.virus.csv",
+            hits  = "{:prev:}/{:target:}.hits.csv",
+            features  = "{:prev:}/{:target:}.features.csv",
             bam   = "{:prev:}/{:target:}.sorted.bam"
         output:
             plot =  "{:this:}/{target}.virus.pdf",
