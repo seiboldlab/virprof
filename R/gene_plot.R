@@ -5,8 +5,10 @@ requireNamespace("readr", quietly = TRUE)
 requireNamespace("stringr", quietly = TRUE)
 requireNamespace("tibble", quietly = TRUE)
 requireNamespace("tidyr", quietly = TRUE)
+requireNamespace("S4Vectors", quietly = TRUE)
 library(dplyr)
 library(magrittr)
+library(BiocGenerics)
 
 #' Linewrap lineage string
 break_lineage <- function(lineage, maxlen=200, insert="\n") {
@@ -273,38 +275,6 @@ annotate_subjects <- function(starts, ends, acc_, feature_table) {
     res
 }
 
-#' Execute bedtools genomecov
-#'
-#' @param strand +/- to get stranded coverage (-du -strand +, du makes
-#'     it so mates are counted towards same strand).
-#' @param split If true, don't count gaps (-split)
-#' @param fragment Count coverage for full fragment length (-fs)
-run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
-    message(
-        "Running bedtools genomecov on ", fname,
-        if (!is.null(strand)) paste(" counting", strand, "strand"),
-        if (split) " not counting gaps between spliced alignments",
-        if (fragment) " counting whole fragment",
-        "..."
-    )
-    proc <- pipe(paste(
-        "bedtools", "genomecov",
-        paste("-ibam", strsplit(fname, ",")[[1]]),
-        "-d",
-        if (is.null(strand)) "" else paste("-du -strand", strand),
-        if (split) "-split" else "",
-        if (fragment) "-fs" else ""
-    ))
-    readr::read_tsv(
-               proc,
-               col_types = "cii",
-               col_names = c("contig", "pos", "depth"),
-               skip = 1
-           )
-}
-
-
-
 
 #' VP data class
 
@@ -313,9 +283,9 @@ setClass(
     slots = list(
         calls = "data.frame",
         alignments = "data.frame",
-        depths = "data.frame",
-        scaffold_depths = "data.frame",
-        features = "data.frame"
+        depths = "DFrame",
+        scaffold_depths = "DFrame",
+        features = "DFrame"
     )
 )
 
@@ -395,9 +365,19 @@ VirProfFromCSV <- function
         message("Not loading feature tables")
     } else {
         message("Loading feature tables...")
-        feature_tables <- readr::read_csv(features_fname, col_types = readr::cols())
+        feature_tables <- readr::read_csv(features_fname, col_types = readr::cols()) %>%
+            arrange(acc, start, end)
+
         message("... ", nrow(feature_tables), " feature annotations found")
-        res@features <- feature_tables
+        res@features <-
+            S4Vectors::DataFrame(
+                           acc = S4Vectors::Rle(feature_tables$acc),
+                           start = feature_tables$start,
+                           end = feature_tables$end,
+                           typ = as.factor(feature_tables$typ),
+                           key = as.factor(feature_tables$key),
+                           value = as.factor(feature_tables$value)
+                       )
     }
     return(res)
 }
@@ -409,8 +389,6 @@ setMethod("show", "VirProf", function(object) {
     cat("# ", nrow(object@alignments), " alignments\n")
     cat("# ", nrow(object@features), " features\n")
 })
-
-
 
 
 #' Create offsets for qacc positions in plot
@@ -451,6 +429,36 @@ setMethod(
     })
 
 
+#' Execute bedtools genomecov
+#'
+#' @param strand +/- to get stranded coverage (-du -strand +, du makes
+#'     it so mates are counted towards same strand).
+#' @param split If true, don't count gaps (-split)
+#' @param fragment Count coverage for full fragment length (-fs)
+run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
+    message(
+        "Running bedtools genomecov on ", fname,
+        if (!is.null(strand)) paste(" counting", strand, "strand"),
+        if (split) " not counting gaps between spliced alignments",
+        if (fragment) " counting whole fragment",
+        "..."
+    )
+    proc <- pipe(paste(
+        "bedtools", "genomecov",
+        paste("-ibam", strsplit(fname, ",")[[1]]),
+        "-d",
+        if (is.null(strand)) "" else paste("-du -strand", strand),
+        if (split) "-split" else "",
+        if (fragment) "-fs" else ""
+    ))
+    readr::read_tsv(
+               proc,
+               col_types = "cii",
+               col_names = c("contig", "pos", "depth"),
+               skip = 1
+           )
+}
+
 #' Get depth from BAM file
 #'
 #' @param fname Path to sorted BAM file
@@ -458,16 +466,66 @@ setGeneric("coverage_depth", function(object, ...) standardGeneric("coverage_dep
 setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffold=FALSE) {
     plus <- run_bedtools(fname, strand="+", split=TRUE) %>% rename(plus=depth)
     minus <- run_bedtools(fname, strand="-", split=TRUE) %>% rename(minus=depth)
-    result <- full_join(plus, minus, by=c("contig", "pos"))
-    result$total = result$plus + result$minus
+    merged <- full_join(plus, minus, by=c("contig", "pos")) %>%
+        tidyr::replace_na(list(plus=0, minus=0))
     if (scaffold) {
-        object@scaffold_depths <- result
+        merged <- merged %>%
+            mutate(contig=gsub("_pilon", "", contig)) %>%
+            tidyr::separate(contig, into=c("sample", "sacc"), sep="\\.")
+        object@scaffold_depths <-
+            S4Vectors::DataFrame(
+                           sample = S4Vectors::Rle(merged$sample),
+                           sacc = S4Vectors::Rle(merged$sacc),
+                           pos = merged$pos,
+                           plus = S4Vectors::Rle(merged$plus),
+                           minus = S4Vectors::Rle(merged$minus)
+                       )
     } else {
-        object@depths <- result
+        object@depths <-
+            S4Vectors::DataFrame(
+                           contig = S4Vectors::Rle(merged$contig),
+                           pos = merged$pos,
+                           plus = S4Vectors::Rle(merged$plus),
+                           minus = S4Vectors::Rle(merged$minus)
+                       )
     }
     return(object)
 })
 
+
+setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
+    res <- new("VirProf")
+    res@calls <- as_tibble(rbind(x@calls, y@calls))
+    res@alignments <- as_tibble(rbind(x@alignments, y@alignments))
+    if (is.null(x@depths)) {
+        if (is.null(y@depths)) {
+            res@depths <- NULL
+        } else {
+            res@depths <- y@depths
+        }
+    } else {
+        if (is.null(y@depths)) {
+            res@depths <- x@depths
+        } else {
+            res@depths <- rbind(x@depths, y@depths)
+        }
+    }
+    if (is.null(x@scaffold_depths)) {
+        if (is.null(y@scaffold_depths)) {
+            res@scaffold_depths <- NULL
+        } else {
+            res@scaffold_depths <- y@scaffold_depths
+        }
+    } else {
+        if (is.null(y@scaffold_depths)) {
+            res@scaffold_depths <- x@scaffold_depths
+        } else {
+            res@scaffold_depths <- rbind(x@scaffold_depths, y@scaffold_depths)
+        }
+    }
+    res@features <- S4Vectors::merge(x@features, y@features, by=names(x@features), all=TRUE, no.dups=TRUE)
+    return(res)
+})
 
 ##plot_ranges <- function(reference, hits, depths, featureshowMethods("plot")
 #' The actual plot function

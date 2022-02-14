@@ -304,8 +304,9 @@ with Stage("collect_vp") as S:
         message:
             "{:name:}: Adding scaffold coverage to RDS"
         input:
-            rds = "{:prev:}/{target}.vp.rds",
-            bam   = "{:prev:}/{:target:}.sorted.bam"
+            scaffolds = "{:prev:}/{:target:}.scaffolds.csv",  ## FIXME: load this actually
+            rds = "{:prev:}/{:target:}.vp.rds",
+            bam = "{:prev:}/{:target:}.sorted.bam"
         output:
             rds = "{:this:}/{target}.vp.rds",
         log:
@@ -475,11 +476,34 @@ with Stage("summarize_vp") as S:
             "  cp -v $path {params.this}/{wildcards.target}.$name;"
             "done;"
 
+    rule vp_aggregate_rds:
+        message:
+            "{:name:}: Combining R data"
+        input:
+            rds = "{:prev:}/{:target:}.vp.rds"
+        output:
+            rds = "{:this:}/{target}.vp.rds"
+        log:
+            "{:this:}/{target}.vp.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.aggregate_rds.txt"
+        threads:
+            1
+        resources:
+            mem="32g"
+        conda:
+            "virprof_r"
+        params:
+            task = "combine"
+        script:
+            "vpimport.R"
+
     rule vp_summarize_all:
         message:
             "Completed {:this:}"
         input:
             summary = "{:this:}/{:targets:}.summary.xlsx",
-            fasta = "{:this:}/{:targets:}.genomes.txt"
+            fasta = "{:this:}/{:targets:}.genomes.txt",
+            rds  = "{:this:}/{:targets:}.vp.rds"
         output:
             touch("{:this:}/all_targets.stamp")

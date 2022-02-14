@@ -33,6 +33,19 @@ if (snakemake@params$task == "create") {
     vp <- coverage_depth(vp, bamlist, scaffold=TRUE)
     message("Saving RDS to", snakemake@output$rds)
     saveRDS(vp, snakemake@output$rds)
+} else if (snakemake@params$task ==  "combine") {
+    message("Combining ", length(snakemake@input$rds), " files")
+    fname1 <- snakemake@input$rds[1]
+    message("Loading ", fname1)
+    vp <- readRDS(fname1)
+    for (fname in snakemake@input$rds[-1]) {
+        message("Loading ", fname)
+        vp2 <- readRDS(fname)
+        message("merging...")
+        vp <- BiocGenerics::combine(vp, vp2)
+    }
+    message("Saving RDS to", snakemake@output$rds)
+    saveRDS(vp, snakemake@output$rds)
 }
 
 message("DONE")
