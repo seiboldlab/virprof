@@ -532,26 +532,26 @@ setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
 setMethod("plot", signature("VirProf"), function
 (
     x,
-    accession,
+    sample = NULL,
+    accession = NULL,
     box_colors = c(
         "Contig" = "darkblue",
         "Reference" = "darkred",
-        "gene" = "orange",
-        "product" = "darkorange"
+        "Gene" = "orange",
+        "Product" = "darkorange"
     ),
     label_colors = c(
         "Contig" = "white",
         "Reference" = "white",
-        "gene" = "black",
-        "product" = "black"
+        "Gene" = "black",
+        "Product" = "black"
     ),
     heights = c(
-        scaffold_coverage=5,
         coverage = 5,
-        contigs = 1,
-        alignments = 3,
+        annotations = 1,
         subject = 1,
-        annotations = 1
+        alignments = 3,
+        contigs = 1
     ),
     label_tpl = paste0(
         "Keywords: {reference$words}\n",
@@ -563,30 +563,46 @@ setMethod("plot", signature("VirProf"), function
         "Genome Coverage {reference$slen}bp ({reference$genome_coverage}%)"
     ),
     ylabel_tpl = paste0(
-        "{reference$species}\n",
-        "{reference$sacc}"
-    )
+        "{reference$sample} - {reference$species} ({reference$sacc})"
+    ),
+    cap_coverage_sd = 3,
+    annotation_keys = c("product"),
+    quiet = FALSE
 )
 {
-    message("Plotting ", accession)
-    reference <- filter(x@calls, sacc == accession)
-    hits <- filter(x@alignments, sacc == accession)
-    depths <- x@depths
-    feature_tables <- x@features
+    reference <- x@calls
+    if (!is.null(sample)) {
+        sample_ <- sample
+        reference <- filter(reference, sample == sample_)
+    }
+    if (!is.null(accession)) {
+        reference <- filter(reference, sacc == accession)
+    }
+    if (nrow(reference) > 1) {
+        if (!quiet) message("Multiple calls selected; plotting the one with the most hits")
+        reference <- arrange(reference, desc(numreads)) %>% head(n=1)
+    }
+    if (!quiet) message("Plotting ", reference$sacc, " from ", reference$sample)
+    hits <- filter(x@alignments, sample == reference$sample, sacc == reference$sacc)
+    ## depths <- x@depths[x@depths$contig %in% hits$qacc,]
+    depths <- NULL
+    scaffold_depths <- x@scaffold_depths[x@scaffold_depths$sample == reference$sample
+                                         & x@scaffold_depths$sacc == reference$sacc, ]
+    feature_tables <- x@features[x@features$acc == reference$sacc,] %>% as_tibble()
 
     #### CONFIG  ###
-    cat(".")
     ymax <- cumsum(rev(heights))
     ymin <- ymax - rev(heights)
     ymax <- ymax - ymin[["coverage"]]
     ymin <- ymin - ymin[["coverage"]]
     heights <- as.list(heights)
+    if (!quiet) {
+        message("Selected heights:")
+        print(data.frame(ymin=ymin, ymax=ymax) %>% arrange(desc(ymin)))
+    }
     ymax <- as.list(ymax)
     ymin <- as.list(ymin)
 
-    lineage <- break_lineage(reference$lineage)
-
-    cat(".")
     ## Calculate alignment positions for hits
     hits <- hits %>%
         mutate(flip = sstart > send) %>%
@@ -596,14 +612,11 @@ setMethod("plot", signature("VirProf"), function
             aright = cstart + qend - 1
         )
 
-
-    cat(".")
     ## Get unique contigs from hits
     contigs <- hits %>%
         group_by(qacc, flip, cstart, cend, contig) %>%
         summarize(.groups="drop")
 
-    cat(".")
     ## Make compressed X scale
     display_slots <-
         bind_rows(
@@ -613,23 +626,34 @@ setMethod("plot", signature("VirProf"), function
         arrange(start, stop) %>%
         compress_axis(merge_dist=200, spacing = 100)
 
-    cat(".")
     ## Setup corners for trapezoid showing alignment mapping
-    alignment_boxes <- bind_rows(
-        hits %>% mutate(y = ymax$alignments, x = aleft),
-        hits %>% mutate(y = ymax$alignments, x = aright),
-        hits %>% mutate(y = ymin$alignments, x = send),
-        hits %>% mutate(y = ymin$alignments, x = sstart)
-    ) %>%
-        mutate(
-            alignment = paste(qacc, aleft, aright, send, sstart)
-        )
+    if (ymin$contigs > ymin$subject) {
+        alignment_boxes <- bind_rows(
+            hits %>% mutate(y = ymax$alignments, x = aleft),
+            hits %>% mutate(y = ymax$alignments, x = aright),
+            hits %>% mutate(y = ymin$alignments, x = send),
+            hits %>% mutate(y = ymin$alignments, x = sstart)
+        ) %>%
+            mutate(
+                alignment = paste(qacc, aleft, aright, send, sstart)
+            )
+    } else {
+        alignment_boxes <- bind_rows(
+            hits %>% mutate(y = ymin$alignments, x = aleft),
+            hits %>% mutate(y = ymin$alignments, x = aright),
+            hits %>% mutate(y = ymax$alignments, x = send),
+            hits %>% mutate(y = ymax$alignments, x = sstart)
+        ) %>%
+            mutate(
+                alignment = paste(qacc, aleft, aright, send, sstart)
+            )
+    }
 
     contig_boxes <- data.frame(
         xmin = contigs$cstart,
         xmax = contigs$cend,
         ymin = ymin$contigs,
-        ymax = ymax$contigs - 0.1,
+        ymax = ymax$contigs,
         type = "Contig",
         label = contigs$contig
     )
@@ -648,23 +672,56 @@ setMethod("plot", signature("VirProf"), function
         subject_boxes
     )
 
-    polygons <- alignment_boxes
-
-    cat(".")
     p <- ggplot2::ggplot() +
         ggplot2::theme_minimal() +
         ggplot2::theme(
-            axis.text.x = ggplot2::element_text(angle=90, hjust=1, size=6)
-        ) +
+                     axis.text.x = ggplot2::element_text(angle=90, hjust=1, size=6)
+                 ) +
         ggplot2::scale_y_continuous() +
         ggplot2::scale_x_continuous(trans = display_slots$trans)  +
         ggplot2::coord_cartesian(
-            ylim = c(NA, max(unlist(ymax))),
-            xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
-                     max(hits$cstart, hits$sstart, hits$cend, hits$send)),
+                     ylim = c(NA, max(unlist(ymax))),
+                     xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
+                              max(hits$cstart, hits$sstart, hits$cend, hits$send)),
+                     )
+
+    if (!is.null(x@scaffold_depths)) {
+        if (!quiet) message("Showing scaffold depths")
+        scaffold_depths <- scaffold_depths %>%
+            as_tibble() %>%
+            mutate(
+                total = plus + minus
+            )
+        sd_depth <- sd(scaffold_depths$total)
+        max_depth <- max(scaffold_depths$total)
+        mean_depth <- mean(scaffold_depths$total)
+        cap_depth <- min(max_depth, mean_depth + cap_coverage_sd * sd_depth)
+        if (!quiet && cap_depth < max_depth) {
+            message("Capping coverage at ", round(cap_depth),
+                    " (", round(cap_depth/max_depth*100), "% of max depth = ", max_depth, ")")
+        }
+
+        depth_data <- scaffold_depths %>%
+            mutate(
+                y = total / cap_depth * heights$coverage,
+                x = pos
+            ) %>%
+            select(
+                sacc, x, y
             )
 
-    cat(".")
+        ## Plot depths above contigs
+        p <- p +
+            ggplot2::stat_summary_bin(
+                geom="bar",
+                orientation="x",
+                fun="median",
+                bins=min(2000, nrow(depth_data)),
+                data = depth_data,
+                ggplot2::aes(x = x, y = y)
+            )
+    }
+
     if(!is.null(depths)) {
         label_tpl <- paste0(label_tpl, ", Average Read Depth: {mean_depth}")
 
@@ -696,48 +753,10 @@ setMethod("plot", signature("VirProf"), function
                 fun="median",
                 bins=min(2000, nrow(depth_data)),
                 data = depth_data,
-                aes(x = x, y = y)
+                ggplot2::aes(x = x, y = y)
             )
     }
-    if (!is.null(x@scaffold_depths) && FALSE) {
-        message("Showing scaffold depths")
-        depths <- x@scaffold_depths %>%
-            filter(sacc == accession)
-                                        #        %>%
 
-#            mutate(contig=gsub("_pilon", "", contig)) %>%
-#            separate(contig, into=c("sample", "sacc"), sep=".")
-#            rename(qacc=contig) %>%
-#            inner_join(contigs, by="qacc")
-
-        sd_depth <- sd(depths$total)
-        max_depth <- max(depths$total)
-        cap_depth <- min(max_depth, mean_depth + 3 * sd_depth)
-
-        depth_data <- depths %>%
-            mutate(
-                y = total / cap_depth * heights$scaffold_coverage + ymin$scaffold_coverage,
-                x = pos
-            ) %>%
-            select(
-                sacc, x, y
-            )
-        message("1")
-
-        ## Plot depths above contigs
-        p <- p +
-            ggplot2::stat_summary_bin(
-                geom="bar",
-                orientation="x",
-                fun="median",
-                bins=min(2000, nrow(depth_data)),
-                data = depth_data,
-                aes(x = x, y = y)
-            )
-        message("2")
-    }
-
-    cat(".")
     if (!is.null(feature_tables)) {
         ## Annotate subject sequences
         subject_annotations <- annotate_subjects(
@@ -748,8 +767,8 @@ setMethod("plot", signature("VirProf"), function
         )
         ## Remove gene for now
         subject_annotations <- subject_annotations %>%
-            filter(key == "product") %>%
-            mutate(key == "Annotation")
+            filter(tolower(key) %in% annotation_keys) %>%
+            mutate(key = stringr::str_to_title(key))
 
         ## Merge annotations spanning display ranges
         subject_annotations <- subject_annotations %>%
@@ -782,7 +801,7 @@ setMethod("plot", signature("VirProf"), function
         annotation_boxes <- data.frame(
             xmin = subject_annotations$start,
             xmax = subject_annotations$stop,
-            ymin = y - subject_annotations$bin + 0.9,
+            ymin = y - subject_annotations$bin + 1,
             ymax = y - subject_annotations$bin,
             type = subject_annotations$key,
             label = subject_annotations$value
@@ -798,45 +817,47 @@ setMethod("plot", signature("VirProf"), function
                 display_slots$trans$trans(xmin) +
                 display_slots$trans$trans(xmax)
             ) / 2),
-            ymid = (ymin+ymax)/2
+            ymid = (ymin+ymax)/2,
+            ## Drop unused types so they won't apper in the legend
+            ## Also reorder factor by ymin so guide has colors same order as plot
+            type = forcats::fct_drop(type) %>% forcats::fct_reorder(-ymin)
         )
 
     p <- p +
         ggnewscale::new_scale_fill() +
-        ggplot2::scale_fill_manual(values = box_colors) +
+        ggplot2::scale_fill_manual(name="", values = box_colors, breaks=levels(boxes$type)) +
         ## Boxes
         ggplot2::geom_rect(
             data = boxes,
-            aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill=type)
+            ggplot2::aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill=type)
         ) +
         ggnewscale::new_scale_color() +
         ggplot2::scale_color_manual(values = label_colors) +
         ggrepel::geom_text_repel(
+                     show.legend = FALSE,
             data = boxes,
-            aes(x=xmid, ymid, label=label, color=type),
+            ggplot2::aes(x=xmid, ymid, label=label, color=type),
             size = 3,
             vjust = .5,
             hjust = .5,
             min.segment.length = 0.1,
             point.size = NA,  # don't shift around center
             max.overlaps = 100,
-        ) +
+            ) +
         ggnewscale::new_scale_fill() +
-        ggplot2::scale_fill_continuous(limits = c(70, 100)) +
+        ggplot2::scale_fill_continuous(name="% Identity", limits = c(70, 100)) +
         ggnewscale::new_scale_color() +
         ggplot2::geom_polygon(
-            data = polygons,
-            aes(x = x, y = y, group = alignment, fill = pident),
+            data = alignment_boxes,
+            ggplot2::aes(x = x, y = y, group = alignment, fill = pident),
             color="lightblue", alpha=.5
         )
 
-    cat(".")
     ## Add labels
+    lineage <- break_lineage(reference$lineage)
     p <- p +
-        xlab(str_glue(label_tpl)) +
-        ylab(str_glue(ylabel_tpl))
+        ggplot2::xlab(stringr::str_glue(label_tpl)) +
+        ggplot2::ylab(stringr::str_glue(ylabel_tpl))
 
-    cat(".")
-    message(" [DONE]")
-    p
+    return(p)
 })
