@@ -527,7 +527,6 @@ setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
     return(res)
 })
 
-##plot_ranges <- function(reference, hits, depths, featureshowMethods("plot")
 #' The actual plot function
 setMethod("plot", signature("VirProf"), function
 (
@@ -570,6 +569,7 @@ setMethod("plot", signature("VirProf"), function
     quiet = FALSE
 )
 {
+    ## Find the right reference based on provided sample and accession
     reference <- x@calls
     if (!is.null(sample)) {
         sample_ <- sample
@@ -583,14 +583,8 @@ setMethod("plot", signature("VirProf"), function
         reference <- arrange(reference, desc(numreads)) %>% head(n=1)
     }
     if (!quiet) message("Plotting ", reference$sacc, " from ", reference$sample)
-    hits <- filter(x@alignments, sample == reference$sample, sacc == reference$sacc)
-    ## depths <- x@depths[x@depths$contig %in% hits$qacc,]
-    depths <- NULL
-    scaffold_depths <- x@scaffold_depths[x@scaffold_depths$sample == reference$sample
-                                         & x@scaffold_depths$sacc == reference$sacc, ]
-    feature_tables <- x@features[x@features$acc == reference$sacc,] %>% as_tibble()
 
-    #### CONFIG  ###
+    ## Determine heights for plot parts
     ymax <- cumsum(rev(heights))
     ymin <- ymax - rev(heights)
     ymax <- ymax - ymin[["coverage"]]
@@ -604,7 +598,11 @@ setMethod("plot", signature("VirProf"), function
     ymin <- as.list(ymin)
 
     ## Calculate alignment positions for hits
-    hits <- hits %>%
+    hits <- x@alignments %>%
+        filter(
+            sample == reference$sample,
+            sacc == reference$sacc
+        ) %>%
         mutate(flip = sstart > send) %>%
         select(sacc, qacc, qstart, qend, sstart, send, cstart, cend, flip, contig, pident) %>%
         mutate(
@@ -617,8 +615,10 @@ setMethod("plot", signature("VirProf"), function
         group_by(qacc, flip, cstart, cend, contig) %>%
         summarize(.groups="drop")
 
-    ## Make compressed X scale
-    display_slots <-
+    ## Make compressor for x scale from alignment positions
+    ## This shrinks parts of the x axis that have no contigs to
+    ## improve horizontal space usage
+    x_compressor <-
         bind_rows(
             hits %>% mutate(start=sstart, stop=send) %>% select(start, stop),
             hits %>% mutate(start=cstart, stop=cend) %>% select(start, stop)
@@ -626,67 +626,25 @@ setMethod("plot", signature("VirProf"), function
         arrange(start, stop) %>%
         compress_axis(merge_dist=200, spacing = 100)
 
-    ## Setup corners for trapezoid showing alignment mapping
-    if (ymin$contigs > ymin$subject) {
-        alignment_boxes <- bind_rows(
-            hits %>% mutate(y = ymax$alignments, x = aleft),
-            hits %>% mutate(y = ymax$alignments, x = aright),
-            hits %>% mutate(y = ymin$alignments, x = send),
-            hits %>% mutate(y = ymin$alignments, x = sstart)
-        ) %>%
-            mutate(
-                alignment = paste(qacc, aleft, aright, send, sstart)
-            )
-    } else {
-        alignment_boxes <- bind_rows(
-            hits %>% mutate(y = ymin$alignments, x = aleft),
-            hits %>% mutate(y = ymin$alignments, x = aright),
-            hits %>% mutate(y = ymax$alignments, x = send),
-            hits %>% mutate(y = ymax$alignments, x = sstart)
-        ) %>%
-            mutate(
-                alignment = paste(qacc, aleft, aright, send, sstart)
-            )
-    }
-
-    contig_boxes <- data.frame(
-        xmin = contigs$cstart,
-        xmax = contigs$cend,
-        ymin = ymin$contigs,
-        ymax = ymax$contigs,
-        type = "Contig",
-        label = contigs$contig
-    )
-
-    subject_boxes<- data.frame(
-        xmin = hits$sstart,
-        xmax = hits$send,
-        ymin = ymin$subject,
-        ymax= ymax$subject,
-        type = "Reference",
-        label = NA
-    )
-
-    boxes <- rbind(
-        contig_boxes,
-        subject_boxes
-    )
-
+    ## Create base ggplot object
     p <- ggplot2::ggplot() +
         ggplot2::theme_minimal() +
         ggplot2::theme(
                      axis.text.x = ggplot2::element_text(angle=90, hjust=1, size=6)
                  ) +
         ggplot2::scale_y_continuous() +
-        ggplot2::scale_x_continuous(trans = display_slots$trans)  +
+        ggplot2::scale_x_continuous(trans = x_compressor$trans)  +
         ggplot2::coord_cartesian(
                      ylim = c(NA, max(unlist(ymax))),
                      xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
                               max(hits$cstart, hits$sstart, hits$cend, hits$send)),
                      )
 
+    ## Add geom showing the scaffold depths
     if (!is.null(x@scaffold_depths)) {
         if (!quiet) message("Showing scaffold depths")
+        scaffold_depths <- x@scaffold_depths[x@scaffold_depths$sample == reference$sample
+                                             & x@scaffold_depths$sacc == reference$sacc, ]
         scaffold_depths <- scaffold_depths %>%
             as_tibble() %>%
             mutate(
@@ -722,7 +680,59 @@ setMethod("plot", signature("VirProf"), function
             )
     }
 
-    if(!is.null(depths)) {
+    ## Setup corners for trapezoid showing alignment mapping
+    if (ymin$contigs > ymin$subject) {
+        alignment_boxes <- bind_rows(
+            hits %>% mutate(y = ymax$alignments, x = aleft),
+            hits %>% mutate(y = ymax$alignments, x = aright),
+            hits %>% mutate(y = ymin$alignments, x = send),
+            hits %>% mutate(y = ymin$alignments, x = sstart)
+        ) %>%
+            mutate(
+                alignment = paste(qacc, aleft, aright, send, sstart)
+            )
+    } else {
+        alignment_boxes <- bind_rows(
+            hits %>% mutate(y = ymin$alignments, x = aleft),
+            hits %>% mutate(y = ymin$alignments, x = aright),
+            hits %>% mutate(y = ymax$alignments, x = send),
+            hits %>% mutate(y = ymax$alignments, x = sstart)
+        ) %>%
+            mutate(
+                alignment = paste(qacc, aleft, aright, send, sstart)
+            )
+    }
+
+    ## Setup boxes representing contigs
+    contig_boxes <- data.frame(
+        xmin = contigs$cstart,
+        xmax = contigs$cend,
+        ymin = ymin$contigs,
+        ymax = ymax$contigs,
+        type = "Contig",
+        label = contigs$contig
+    )
+
+    ## Setup boxes representing subject parts
+    ## FIXME: should this be a single box?
+    subject_boxes<- data.frame(
+        xmin = hits$sstart,
+        xmax = hits$send,
+        ymin = ymin$subject,
+        ymax= ymax$subject,
+        type = "Reference",
+        label = NA
+    )
+
+    boxes <- rbind(
+        contig_boxes,
+        subject_boxes
+    )
+
+
+
+    if(!is.null(x@depths) && FALSE) {
+        depths <- x@depths[x@depths$contig %in% hits$qacc,]
         label_tpl <- paste0(label_tpl, ", Average Read Depth: {mean_depth}")
 
         depths <- depths %>%
@@ -757,11 +767,13 @@ setMethod("plot", signature("VirProf"), function
             )
     }
 
-    if (!is.null(feature_tables)) {
+    if (!is.null(x@features)) {
+        feature_tables <- x@features[x@features$acc == reference$sacc,] %>% as_tibble()
+
         ## Annotate subject sequences
         subject_annotations <- annotate_subjects(
-            display_slots$ranges$start,
-            display_slots$ranges$end,
+            x_compressor$ranges$start,
+            x_compressor$ranges$end,
             reference$sacc,
             feature_tables
         )
@@ -781,8 +793,8 @@ setMethod("plot", signature("VirProf"), function
         ## Compute label location
         subject_annotations <- subject_annotations %>%
             mutate(
-                trans_s = display_slots$trans$trans(start),
-                trans_e = display_slots$trans$trans(stop),
+                trans_s = x_compressor$trans$trans(start),
+                trans_e = x_compressor$trans$trans(stop),
             )
         ## Remove duplicates
         subject_annotations <- subject_annotations %>%
@@ -813,9 +825,9 @@ setMethod("plot", signature("VirProf"), function
 
     boxes <- boxes %>%
         mutate(
-            xmid = display_slots$trans$inv((
-                display_slots$trans$trans(xmin) +
-                display_slots$trans$trans(xmax)
+            xmid = x_compressor$trans$inv((
+                x_compressor$trans$trans(xmin) +
+                x_compressor$trans$trans(xmax)
             ) / 2),
             ymid = (ymin+ymax)/2,
             ## Drop unused types so they won't apper in the legend
