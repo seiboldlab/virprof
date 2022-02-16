@@ -252,21 +252,24 @@ annotate_subjects <- function(starts, ends, acc_, feature_table) {
     ranges <- IRanges::IRanges(starts, ends) %>%
         IRanges::reduce()
 
-    ft <- feature_table %>%
+    features <- feature_table %>%
+        as_tibble() %>%
         tibble::rowid_to_column() %>%
         filter(acc == acc_) %>%
         mutate(swap_if(start > end, start, end)) %>%
         {IRanges::IRanges(.$start, .$end, name = .$rowid)} %>%
         IRanges::subsetByOverlaps(ranges)
 
-    overlaps <- IRanges::intersect(ranges, ft)
-    hits <- IRanges::findOverlaps(overlaps, ft)
+    overlaps <- IRanges::intersect(ranges, features)
+    hits <- IRanges::findOverlaps(overlaps, features)
     overlaps_out <- overlaps[S4Vectors::from(hits)]
-    ft_out <- ft[S4Vectors::to(hits)]
+    ft_out <- features[S4Vectors::to(hits)]
     index_out <- as.integer(names(ft_out))
     res <- data.frame(
-        start = IRanges::start(overlaps_out),
-        stop  = IRanges::end(overlaps_out),
+        start = pmax(IRanges::start(overlaps_out), IRanges::start(ft_out)),
+        stop  = pmin(IRanges::end(overlaps_out), IRanges::end(ft_out)),
+        rstart = IRanges::start(overlaps_out),
+        rstop  = IRanges::end(overlaps_out),
         gstart = IRanges::start(ft_out),
         gstop = IRanges::end(ft_out),
         key = feature_table$key[index_out],
