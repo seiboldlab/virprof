@@ -584,19 +584,6 @@ setMethod("plot", signature("VirProf"), function
     }
     if (!quiet) message("Plotting ", reference$sacc, " from ", reference$sample)
 
-    ## Determine heights for plot parts
-    ymax <- cumsum(rev(heights))
-    ymin <- ymax - rev(heights)
-    ymax <- ymax - ymin[["coverage"]]
-    ymin <- ymin - ymin[["coverage"]]
-    heights <- as.list(heights)
-    if (!quiet) {
-        message("Selected heights:")
-        print(data.frame(ymin=ymin, ymax=ymax) %>% arrange(desc(ymin)))
-    }
-    ymax <- as.list(ymax)
-    ymin <- as.list(ymin)
-
     ## Calculate alignment positions for hits
     hits <- x@alignments %>%
         filter(
@@ -633,12 +620,11 @@ setMethod("plot", signature("VirProf"), function
                      axis.text.x = ggplot2::element_text(angle=90, hjust=1, size=6)
                  ) +
         ggplot2::scale_y_continuous() +
-        ggplot2::scale_x_continuous(trans = x_compressor$trans)  +
-        ggplot2::coord_cartesian(
-                     ylim = c(NA, max(unlist(ymax))),
-                     xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
-                              max(hits$cstart, hits$sstart, hits$cend, hits$send)),
-                     )
+        ggplot2::scale_x_continuous(trans = x_compressor$trans)
+
+    coord_xlim = c(min(hits$cstart, hits$sstart, hits$cend, hits$send),
+                   max(hits$cstart, hits$sstart, hits$cend, hits$send))
+    coord_ylim = c(NA, NA)
 
     ## Add geom showing the scaffold depths
     if (!is.null(x@scaffold_depths)) {
@@ -657,11 +643,14 @@ setMethod("plot", signature("VirProf"), function
         if (!quiet && cap_depth < max_depth) {
             message("Capping coverage at ", round(cap_depth),
                     " (", round(cap_depth/max_depth*100), "% of max depth = ", max_depth, ")")
+            coord_ylim = c(NA, cap_depth)
         }
+        # Rescale heights to match proportions
+        heights <- heights * cap_depth / heights["coverage"]
 
         depth_data <- scaffold_depths %>%
             mutate(
-                y = total / cap_depth * heights$coverage,
+                y = total,
                 x = pos
             ) %>%
             select(
@@ -679,6 +668,23 @@ setMethod("plot", signature("VirProf"), function
                 ggplot2::aes(x = x, y = y)
             )
     }
+
+    ## Cap display size
+    p <- p + ggplot2::coord_cartesian(xlim = coord_xlim, ylim = coord_ylim)
+
+    ## Determine heights for plot parts
+    ymax <- cumsum(rev(heights))
+    ymin <- ymax - rev(heights)
+    ymax <- ymax - ymin[["coverage"]]
+    ymin <- ymin - ymin[["coverage"]]
+    heights <- as.list(heights)
+    if (!quiet) {
+        message("Selected heights:")
+        print(data.frame(ymin=ymin, ymax=ymax) %>% arrange(desc(ymin)))
+    }
+    ymax <- as.list(ymax)
+    ymin <- as.list(ymin)
+
 
     ## Setup corners for trapezoid showing alignment mapping
     if (ymin$contigs > ymin$subject) {
@@ -729,8 +735,6 @@ setMethod("plot", signature("VirProf"), function
         subject_boxes
     )
 
-
-
     if(!is.null(x@depths) && FALSE) {
         depths <- x@depths[x@depths$contig %in% hits$qacc,]
         label_tpl <- paste0(label_tpl, ", Average Read Depth: {mean_depth}")
@@ -755,12 +759,12 @@ setMethod("plot", signature("VirProf"), function
                 qacc, x, y
             )
 
-        ## Plot depths above contigs
+        ## Plot depths on positive part of y axis
         p <- p +
             ggplot2::stat_summary_bin(
                 geom="bar",
                 orientation="x",
-                fun="median",
+                fun="median", ## FIXME: should this be mean?
                 bins=min(2000, nrow(depth_data)),
                 data = depth_data,
                 ggplot2::aes(x = x, y = y)
@@ -805,22 +809,18 @@ setMethod("plot", signature("VirProf"), function
             mutate(
                 bin = IRanges::disjointBins(IRanges::IRanges(start, stop))
             )
-
-        bins <- max(subject_annotations$bin)
-        y <- ymax$annotations
-        #height <- bins ##(ymax$annotations - y)/bins
+        ## Determine height for level in stack
+        sub_height <- heights$annotations / max(subject_annotations$bin)
 
         annotation_boxes <- data.frame(
             xmin = subject_annotations$start,
             xmax = subject_annotations$stop,
-            ymin = y - subject_annotations$bin + 1,
-            ymax = y - subject_annotations$bin,
+            ymin = ymax$annotations - (subject_annotations$bin - .95) * sub_height,
+            ymax = ymax$annotations - (subject_annotations$bin - .05) * sub_height,
             type = subject_annotations$key,
             label = subject_annotations$value
         )
         boxes <- rbind(boxes, annotation_boxes)
-
-        ## Plot annotations
     }
 
     boxes <- boxes %>%
