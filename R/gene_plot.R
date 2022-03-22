@@ -407,13 +407,13 @@ setMethod(
     function(object, spacing = 10) {
         alignments <- object@alignments
         if (nrow(alignments) == 0) {
-            empty_res <- data.frame(
+            object@alignments <- data.frame(
                 sacc = character(),
                 qacc = character(),
                 cstart = numeric(),
                 cend = numeric()
             )
-            return(empty_res)
+            return(object)
         }
         ## Align each contig to have leftmost qstart be above sstart
         contigs <- alignments %>%
