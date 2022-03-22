@@ -85,16 +85,19 @@ with Stage("get_unmapped_vp") as S:
         threads:
             8
         resources:
-            mem="32g"
+            mem="80g"
         params:
             pattern = "u"
         conda:
             "bbmap"
         shell:
             "exec >{log} 2>&1;"
+            "echo Grabbing {params.pattern} from {input.unmapped};"
+            "echo and extracting from {input.fq};"
             "grep '{params.pattern}$' {input.unmapped} |"
             "  cut -d' ' -f1 |"
             "  filterbyname.sh"
+            "    -Xmx{resources.mem_mb}m"sjobs
             "    in={input.fq[0]}"
             "    in2={input.fq[1]}"
             "    out={output.fq[0]}"
