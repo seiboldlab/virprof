@@ -466,7 +466,11 @@ run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
 #'
 #' @param fname Path to sorted BAM file
 setGeneric("coverage_depth", function(object, ...) standardGeneric("coverage_depth"))
+
 setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffold=FALSE) {
+    if (nrow(object$alignments) == 0) {
+        return(object)
+    }
     plus <- run_bedtools(fname, strand="+", split=TRUE) %>% rename(plus=depth)
     minus <- run_bedtools(fname, strand="-", split=TRUE) %>% rename(minus=depth)
     merged <- full_join(plus, minus, by=c("contig", "pos")) %>%
