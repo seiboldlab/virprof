@@ -106,7 +106,7 @@ with Stage("get_unmapped_vp") as S:
             "      names=/dev/stdin"
             "      include=t"
             "      -Xmx{resources.mem_mb}m"
-            "      -eoom"
+            "      -eoom;"
             "else"
             "  echo No unmapped reads found;"
             "  echo -n | bgzip --stdout > {output.fq[0]};"
