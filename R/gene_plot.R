@@ -454,12 +454,18 @@ run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
         if (split) "-split" else "",
         if (fragment) "-fs" else ""
     ))
-    readr::read_tsv(
-               proc,
-               col_types = "cii",
-               col_names = c("contig", "pos", "depth"),
-               skip = 1
-           )
+    res <- readr::read_tsv(
+                      proc,
+                      col_types = "cii",
+                      col_names = c("contig", "pos", "depth"),
+                      skip = 1
+                  )
+    message("Found ", nrow(res), "positions")
+    if (nrow(res) > 0) {
+        res
+    } else {
+        tibble(contig=character(), pos = integer(), depth = integer())
+    }
 }
 
 #' Get depth from BAM file
@@ -468,9 +474,6 @@ run_bedtools <- function(fname, strand=NULL, split=FALSE, fragment=FALSE) {
 setGeneric("coverage_depth", function(object, ...) standardGeneric("coverage_depth"))
 
 setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffold=FALSE) {
-    if (nrow(object$alignments) == 0) {
-        return(object)
-    }
     plus <- run_bedtools(fname, strand="+", split=TRUE) %>% rename(plus=depth)
     minus <- run_bedtools(fname, strand="-", split=TRUE) %>% rename(minus=depth)
     merged <- full_join(plus, minus, by=c("contig", "pos")) %>%
