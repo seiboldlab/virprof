@@ -137,6 +137,8 @@ with Stage("index_vp") as S:
             "benchmarks/{:name:}/{:this:}/ALL.txt"
         threads:
             1
+        resources:
+            mem="8g"
         params:
             taxonomy_prefix = lambda wc, input: input.ncbi_names[:-len("names.dmp")]
         conda:
@@ -171,6 +173,8 @@ with Stage("blastfilter_vp") as S:
             "benchmarks/{:name:}/{:this:}/{target}.txt"
         threads:
             1
+        resources:
+            mem="8g"
         conda:
             "virprof_py"
         shell:"""
@@ -219,6 +223,8 @@ with Stage("blastbin_vp") as S:
             ncbi_api_key = ""
         threads:
             1
+        resources:
+            mem="8g"
         conda:
             "virprof_py"
         shell:
@@ -250,6 +256,8 @@ with Stage("blastbin_vp") as S:
             "benchmarks/{:name:}/{:this:}/{target}.vp.rds.txt"
         threads:
             1
+        resources:
+            mem="8g"
         conda:
             "virprof_r"
         params:
@@ -276,7 +284,10 @@ with Stage("scaffold_vp") as S:
             "{:this:}/{target}.bin.log"
         benchmark:
             "benchmarks/{:name:}/{:this:}/{target}.txt"
-        threads: 1
+        threads:
+            1
+        resources:
+            mem="8g"
         conda:
             "virprof_py"
         params:
@@ -324,6 +335,8 @@ with Stage("collect_vp") as S:
             "benchmarks/{:name:}/{:this:}/{target}.show_bins.txt"
         threads:
             1
+        resources:
+            mem="64g"
         conda:
             "virprof_r"
         params:
@@ -368,7 +381,10 @@ with Stage("bin_vp") as S:
             "{:this:}/{target}.bin.log"
         benchmark:
             "benchmarks/{:name:}/{:this:}/{target}.txt"
-        threads: 1
+        threads:
+            1
+        resources:
+            mem="8g"
         conda:
             "virprof_py"
         params:
@@ -428,6 +444,8 @@ with Stage("summarize_vp") as S:
             slack_hook  = "",  # should be trailing part of form xxx/xxx/xxx
         threads:
             1
+        resources:
+            mem="8g"
         conda:
             "virprof_r"
         shell:
@@ -499,7 +517,7 @@ with Stage("summarize_vp") as S:
         threads:
             1
         resources:
-            mem="32g"
+            mem="128g"
         conda:
             "virprof_r"
         params:
