@@ -99,6 +99,9 @@ pipelines:
       - collect_vp
       - group_ALL
       - summarize_vp
+      - qc_multiqc
+      - group_ALL
+      - report_pathogen_vp
 
   # Re-Assemble created bins
   reassemble:

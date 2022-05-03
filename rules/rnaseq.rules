@@ -148,7 +148,6 @@ with Stage("report_vp") as S:
             mem = "50m"
         params:
             slack_hook = "",  # should be trailing part of form xxx/xxx/xxx
-            this = "{:this:}",
             reporttpl  = "{:ensuredir.reports:}/{:project:}.$LABEL.$TYPE.%Y-%m-%d_%H-%M$EXT",
             project = "{:project:}",
             label = make_label,

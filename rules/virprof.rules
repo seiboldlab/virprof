@@ -419,13 +419,12 @@ with Stage("summarize_vp") as S:
             coverages="{:prev:}/{:target:}.coverage",
             basecov="{:prev:}/{:target:}.basecov.bg",
             scaffolds="{:prev:}/{:target:}.scaffolds.csv",
-            data="{:prev:}/{:target:}.vp.rds",
         output:
             call_files=temp("{:this:}/{target}.call_flist"),
             coverage_files=temp("{:this:}/{target}.coverage_flist"),
             basecov_files=temp("{:this:}/{target}.basecov_flist"),
             scaffold_files=temp("{:this:}/{target}.scaffold_flist"),
-            excel="{:this:}/{target}.summary.xlsx",
+            excel="{:this:}/{target}.pathogens.xlsx",
         benchmark:
             "benchmarks/{:name:}/{:this:}/{target}.txt"
         log:
@@ -439,9 +438,6 @@ with Stage("summarize_vp") as S:
             filter_host = "Homo sapiens",
             min_bp      = 200,
             min_reads   = 3,
-            reporttpl   = "{:ensuredir.reports:}/{:project:}.pathogens.summary.%Y-%m-%d_%H-%M.xlsx",
-            project = "{:project:}",
-            slack_hook  = "",  # should be trailing part of form xxx/xxx/xxx
         threads:
             1
         resources:
@@ -468,39 +464,24 @@ with Stage("summarize_vp") as S:
             "  --in-scaffold-list {output.scaffold_files}"
             "  --in-basecov-list {output.basecov_files};\n"
             "\n"
-            "MSG=\"New pathogen results for \`{params.project}\`:\n\n\";"
-            "REPORT=$(date +{params.reporttpl});"
-            "MSG=\"$MSG\n- \`$REPORT\`\";"
-            "cp -v {output.excel} $REPORT;"
-            "\n"
-            "if [ -n \"{params.slack_hook}\" ]; then"
-            "  curl"
-            "    --silent"
-            "    --request POST"
-            "    --header 'Content-type: application/json'"
-            "    --data '{{\"text\":\"'\"$MSG\"'\"}}'"
-            "    https://hooks.slack.com/services/{params.slack_hook};"
-            "  fi;"
 
 
+    localrules: vp_aggregate_genomes
     rule vp_aggregate_genomes:
         message:
             "{:name:}: Copying genome files to {:this:}"
         input:
-            fasta = "{:prev:}/{:target:}.fasta.gz"
+            fasta = "{:prev:}/{:target:}.fasta.gz",
         output:
-            fasta_list = "{:this:}/{target}.genomes.txt"
+            genomes_dir = directory("{:this:}/{target}.genomes"),
         log:
             "{:this:}/{target}.genomes.log"
-        params:
-            this = "{:this:}"
         shell:
             "exec >{log} 2>&1;"
-            "echo > {output.fasta_list};"
+            "mkdir -p {output.genomes_dir};"
             "for path in {input.fasta}; do"
             "  name=$(basename $path);"
-            "  echo $name >> {output.fasta_list};"
-            "  cp -v $path {params.this}/{wildcards.target}.$name;"
+            "  cp -v $path {output.genomes_dir}/$name;"
             "done;"
 
     rule vp_aggregate_rds:
@@ -525,12 +506,81 @@ with Stage("summarize_vp") as S:
         script:
             "vpimport.R"
 
-    rule vp_summarize_all:
-        message:
-            "Completed {:this:}"
+
+with Stage("report_pathogen_vp") as S:
+    def make_label(wildcards):
+        # keep in sync with pipelines.yml
+        version = str(ymp.get_config()._config.userdata.virprof.version)
+        prefix = wildcards._YMP_DIR
+        pipeline = []
+        if "star" in prefix:
+            pipeline += ["star"]
+        if "rnaseq_salmon" in prefix:
+            pipeline += ["salmon_sa"]
+        elif "salmon" in prefix:
+            pipeline += ["salmon"]
+        if "rsem" in prefix:
+            pipeline += ["rsem"]
+        if "dedup_umi_vp" in prefix:
+            pipeline += ["umi"]
+        return "_".join(pipeline or ["unknown"]) + "." + version
+
+    localrules: vp_pathogen_report
+    rule vp_pathogen_report:
+        message: "Copying results to reports directory"
         input:
-            summary = "{:this:}/{:targets:}.summary.xlsx",
-            fasta = "{:this:}/{:targets:}.genomes.txt",
-            rds  = "{:this:}/{:targets:}.vp.rds"
+            "{:prev:}/{:target:}.pathogens.xlsx",
+            directory("{:prev:}/{:target:}.genomes"),
+            "{:prev:}/{:target:}.vp.rds",
+            "{:prev:}/multiqc_report.html",
+            directory("{:prev:}/multiqc_report_data"),
         output:
-            touch("{:this:}/all_targets.stamp")
+            "{:this:}/{target}.pathogens.xlsx",
+            directory("{:this:}/{target}.genomes"),
+            "{:this:}/{target}.vp.rds",
+            "{:this:}/{target}.vp_multiqc_report.html",
+            directory("{:this:}/{target}.vp_multiqc_report_data"),
+        log:
+            "{:this:}/{target}.log"
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
+        threads:
+            1
+        resources:
+            mem = "50m"
+        params:
+            slack_hook  = "",  # should be trailing part of form xxx/xxx/xxx
+            reporttpl   = "{:ensuredir.reports:}/{:project:}.$LABEL.$TYPE.%Y-%m-%d_%H-%M$EXT",
+            project = "{:project:}",
+            label = make_label,
+            version = ymp.get_config()._config.userdata.virprof.version,
+        shell:
+            "exec >{log} 2>&1;"
+            "SRCS=({input});"
+            "DSTS=({output});"
+            "MSG=\"New Pathogen (v{params.version}) results for \`{params.project}\`:\n\n\";"
+            "LABEL={params.label};"
+            "for i in \"${{!SRCS[@]}}\"; do"
+            "  echo Copying ${{SRCS[i]}} to ${{DSTS[i]}};"
+            "  cp -a ${{SRCS[i]}} ${{DSTS[i]}};"
+            "  BASE=$(basename ${{DSTS[i]}});"
+            "  SUFFIX=${{BASE#{wildcards.target}.}};"
+            "  TYPE=${{SUFFIX%.*}};"
+            "  EXT=${{SUFFIX#*.}};"
+            "  if [ \"$TYPE\"a == \"$EXT\"a ]; then"
+            "    EXT=;"
+            "  else"
+            "    EXT=\".$EXT\";"
+            "  fi;"
+            "  REPORT=$(date +{params.reporttpl});"
+            "  echo Copying ${{SRCS[i]}} to $REPORT;"
+            "  cp -a ${{SRCS[i]}} $REPORT;"
+            "  MSG=\"$MSG\n- \`$REPORT\`\";"
+            "done;"
+            "if [ -n \"{params.slack_hook}\" ]; then"
+            "  curl"
+            "    --request POST"
+            "    --header 'Content-type: application/json'"
+            "    --data '{{\"text\":\"'\"$MSG\"'\"}}'"
+            "    https://hooks.slack.com/services/{params.slack_hook};"
+            "fi;"

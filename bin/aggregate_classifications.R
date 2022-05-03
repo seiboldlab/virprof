@@ -395,7 +395,10 @@ load_scaffolds <- function(calls, scaffold_filelist_file) {
         "qacc" = col_character(),
         "qstart" = col_integer(),
         "qend" = col_integer(),
-        "reversed" = col_logical()
+        "qlen" = col_integer(),
+        "reversed" = col_logical(),
+        "bp" = col_integer(),
+        "scaffold" = col_character()
     )
     scaffolds <- scaffold_filelist_file %>%
         read_table(

@@ -32,7 +32,7 @@ if (snakemake@params$task == "create") {
     message("Adding scaffold coverage depths")
     bamlist <- paste(snakemake@input$bam, collapse=",")
     vp <- coverage_depth(vp, bamlist, scaffold=TRUE)
-    message("Saving RDS to", snakemake@output$rds)
+    message("Saving RDS to ", snakemake@output$rds)
     saveRDS(vp, snakemake@output$rds)
 } else if (snakemake@params$task ==  "combine") {
     n <- length(snakemake@input$rds)
@@ -50,7 +50,7 @@ if (snakemake@params$task == "create") {
         message(now(), " collecting garbage...")
         gc()
     }
-    message(now(), " Saving RDS to", snakemake@output$rds)
+    message(now(), " Saving RDS to ", snakemake@output$rds)
     saveRDS(vp, snakemake@output$rds)
 }
 
