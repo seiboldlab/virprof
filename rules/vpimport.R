@@ -10,6 +10,7 @@ sink(logfile)
 sink(logfile, type="message")
 
 snakemake@source("../R/gene_plot.R")
+library(lubridate)
 
 if (snakemake@params$task == "create") {
     message("Creating VP object")
@@ -34,17 +35,22 @@ if (snakemake@params$task == "create") {
     message("Saving RDS to", snakemake@output$rds)
     saveRDS(vp, snakemake@output$rds)
 } else if (snakemake@params$task ==  "combine") {
-    message("Combining ", length(snakemake@input$rds), " files")
+    n <- length(snakemake@input$rds)
+    i <- 1
     fname1 <- snakemake@input$rds[1]
-    message("Loading ", fname1)
+    message(now(), " Loading #", i, "/", n, ": ", fname1)
     vp <- readRDS(fname1)
     for (fname in snakemake@input$rds[-1]) {
-        message("Loading ", fname)
+        i <- i + 1
+        message(now(), " Loading #", i, "/", n, ": ", fname)
         vp2 <- readRDS(fname)
-        message("merging...")
+        message(now(), " merging...")
         vp <- BiocGenerics::combine(vp, vp2)
+        rm(vp2)
+        message(now(), " collecting garbage...")
+        gc()
     }
-    message("Saving RDS to", snakemake@output$rds)
+    message(now(), " Saving RDS to", snakemake@output$rds)
     saveRDS(vp, snakemake@output$rds)
 }
 
