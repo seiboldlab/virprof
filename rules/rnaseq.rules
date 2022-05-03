@@ -106,6 +106,7 @@ with Stage("quant_exon_vp") as S:
 
 with Stage("report_vp") as S:
     def make_label(wildcards):
+        # keep in sync with virprof.rules
         version = str(ymp.get_config()._config.userdata.virprof.version)
         prefix = wildcards._YMP_DIR
         pipeline = []
@@ -171,7 +172,7 @@ with Stage("report_vp") as S:
             "    EXT=\".$EXT\";"
             "  fi;"
             "  REPORT=$(date +{params.reporttpl});"
-            "  echo Copying $REPORT to $REPORT;"
+            "  echo Copying ${{SRCS[i]}} to $REPORT;"
             "  cp -a ${{SRCS[i]}} $REPORT;"
             "  MSG=\"$MSG\n- \`$REPORT\`\";"
             "done;"
