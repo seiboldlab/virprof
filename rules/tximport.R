@@ -176,7 +176,7 @@ if (snakemake@params$input_type == "Salmon") {
 message("4. ----------- Assembling SummarizedExperiment ----------")
 
 message("4.1. ----------- Preparing colData (sample sheet) -----------")
-idcolumn <- names(which(sapply(samples, function(x) all(sort(x)==names(files)))))
+idcolumn <- names(which(sapply(samples, function(x) all(sort(as.character(x))==names(files)))))
 if (length(idcolumn) == 0) {
     message("The sample sheet columns and file names didn't match up. Something is wrong. Bailing out.")
     message("samples:")
@@ -187,6 +187,7 @@ if (length(idcolumn) == 0) {
 }
 
 coldata <- samples %>%
+    mutate(across(all_of(idcolumn), as.character)) %>%
     group_by(across(all_of(idcolumn))) %>%
     summarize(
         across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1]),
