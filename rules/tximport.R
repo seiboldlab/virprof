@@ -103,21 +103,34 @@ metadata <- list(
 message("2. ----------- Loading files ----------")
 message("2.1. ----------- Loading Sample Sheet ----------")
 message("Filename = ", snakemake@input$meta)
-samples <- read.csv(snakemake@input$meta, sep="\t")
+samples <- read_tsv(snakemake@input$meta)
 samples <- Filter(function(x)!all(is.na(x)), samples)  # remove all-NA columns
 
 message("2.2. ----------- Loading GTF ----------")
 message("Filename = ", snakemake@input$gtf)
 gr <- rtracklayer::import.gff(snakemake@input$gtf)
 
+
 if (snakemake@params$input_type == "Salmon") {
-    message("3.1. ----------- Loading quant.sf files ----------")
+    message("3.1. ---------- Checking for empty samples --------")
     files <- snakemake@input$counts
-    names(files) <- gsub(".salmon", "", basename(dirname(snakemake@input$counts)))
+    names(files) <- gsub(".salmon", "", basename(dirname(files)))
     files <- files[order(names(files))]
+
+    no_data <- sapply(files, function(fn) {
+        nrow(read_tsv(fn, n_max = 1, guess_max = 1, col_types = "cdddd")) == 0
+    })
+    if (any(no_data)) {
+        message("Warning: excluded ", length(which(no_data)), " empty samples:")
+        message("  ", paste(names(files[no_data]), collapse = ", "))
+        metadata$excluded_empty_samples <- names(files[no_data])
+        files <- files[!no_data]
+    }
+
+    message("3.2. ----------- Loading quant.sf files ----------")
     txi <- tximport(files, type="salmon", txOut=TRUE)
 
-    message("3.2. ----------- Loading meta_info.json files ----------")
+    message("3.3. ----------- Loading meta_info.json files ----------")
     salmon_all_meta <-
         files %>%
         gsub("/quant.sf", "/aux_info/meta_info.json", .) %>%
@@ -176,8 +189,14 @@ if (snakemake@params$input_type == "Salmon") {
 message("4. ----------- Assembling SummarizedExperiment ----------")
 
 message("4.1. ----------- Preparing colData (sample sheet) -----------")
-idcolumn <- names(which(sapply(samples, function(x) all(sort(as.character(x))==names(files)))))
-if (length(idcolumn) == 0) {
+
+# Extract the columns used with the active grouping to identify the samples:
+idcolumns <- names(which(sapply(samples, function(x) {
+    n_distinct(x) == length(x) && # column must be unique
+        all(names(files) %in% as.character(x)) # must identify each sample
+})))
+
+if (length(idcolumns) == 0) {
     message("The sample sheet columns and file names didn't match up. Something is wrong. Bailing out.")
     message("samples:")
     print(as.data.frame(samples))
@@ -187,22 +206,30 @@ if (length(idcolumn) == 0) {
 }
 
 coldata <- samples %>%
-    mutate(across(all_of(idcolumn), as.character)) %>%
-    group_by(across(all_of(idcolumn))) %>%
+    # Make sure all idcolumns are character type (we don't want these numeric)
+    mutate(across(all_of(idcolumns), as.character)) %>%
+    # Remove samples (really, results) filtered out above
+    filter(.data[[idcolumns[1]]] %in% names(files)) %>%
+    # Group sample sheet to match active result grouping
+    group_by(across(all_of(idcolumns))) %>%
     summarize(
+        # Columns with group unique values get that value assigned
         across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1]),
+        # Columns with multiple values get them semi colon separated
         across(where(~ length(unique(.x)) > 1), ~ paste(as.character(.x), collapse=";")),
+        # Also attach the count of units grouped
         num_units=n(),
         .groups="drop"
     ) %>%
-    arrange(across(all_of(idcolumn))) %>%
+    arrange(across(all_of(idcolumns))) %>%
+    # Merge in the extra_coldata gathered above
     left_join(
         extra_coldata,
-        by = set_names("idcolumn", idcolumn[[1]])
+        by = set_names("idcolumn", idcolumns[[1]])
     )
 
 if (snakemake@params$input_type == "ExonSE") {
-    stopifnot(all(colnames(se) == coldata[idcolumn[[1]]]))
+    stopifnot(all(colnames(se) == coldata[idcolumns[[1]]]))
     colData(se) <- as(coldata, "DataFrame")
     message("5. ----------- Writing RDS with exon se object ----------")
     message("Filename = ", snakemake@output$counts)
