@@ -31,6 +31,7 @@ with Stage("filter_trf") as S:
         shadow: "shallow"
         shell:
             "exec >{log} 2>&1;"
+            "set -x;"
             "gzip -dc {input.fq[0]} |"
             "  sed -n '1~4s/^@/>/p;2~4p' |"
             "  parallel --pipe -L2 -j {threads} trf - "
@@ -42,7 +43,7 @@ with Stage("filter_trf") as S:
             "    {params.minscore}"
             "    {params.maxperiod}"
             "    {params.opts} |"
-            "  grep ^@ |"
+            "  (grep ^@ || true) |"
             "  cut -c 2- |"
             "  gzip -c >{output.matches}"
 
