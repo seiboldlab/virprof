@@ -476,11 +476,17 @@ setGeneric("coverage_depth", function(object, ...) standardGeneric("coverage_dep
 setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffold=FALSE) {
     plus <- run_bedtools(fname, strand="+", split=TRUE) %>% rename(plus=depth)
     minus <- run_bedtools(fname, strand="-", split=TRUE) %>% rename(minus=depth)
-    merged <- full_join(plus, minus, by=c("contig", "pos")) %>%
+    message("Merging coverages")
+    merged <- full_join(plus, minus, by=c("contig", "pos"))
+    message("Replacing NA")
+    merged <- merged %>%
         tidyr::replace_na(list(plus=0, minus=0))
     if (scaffold) {
+        message("Removing Trailing _pilon")
         merged <- merged %>%
-            mutate(contig=gsub("_pilon", "", contig)) %>%
+            mutate(contig=gsub("_pilon", "", contig))
+        message("Splitting sample and sacc")
+        merged <- merged %>%
             tidyr::separate(contig, into=c("sample", "sacc"), sep="\\.")
         object@scaffold_depths <-
             S4Vectors::DataFrame(
@@ -505,7 +511,9 @@ setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffo
 
 setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
     res <- new("VirProf")
+    message(now(), " merging calls")
     res@calls <- as_tibble(rbind(x@calls, y@calls))
+    message(now(), " merging alignments")
     res@alignments <- as_tibble(rbind(x@alignments, y@alignments))
     if (is.null(x@depths)) {
         if (is.null(y@depths)) {
@@ -517,6 +525,7 @@ setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
         if (is.null(y@depths)) {
             res@depths <- x@depths
         } else {
+            message(now(), " merging depths")
             res@depths <- rbind(x@depths, y@depths)
         }
     }
@@ -530,10 +539,36 @@ setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
         if (is.null(y@scaffold_depths)) {
             res@scaffold_depths <- x@scaffold_depths
         } else {
+            message(now(), " merging scaffold depths")
             res@scaffold_depths <- rbind(x@scaffold_depths, y@scaffold_depths)
         }
     }
-    res@features <- S4Vectors::merge(x@features, y@features, by=names(x@features), all=TRUE, no.dups=TRUE)
+    message(now(), " merging features")
+    if (is(x@features$acc, "Rle"))
+        x@features$acc <- as.character(x@features$acc)
+    if (is(y@features$acc, "Rle"))
+        y@features$acc <- as.character(y@features$acc)
+    if (is(x@features$value, "Rle"))
+        x@features$value <- as.character(x@features$value)
+    if (is(y@features$value, "Rle"))
+        y@features$value <- as.character(y@features$value)
+    res@features <- rbind(x@features, y@features)
+    message(now(), " have ", nrow(res@features), " entries")
+    message(now(), " done merging")
+    return(res)
+
+    message(now(), " converted")
+    str(x@features)
+    res@features <- S4Vectors::merge(
+                                   x@features,
+                                   y@features,
+                                   by=names(x@features),
+                                   all=TRUE,
+                                   no.dups=TRUE,
+                                   sort = TRUE
+                               )
+    message(now(), " have ", nrow(res@features), " entries")
+    message(now(), " done merging")
     return(res)
 })
 
