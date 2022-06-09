@@ -44,7 +44,8 @@ with Stage("get_unmapped_vp") as S:
         input:
             bam =  "{:prev:}/{target}.bam"
         output:
-            pairs = "{:this:}/{target}.{:pairnames:}.fq.gz"
+            fq1 = temp("{:this:}/{target}.{:pairnames[0]:}.fq.gz"),
+            fq2 = temp("{:this:}/{target}.{:pairnames[1]:}.fq.gz"),
         log:
             "{:this:}/{target}.log"
         benchmark:
@@ -61,8 +62,8 @@ with Stage("get_unmapped_vp") as S:
             "samtools"
         shell:
             "samtools fastq"
-            " -1 {output.pairs[0]}"
-            " -2 {output.pairs[1]}"
+            " -1 {output.fq1}"
+            " -2 {output.fq2}"
             " --threads {threads}"
             " -f {params.f}"
             " -F {params.F}"
@@ -72,12 +73,14 @@ with Stage("get_unmapped_vp") as S:
 
     rule vp_unmapped_from_salmon:
         message:
-            "{:name:}: {output.fq[0]} from Salmon unmapped names"
+            "{:name:}: {output.fq1} from Salmon unmapped names"
         input:
-            fq = "{:prev:}/{target}.{:pairnames:}.fq.gz",
+            fq1 = "{:prev:}/{target}.{:pairnames[0]:}.fq.gz",
+            fq2 = "{:prev:}/{target}.{:pairnames[1]:}.fq.gz",
             unmapped = "{:prev:}/{target}.salmon/aux_info/unmapped_names.txt",
         output:
-            fq = "{:this:}/{target}.{:pairnames:}.fq.gz"
+            fq1 = temp("{:this:}/{target}.{:pairnames[0]:}.fq.gz"),
+            fq2 = temp("{:this:}/{target}.{:pairnames[1]:}.fq.gz"),
         log:
             "{:this:}/{target}.log"
         benchmark:
@@ -93,24 +96,24 @@ with Stage("get_unmapped_vp") as S:
         shell:
             "exec >{log} 2>&1;"
             "echo Grabbing {params.pattern} from {input.unmapped};"
-            "echo and extracting from {input.fq};"
+            "echo and extracting from {input.fq1} and {input.fq2};"
             "if grep -ql '{params.pattern}$' {input.unmapped}; then"
             "  grep '{params.pattern}$' {input.unmapped} |"
             "    cut -d' ' -f1 |"
             "    filterbyname.sh"
             "      -Xmx{resources.mem_mb}m"
-            "      in={input.fq[0]}"
-            "      in2={input.fq[1]}"
-            "      out={output.fq[0]}"
-            "      out2={output.fq[1]}"
+            "      in={input.fq1}"
+            "      in2={input.fq2}"
+            "      out={output.fq1}"
+            "      out2={output.fq2}"
             "      names=/dev/stdin"
             "      include=t"
             "      -Xmx{resources.mem_mb}m"
             "      -eoom;"
             "else"
             "  echo No unmapped reads found;"
-            "  echo -n | bgzip --stdout > {output.fq[0]};"
-            "  echo -n | bgzip --stdout > {output.fq[1]};"
+            "  echo -n | bgzip --stdout > {output.fq1};"
+            "  echo -n | bgzip --stdout > {output.fq2};"
             "fi;"
 
 
