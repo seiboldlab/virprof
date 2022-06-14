@@ -534,13 +534,13 @@ with Stage("report_pathogen_vp") as S:
         input:
             "{:prev:}/{:target:}.pathogens.xlsx",
             directory("{:prev:}/{:target:}.genomes"),
-            "{:prev:}/{:target:}.vp.rds",
+            #"{:prev:}/{:target:}.vp.rds",
             "{:prev:}/multiqc_report.html",
             directory("{:prev:}/multiqc_report_data"),
         output:
             "{:this:}/{target}.pathogens.xlsx",
             directory("{:this:}/{target}.genomes"),
-            "{:this:}/{target}.vp.rds",
+            #"{:this:}/{target}.vp.rds",
             "{:this:}/{target}.vp_multiqc_report.html",
             directory("{:this:}/{target}.vp_multiqc_report_data"),
         log:
