@@ -35,24 +35,30 @@ if (snakemake@params$task == "create") {
     message("Saving RDS to ", snakemake@output$rds)
     saveRDS(vp, snakemake@output$rds)
 } else if (snakemake@params$task ==  "combine") {
-    n <- length(snakemake@input$rds)
-    i <- 1
-    fname1 <- snakemake@input$rds[1]
-    message(now(), " Loading #", i, "/", n, ": ", fname1)
-    vp <- readRDS(fname1)
-    for (fname in snakemake@input$rds[-1]) {
-        i <- i + 1
-        message(now(), " Loading #", i, "/", n, ": ", fname)
+    vp <- new("VirProf")
+    total <- length(snakemake@input$rds)
+    for (n in seq_along(snakemake@input$rds)) {
+        fname <- snakemake@input$rds[n]
+        message(now(), " Loading #", n, "/", total, ": ", fname)
         vp2 <- readRDS(fname)
         message(now(), " merging...")
         vp <- BiocGenerics::combine(vp, vp2)
-        rm(vp2)
-        message(now(), " collecting garbage...")
-        gc()
+        if (n %% 50 == 0) {
+            message(now(), " Collecting garbage...")
+            gc()
+            message(now(), " Dedup'ing intermediate")
+            vp <- unique(vp)
+            message(now(), " Collecting garbage...")
+            gc()
+        }
     }
+    message(now(), " Collecting garbage...")
+    gc()
+    message(now(), " Dedup'ing final")
+    vp <- unique(vp)
     message(now(), " Saving RDS to ", snakemake@output$rds)
     saveRDS(vp, snakemake@output$rds)
 }
 
-message("DONE")
+message(now(), " DONE")
 

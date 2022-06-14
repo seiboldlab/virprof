@@ -509,11 +509,11 @@ setMethod("coverage_depth", signature("VirProf"), function(object, fname, scaffo
 })
 
 
-setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
+setMethod("combine", signature("VirProf", "VirProf"), function(x, y) {
     res <- new("VirProf")
-    message(now(), " merging calls")
+    message(lubridate::now(), " merging calls")
     res@calls <- as_tibble(rbind(x@calls, y@calls))
-    message(now(), " merging alignments")
+    message(lubridate::now(), " merging alignments")
     res@alignments <- as_tibble(rbind(x@alignments, y@alignments))
     if (is.null(x@depths)) {
         if (is.null(y@depths)) {
@@ -525,7 +525,7 @@ setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
         if (is.null(y@depths)) {
             res@depths <- x@depths
         } else {
-            message(now(), " merging depths")
+            message(lubridate::now(), " merging depths")
             res@depths <- rbind(x@depths, y@depths)
         }
     }
@@ -539,37 +539,38 @@ setMethod("combine", c("VirProf", "VirProf"), function(x, y) {
         if (is.null(y@scaffold_depths)) {
             res@scaffold_depths <- x@scaffold_depths
         } else {
-            message(now(), " merging scaffold depths")
-            res@scaffold_depths <- rbind(x@scaffold_depths, y@scaffold_depths)
+            message(lubridate::now(), " merging scaffold depths")
+            if (nrow(x@scaffold_depths) > 0 && nrow(y@scaffold_depths) > 0) {
+                res@scaffold_depths <- rbind(x@scaffold_depths, y@scaffold_depths)
+            } else if (nrow(x@scaffold_depths) > 0) {
+                res@scaffold_depths <- x@scaffold_depths
+            } else {
+                res@scaffold_depths <- y@scaffold_depths
+            }
         }
     }
-    message(now(), " merging features")
-    if (is(x@features$acc, "Rle"))
-        x@features$acc <- as.character(x@features$acc)
-    if (is(y@features$acc, "Rle"))
-        y@features$acc <- as.character(y@features$acc)
-    if (is(x@features$value, "Rle"))
-        x@features$value <- as.character(x@features$value)
-    if (is(y@features$value, "Rle"))
-        y@features$value <- as.character(y@features$value)
-    res@features <- rbind(x@features, y@features)
-    message(now(), " have ", nrow(res@features), " entries")
-    message(now(), " done merging")
+    if (is.null(x@features)) {
+        if (is.null(y@features)) {
+            res@features <- NULL
+        } else {
+            res@features <- y@features
+        }
+    } else {
+        if (is.null(y@features)) {
+            res@features <- x@features
+        } else {
+            message(lubridate::now(), " merging features")
+            res@features <- rbind(x@features, y@features)
+        }
+    }
+    message(lubridate::now(), " done merging")
     return(res)
+})
 
-    message(now(), " converted")
-    str(x@features)
-    res@features <- S4Vectors::merge(
-                                   x@features,
-                                   y@features,
-                                   by=names(x@features),
-                                   all=TRUE,
-                                   no.dups=TRUE,
-                                   sort = TRUE
-                               )
-    message(now(), " have ", nrow(res@features), " entries")
-    message(now(), " done merging")
-    return(res)
+setMethod("unique", signature("VirProf"), function(x) {
+    xfeatures <- sort(x@features)
+    x@features[S4Vectors::selfmatch(x@features) == seq_len(nrow(x@features)), ]
+    x
 })
 
 #' The actual plot function
