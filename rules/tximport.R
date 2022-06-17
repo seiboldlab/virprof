@@ -93,6 +93,9 @@ library(dplyr)
 library(magrittr)
 library(purrr)
 library(jsonlite)
+library(fs)
+library(stringr)
+library(tidyr)
 
 metadata <- list(
     date = date(),
@@ -110,6 +113,47 @@ message("2.2. ----------- Loading GTF ----------")
 message("Filename = ", snakemake@input$gtf)
 gr <- rtracklayer::import.gff(snakemake@input$gtf)
 
+message("2.3. ----------- Loading MultiQC Report Data ----------")
+
+# FastQC
+for (n in c(1,2)) {
+    suffix = c("", "_1")[n]
+    round = c("raw", "trimmed")[n]
+    fastqc_fn <- path(
+        snakemake@input$multiqc,
+        str_glue("multiqc_fastqc{suffix}.txt")
+    )
+    if (fs::file_exists(fastqc_fn)) {
+        df <- read_tsv(fastqc_fn, show_col_types = FALSE) %>%
+            # Sequence length can be `95` or `95-151`, split here
+            tidyr::separate(
+                col = `Sequence length`,
+                into = c("read_len_min", "read_len_max"),
+                convert = TRUE,
+                fill = "right"
+            ) %>%
+            {print(.); .} %>%
+            transmute(
+                sample = sub(".R[12]$", "", Sample),
+                mate = if_else(str_ends(Sample, "R2"), "R2", "R1"),
+                num_reads = `Total Sequences`,
+                read_len_min,
+                read_len_max = if_else(
+                    is.na(read_len_max), read_len_min, read_len_max
+                ),
+                read_len_avg = avg_sequence_length,
+                pct_gc = `%GC`,
+                # This is the percentage of unique reads (dedup/total)
+                pct_unique = total_deduplicated_percentage,
+                trimmed = round == "trimmed"
+            )
+        if (is.null(metadata$fastqc)) {
+            metadata$fastqc <- df
+        } else {
+            metadata$fastqc <- bind_rows(metadata$fastqc, df)
+        }
+    }
+}
 
 if (snakemake@params$input_type == "Salmon") {
     message("3.1. ---------- Checking for empty samples --------")
@@ -235,82 +279,85 @@ if (snakemake@params$input_type == "ExonSE") {
     message("Filename = ", snakemake@output$counts)
     saveRDS(se, snakemake@output$counts)
     saveRDS(se, snakemake@output$transcripts)
-    } else {
+} else {
 
-message("4.2. ----------- Preparing rowData (gene sheet) ----------")
-txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]  # only transcript rows
-txmeta <- subset(txmeta, select = -type)
-rownames(txmeta) <- txmeta$transcript_id  # set names
-txmeta <- txmeta[rownames(txi$counts), ]  # only rows for which we have counts
-txmeta <- Filter(function(x)!all(is.na(x)), txmeta)  # remove all-NA columns
+    message("4.2. ----------- Preparing rowData (gene sheet) ----------")
+    txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]  # only transcript rows
+    txmeta <- subset(txmeta, select = -type)
+    rownames(txmeta) <- txmeta$transcript_id  # set names
+    txmeta <- txmeta[rownames(txi$counts), ]  # only rows for which we have counts
+    txmeta <- Filter(function(x)!all(is.na(x)), txmeta)  # remove all-NA columns
 
-message("4.3. ----------- Creating object ----------")
-se <- SummarizedExperiment(
-    assays = txi[c("counts", "abundance", "length")],
-    rowData = txmeta,
-    colData = coldata,
-    metadata = c(
-        metadata,
-        list(
-            countsFromAbundance = txi$countsFromAbundance  # should be no
+    message("4.3. ----------- Creating object ----------")
+    se <- SummarizedExperiment(
+        assays = txi[c("counts", "abundance", "length")],
+        rowData = txmeta,
+        colData = coldata,
+        metadata = c(
+            metadata,
+            list(
+                countsFromAbundance = txi$countsFromAbundance  # should be no
+            )
         )
     )
-)
 
-message("5. ----------- Writing RDS with transcript se object ----------")
-message("Filename = ", snakemake@output$transcripts)
-saveRDS(se, snakemake@output$transcripts)
+    message("5. ----------- Writing RDS with transcript se object ----------")
+    message("Filename = ", snakemake@output$transcripts)
+    saveRDS(se, snakemake@output$transcripts)
 
-if (snakemake@params$input_type == "Salmon") {
-    message("6. ----------- Summarizing transcript counts to gene counts ----------")
-    txi_genes <- summarizeToGene(txi, txmeta[,c("transcript_id", "gene_id")])
-} else if (snakemake@params$input_type == "RSEM") {
-    gene_files <- snakemake@input$counts
-    names(gene_files) <- gsub(".genes.results", "", basename(gene_files))
-    txi_genes <- tximport(gene_files, type = "rsem", txIn = FALSE, txOut = FALSE)
-   
-    ## Something inside of tximport seems to reset the log sink on the
-    ## second call. Resetting it here:
-    sink(logfile)
-    sink(logfile, type="message")
-}
+    if (snakemake@params$input_type == "Salmon") {
+        message("6. ----------- Summarizing transcript counts to gene counts ----------")
+        txi_genes <- summarizeToGene(txi, txmeta[,c("transcript_id", "gene_id")])
+    } else if (snakemake@params$input_type == "RSEM") {
+        gene_files <- snakemake@input$counts
+        names(gene_files) <- gsub(".genes.results", "", basename(gene_files))
+        txi_genes <- tximport(gene_files, type = "rsem", txIn = FALSE, txOut = FALSE)
 
-message("7. ----------- Assembling SummarizedExperiment ----------")
-gmeta <-  mcols(gr)[mcols(gr)$type=="gene", ]  # only transcript rows
-gmeta <- subset(gmeta, select = -type)
-rownames(gmeta) <- gmeta$gene_id  # set names
-gmeta <- gmeta[rownames(txi_genes$counts), ]  # only rows for which we have counts
-gmeta <- Filter(function(x)!all(is.na(x)), gmeta)  # remove all-NA columns
-
-gse <- SummarizedExperiment(
-    assays = txi_genes[c("counts", "abundance", "length")],
-    colData = coldata,
-    rowData = gmeta,
-    metadata = c(
-        metadata,
-        list(
-            countsFromAbundance = txi_genes$countsFromAbundance  # should be no
-        )
-    )
-)
-
-message("Rounding counts to keep DESeq2 happy")
-assay(gse) <- round(assay(gse))
-mode(assay(gse)) <- "integer"
-
-## Rename length assay IFF we are having counts, not TPM
-## (not sure if otherwise is possible with Salmon, but since this is
-## checked inside of deseq/tximeta, let's do check here as well).
-if (snakemake@params$input_type == "Salmon") {
-    if (txi_genes$countsFromAbundance == "no") {
-        message("Renaming length assay to avgTxLength so DESeq2 will use for size estimation")
-        assayNames(gse)[assayNames(gse) == "length"] <- "avgTxLength"
+        ## Something inside of tximport seems to reset the log sink on the
+        ## second call. Resetting it here:
+        sink(logfile)
+        sink(logfile, type="message")
     }
-}
 
-message("8. ----------- Writing RDS with gene se object ----------")
-message("Filename = ", snakemake@output$transcripts)
-saveRDS(gse, snakemake@output$counts)
+    message("7. ----------- Assembling SummarizedExperiment ----------")
+    gmeta <-  mcols(gr)[mcols(gr)$type=="gene", ]  # only transcript rows
+    gmeta <- subset(gmeta, select = -type)
+    rownames(gmeta) <- gmeta$gene_id  # set names
+    gmeta <- gmeta[rownames(txi_genes$counts), ]  # only rows for which we have counts
+    gmeta <- Filter(function(x)!all(is.na(x)), gmeta)  # remove all-NA columns
 
+    gse <- SummarizedExperiment(
+        assays = txi_genes[c("counts", "abundance", "length")],
+        colData = coldata,
+        rowData = gmeta,
+        metadata = c(
+            metadata,
+            list(
+                countsFromAbundance = txi_genes$countsFromAbundance  # should be no
+            )
+        )
+    )
+
+    message("Rounding counts to keep DESeq2 happy")
+    assay(gse) <- round(assay(gse))
+    mode(assay(gse)) <- "integer"
+
+    ## Rename length assay IFF we are having counts, not TPM
+    ## (not sure if otherwise is possible with Salmon, but since this is
+    ## checked inside of deseq/tximeta, let's do check here as well).
+    if (snakemake@params$input_type == "Salmon") {
+        if (txi_genes$countsFromAbundance == "no") {
+            message("Renaming length assay to avgTxLength so DESeq2 will use for size estimation")
+            assayNames(gse)[assayNames(gse) == "length"] <- "avgTxLength"
+        }
+    }
+
+    message("8. ----------- Writing RDS with gene se object ----------")
+    message("Filename = ", snakemake@output$transcripts)
+    saveRDS(gse, snakemake@output$counts)
+
+    message("8. ----------- Writing RDS with metadata object ----------")
+    message("Filename = ", snakemake@output$transcripts)
+    saveRDS(metadata(gse), snakemake@output$stats)
 }
 message("done")

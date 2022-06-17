@@ -1,17 +1,21 @@
 Env(name="vp_rnaseq_r", base="bioconda", packages=[
     "bioconductor-tximport",
     "bioconductor-tximeta",
-    "r-readr",  # faster read
     "bioconductor-genomicfeatures",
     "bioconductor-genomicranges",
     "bioconductor-genomicalignments",
     "bioconductor-biocparallel",
-    "r-jsonlite",
-    "r-purrr",
-    "r-dplyr",
-    "r-magrittr",
     "bioconductor-rtracklayer",
     "bioconductor-summarizedexperiment",
+    "r-readr",  # faster read
+    "r-dplyr",
+    "r-magrittr",
+    "r-purrr",
+    "r-jsonlite",
+    "r-tidyr",
+    "r-fs",
+    "r-stringr",
+    "r-tidyr",
 ])
 
 
@@ -25,6 +29,7 @@ with Stage("tximport_vp") as S:
             ["exon.se.rds"],  # our own exon counting
         ],
         gtf = [["gtf"]],
+        multiqc = [["/multiqc_report_data"]],
     )
 
     rule vp_tximport_rsem:
@@ -35,9 +40,11 @@ with Stage("tximport_vp") as S:
             transcripts = "{:prev:}/{:target:}.isoforms.results",
             gtf = "{:prev:}/{:target:}.gtf",
             meta = "{:project:}/qiime_mapping.tsv",
+            multiqc = "{:prev:}/multiqc_report_data",
         output:
             counts = "{:this:}/{target}.gene_counts.rds",
             transcripts = "{:this:}/{target}.tx_counts.rds",
+            stats = "{:this:}/{target}.stats.rds"
         params:
             input_type = "RSEM",
             version = ymp.get_config()._config.userdata.virprof.version,
