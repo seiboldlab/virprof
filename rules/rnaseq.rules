@@ -139,11 +139,13 @@ with Stage("report_vp") as S:
         input:
             "{:prev:}/{:target:}.gene_counts.rds",
             "{:prev:}/{:target:}.tx_counts.rds",
+            "{:prev:}/{:target:}.stats.rds",
             "{:prev:}/multiqc_report.html",
             directory("{:prev:}/multiqc_report_data"),
         output:
             "{:this:}/{target}.gene_counts.rds",
             "{:this:}/{target}.tx_counts.rds",
+            "{:this:}/{target}.stats.rds",
             "{:this:}/{target}.multiqc_report.html",
             directory("{:this:}/{target}.multiqc_report_data"),
         log:
