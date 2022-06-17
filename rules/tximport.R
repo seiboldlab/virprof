@@ -96,6 +96,8 @@ library(jsonlite)
 library(fs)
 library(stringr)
 library(tidyr)
+library(tibble)
+library(DESeq2)
 
 metadata <- list(
     date = date(),
@@ -352,11 +354,86 @@ if (snakemake@params$input_type == "ExonSE") {
         }
     }
 
-    message("8. ----------- Writing RDS with gene se object ----------")
+    message("8. ----------- Collecting mappign metadata ----------")
+
+    mito_genes <- rowData(gse) %>%
+        as_tibble() %>%
+        filter(str_detect(gene_name, "^MT-")) %>%
+        pull(gene_id)
+
+    ribo_genes <-
+        rowData(gse) %>%
+        as_tibble() %>%
+        filter(gene_type %in% c("rRNA", "rRNA_pseudogene")) %>%
+        pull(gene_id)
+
+    non_coding_genes <-
+        rowData(gse) %>%
+        as_tibble() %>%
+        filter(
+            gene_type != "protein_coding",
+            !gene_id %in% c(mito_genes, ribo_genes)
+        ) %>%
+        pull(gene_id)
+
+    coding_genes <- rowData(gse) %>%
+        as_tibble() %>%
+        filter(
+            !gene_id %in% c(mito_genes, ribo_genes, non_coding_genes)
+        ) %>%
+        pull(gene_id)
+
+    mapping <- colSums(assay(gse)) %>%
+        enframe(name = idcolumns[[1]], value = "count_total") %>%
+        left_join(
+            colSums(assay(gse)[mito_genes,]) %>%
+                enframe(name = idcolumns[[1]], value = "count_mito"),
+            by = idcolumns[[1]]
+        ) %>%
+        left_join(
+            colSums(assay(gse)[ribo_genes,]) %>%
+                enframe(name = idcolumns[[1]], value = "count_ribo"),
+            by = idcolumns[[1]]
+        ) %>%
+        left_join(
+            colSums(assay(gse)[non_coding_genes,]) %>%
+                enframe(name = idcolumns[[1]], value = "count_noncoding"),
+            by = idcolumns[[1]]
+        ) %>%
+        left_join(
+            colSums(assay(gse)[coding_genes,] > 0) %>%
+                enframe(name = idcolumns[[1]], value = "num_expr_genes"),
+            by = idcolumns[[1]]
+        ) %>%
+        transmute(
+            across(all_of(idcolumns[[1]])),
+            pct_mito = count_mito/count_total,
+            pct_ribo = count_ribo/count_total,
+            pct_noncoding = count_noncoding/count_total,
+            num_expr_genes
+        )
+
+    message("8. ----------- Try Generating PCA data ----------")
+
+    tryCatch({
+        dds <- DESeqDataSet(gse[coding_genes,], design = ~ 1)
+        dds <- dds[ rowSums(counts(dds)) > 0, ]
+        dds <- estimateSizeFactors(dds)
+        vsd <- DESeq2::varianceStabilizingTransformation(dds)
+        pca <- plotPCA(vsd, intgroup = idcolumns[[1]], returnData = TRUE) %>%
+            select(all_of(idcolumns[[1]], PC1, PC2))
+        mapping <- left_join(mapping, pca, by = idcolumns[[1]])
+        metadata(gse)$mapping <- mapping
+        message("Success")
+    }, error = function(err) {
+        message("Failed - Going on")
+    })
+
+    message("9. ----------- Writing RDS with gene se object ----------")
     message("Filename = ", snakemake@output$transcripts)
     saveRDS(gse, snakemake@output$counts)
 
-    message("8. ----------- Writing RDS with metadata object ----------")
+    message("10. ----------- Writing RDS with metadata object ----------")
     message("Filename = ", snakemake@output$transcripts)
     saveRDS(metadata(gse), snakemake@output$stats)
 }
