@@ -1,8 +1,17 @@
 CHANGELOG
 ---------
+v0.6.0:
+ - add VP S4 object carrying pathogen data
+ - fix error on empty (after qc, after human deplete) fastq
+ - fix numeric sample names break merge
+ - add named report export to pathogen pipeline
+ - fix raw depleted reads kept unnecessarily (space optimize)
+ - add incorporation of QC stats into gene RDS
+ - add export of metadata only RDS
+
 v0.5.0:
- - added workflow for extracting exon counts (with R GenomicAlignments)
- - added workflows for handling UMIs on bulk RNA-seq data
+ - add workflow for extracting exon counts (with R GenomicAlignments)
+ - add workflows for handling UMIs on bulk RNA-seq data
 
 v0.4.0:
  - changed RNA-seq pipelines to use STAR "twopassMode Basic"
