@@ -134,13 +134,12 @@ for (n in c(1,2)) {
                 convert = TRUE,
                 fill = "right"
             ) %>%
-            {print(.); .} %>%
             transmute(
                 sample = sub(".R[12]$", "", Sample),
                 mate = if_else(str_ends(Sample, "R2"), "R2", "R1"),
                 num_reads = `Total Sequences`,
                 read_len_min,
-                read_len_max = if_else(
+                read_len_max = ifelse(
                     is.na(read_len_max), read_len_min, read_len_max
                 ),
                 read_len_avg = avg_sequence_length,
@@ -421,13 +420,14 @@ if (snakemake@params$input_type == "ExonSE") {
         dds <- estimateSizeFactors(dds)
         vsd <- DESeq2::varianceStabilizingTransformation(dds)
         pca <- plotPCA(vsd, intgroup = idcolumns[[1]], returnData = TRUE) %>%
-            select(all_of(idcolumns[[1]], PC1, PC2))
+            select(all_of(idcolumns[[1]]), PC1, PC2)
         mapping <- left_join(mapping, pca, by = idcolumns[[1]])
-        metadata(gse)$mapping <- mapping
         message("Success")
     }, error = function(err) {
+        print(err)
         message("Failed - Going on")
     })
+    metadata(gse)$mapping <- mapping
 
     message("9. ----------- Writing RDS with gene se object ----------")
     message("Filename = ", snakemake@output$transcripts)
