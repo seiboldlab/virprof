@@ -353,7 +353,7 @@ if (snakemake@params$input_type == "ExonSE") {
         }
     }
 
-    message("8. ----------- Collecting mappign metadata ----------")
+    message("8. ----------- Collecting mapping metadata ----------")
 
     mito_genes <- rowData(gse) %>%
         as_tibble() %>%
@@ -435,6 +435,7 @@ if (snakemake@params$input_type == "ExonSE") {
 
     message("10. ----------- Writing RDS with metadata object ----------")
     message("Filename = ", snakemake@output$transcripts)
+    metadata(gse)$coldata <- colData(gse)
     saveRDS(metadata(gse), snakemake@output$stats)
 }
 message("done")
