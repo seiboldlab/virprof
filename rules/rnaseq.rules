@@ -8,6 +8,7 @@ Env(name="vp_rnaseq_r", base="bioconda", packages=[
     "bioconductor-rtracklayer",
     "bioconductor-summarizedexperiment",
     "bioconductor-deseq2",
+    "r-lubridate",
     "r-readr",  # faster read
     "r-dplyr",
     "r-magrittr",

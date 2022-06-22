@@ -98,9 +98,9 @@ library(stringr)
 library(tidyr)
 library(tibble)
 library(DESeq2)
+library(lubridate)
 
 metadata <- list(
-    date = date(),
     virprof_version = snakemake@params$version,
     pipeline = snakemake@params$label
 )
@@ -272,6 +272,8 @@ coldata <- samples %>%
         extra_coldata,
         by = set_names("idcolumn", idcolumns[[1]])
     )
+
+metadata$date = now()
 
 if (snakemake@params$input_type == "ExonSE") {
     stopifnot(all(colnames(se) == coldata[idcolumns[[1]]]))
