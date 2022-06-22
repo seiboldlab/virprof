@@ -417,7 +417,9 @@ if (snakemake@params$input_type == "ExonSE") {
     tryCatch({
         dds <- DESeqDataSet(gse[coding_genes,], design = ~ 1)
         dds <- dds[ rowSums(counts(dds)) > 0, ]
-        dds <- estimateSizeFactors(dds)
+        # Using poscounts type size factor estimation so we don't fail
+        # if there is no gene without zeros.
+        dds <- estimateSizeFactors(dds, type = "poscounts")
         vsd <- DESeq2::varianceStabilizingTransformation(dds)
         pca <- plotPCA(vsd, intgroup = idcolumns[[1]], returnData = TRUE) %>%
             select(all_of(idcolumns[[1]]), PC1, PC2)
