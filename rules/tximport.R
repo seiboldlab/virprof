@@ -408,9 +408,9 @@ if (snakemake@params$input_type == "ExonSE") {
         ) %>%
         transmute(
             across(all_of(idcolumns[[1]])),
-            pct_mito = count_mito/count_total,
-            pct_ribo = count_ribo/count_total,
-            pct_noncoding = count_noncoding/count_total,
+            pct_mito = count_mito / count_total * 100,
+            pct_ribo = count_ribo / count_total * 100,
+            pct_noncoding = count_noncoding / count_total * 100,
             num_expr_genes
         )
 
