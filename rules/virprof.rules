@@ -395,7 +395,7 @@ with Stage("bin_vp") as S:
             filter_lineage = "^Virus",
         shell:
             "exec >{log} 2>&1;"
-            "ulimit -Hn 4096;"  # may need a lot of files
+            "ulimit -Sn 50000;"  # may need a lot of files
             "{BIN}/virprof find-bins"
             " --in-call-files {input.call_flist}"
             " --in-fasta-files {input.fasta_flist}"
