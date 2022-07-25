@@ -40,7 +40,7 @@ with Stage("get_unmapped_vp") as S:
     )
     rule vp_unmapped_from_bam:
         message:
-            "{:name:}: {output.pairs[0]} from BAM"
+            "{:name:}: {input.bam}"
         input:
             bam =  "{:prev:}/{target}.bam"
         output:
