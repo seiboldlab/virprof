@@ -22,6 +22,12 @@ references:
     - type: pipeline
       stages:
         - index_blast
+    - type: pipeline
+      stages:
+        - index_fasta
+    - type: pipeline
+      stages:
+        - index_tx_fasta
 
   # Human reference for test data (contains only start of chr1)
   hg38gtest:
@@ -69,6 +75,13 @@ references:
     - type: pipeline
       stages:
         - index_blast
+    - type: pipeline
+      stages:
+        - index_fasta
+    - type: pipeline
+      stages:
+        - index_tx_fasta
+
 
   # NCBI Nucleotide database for Blast
   NT:
