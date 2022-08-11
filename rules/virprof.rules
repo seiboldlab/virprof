@@ -88,7 +88,7 @@ with Stage("get_unmapped_vp") as S:
         threads:
             8
         resources:
-            mem="80g"
+            mem="120g" # 80g sufficed for <48GB/fq.gz
         params:
             pattern = "u"
         conda:
