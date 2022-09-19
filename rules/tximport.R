@@ -80,7 +80,6 @@ read_json_nolist <- function(fname, ...) {
     tmp[sapply(tmp, function(x) length(x) == 1)]
 }
 
-
 message("Importing ", snakemake@params$input_type, " data into R")
 
 message("1. ----------- Loading packages ----------")
@@ -213,16 +212,15 @@ if (snakemake@params$input_type == "Salmon") {
         message("Warning: excluded ", length(which(no_data)),
                 " empty samples:")
         message("  ", paste(names(files[no_data]), collapse = ", "))
-        metadata$excluded_empty_samples <- names(files[no_data])
-        files <- files[!no_data]
+        metadata$empty_samples <- names(files[no_data])
     }
 
     message("3.2. ----------- Loading quant.sf files ----------")
-    txi <- tximport(files, type="salmon", txOut=TRUE)
+    txi <- tximport(files[!no_data], type="salmon", txOut=TRUE)
 
     message("3.3. ----------- Loading meta_info.json files ----------")
     salmon_all_meta <-
-        files %>%
+        files[!no_data] %>%
         gsub("/quant.sf", "/aux_info/meta_info.json", .) %>%
         purrr::map_df(read_json_nolist, simplifyVector = TRUE,
                       .id = "idcolumn")
@@ -246,8 +244,8 @@ if (snakemake@params$input_type == "Salmon") {
 
     if (length(intersect(colnames(extra_coldata), must_be_identical)) > 0) {
         errorfn = paste0(logfile, ".error.csv")
-        message("Samples were run with multiple references or varried parameters.",
-                "Refusing to aggregate.",
+        message("Samples were run with multiple references or ",
+                "varied parameters. Refusing to aggregate.",
                 "Writing coldata to ", errorfn)
         readr::write_csv(extra_coldata, errorfn)
         stop()
@@ -259,6 +257,25 @@ if (snakemake@params$input_type == "Salmon") {
             across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1])
         ) %>%
         as.list()
+
+    if (length(metadata$empty_samples) > 0) {
+        txi$abundance <- rep(0, nrow(txi$abundance)) %>%
+            matrix(ncol = length(metadata$empty_samples)) %>%
+            set_colnames(metadata$empty_samples) %>%
+            cbind(txi$abundance, .)
+        txi$abundance <- txi$abundance[,names(files)]
+        txi$counts <- rep(0, nrow(txi$counts)) %>%
+            matrix(ncol = length(metadata$empty_samples)) %>%
+            set_colnames(metadata$empty_samples) %>%
+            cbind(txi$counts, .)
+        txi$counts <- txi$counts[,names(files)]
+        txi$length <- rep(rowMeans(txi$length),
+                          length(metadata$empty_samples)) %>%
+            matrix(ncol = length(metadata$empty_samples)) %>%
+            set_colnames(metadata$empty_samples) %>%
+            cbind(txi$length, .)
+        txi$length <- txi$length[,names(files)]
+    }
 } else if (snakemake@params$input_type == "RSEM") {
     files <- snakemake@input$transcripts
     names(files) <- gsub(".isoforms.results", "", basename(files))
@@ -307,8 +324,6 @@ coldata <- sample_sheet %>%
     # Make sure all idcolumns are character type (we don't want these
     # numeric)
     mutate(across(all_of(idcolumns), as.character)) %>%
-    # Remove samples (really, results) filtered out above
-    filter(.data[[idcolumns[1]]] %in% names(files)) %>%
     # Group sample sheet to match active result grouping
     group_by(across(all_of(idcolumns))) %>%
     summarize(
@@ -471,6 +486,7 @@ if (snakemake@params$input_type == "ExonSE") {
 
     tryCatch({
         dds <- DESeqDataSet(gse[coding_genes,], design = ~ 1)
+        dds <- dds[ , colSums(counts(dds)) > 0 ]
         dds <- dds[ rowSums(counts(dds)) > 0, ]
         # Using poscounts type size factor estimation so we don't fail
         # if there is no gene without zeros.
@@ -491,7 +507,7 @@ if (snakemake@params$input_type == "ExonSE") {
     saveRDS(gse, snakemake@output$counts)
 
     message("10. ----------- Writing RDS with metadata object ----------")
-    message("Filename = ", snakemake@output$transcripts)
+    message("Filename = ", snakemake@output$stats)
     metadata(gse)$coldata <- colData(gse)
     saveRDS(metadata(gse), snakemake@output$stats)
 }

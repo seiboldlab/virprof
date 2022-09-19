@@ -6,6 +6,8 @@ v0.7.0:
    the respective mate as well as the remainder of the columns from
    the primary project table (for later grouping).
  - add entire sample sheet as metadata(se)$sample_sheet
+ - fill assay matrix with zero or fake length for samples that failed
+   salmon quantification.
 
 v0.6.1:
  - store coldata object in metadata
