@@ -108,8 +108,8 @@ metadata <- list(
 message("2. ----------- Loading files ----------")
 message("2.1. ----------- Loading Sample Sheet ----------")
 message("Filename = ", snakemake@input$meta)
-samples <- read_tsv(snakemake@input$meta)
-samples <- Filter(function(x)!all(is.na(x)), samples)  # remove all-NA columns
+sample_sheet <- read_tsv(snakemake@input$meta)
+sample_sheet <- Filter(function(x)!all(is.na(x)), sample_sheet)  # remove all-NA columns
 
 message("2.2. ----------- Loading GTF ----------")
 message("Filename = ", snakemake@input$gtf)
@@ -119,8 +119,8 @@ message("2.3. ----------- Loading MultiQC Report Data ----------")
 
 # FastQC
 for (n in c(1,2)) {
-    suffix = c("", "_1")[n]
-    round = c("raw", "trimmed")[n]
+    suffix <- c("", "_1")[n]
+    round <- c("raw", "trimmed")[n]
     fastqc_fn <- path(
         snakemake@input$multiqc,
         str_glue("multiqc_fastqc{suffix}.txt")
@@ -135,6 +135,7 @@ for (n in c(1,2)) {
                 fill = "right"
             ) %>%
             transmute(
+                # filename is just sample.R[12].fq.gz, ignoring
                 sample = sub(".R[12]$", "", Sample),
                 mate = if_else(str_ends(Sample, "R2"), "R2", "R1"),
                 num_reads = `Total Sequences`,
@@ -236,22 +237,24 @@ message("4. ----------- Assembling SummarizedExperiment ----------")
 message("4.1. ----------- Preparing colData (sample sheet) -----------")
 
 # Extract the columns used with the active grouping to identify the samples:
-idcolumns <- names(which(sapply(samples, function(x) {
+idcolumns <- names(which(sapply(sample_sheet, function(x) {
     n_distinct(x) == length(x) && # column must be unique
         all(names(files) %in% as.character(x)) # must identify each sample
 })))
 
 if (length(idcolumns) == 0) {
-    message("The sample sheet columns and file names didn't match up. Something is wrong. Bailing out.")
+    message("The sample sheet columns and file names didn't match up.",
+            " Something is wrong. Bailing out.")
     message("samples:")
-    print(as.data.frame(samples))
+    print(as.data.frame(sample_sheet))
     message("files:")
     print(as.data.frame(files))
     stop("Unable to determine id columns")
 }
 
-coldata <- samples %>%
-    # Make sure all idcolumns are character type (we don't want these numeric)
+coldata <- sample_sheet %>%
+    # Make sure all idcolumns are character type (we don't want these
+    # numeric)
     mutate(across(all_of(idcolumns), as.character)) %>%
     # Remove samples (really, results) filtered out above
     filter(.data[[idcolumns[1]]] %in% names(files)) %>%
@@ -261,7 +264,8 @@ coldata <- samples %>%
         # Columns with group unique values get that value assigned
         across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1]),
         # Columns with multiple values get them semi colon separated
-        across(where(~ length(unique(.x)) > 1), ~ paste(as.character(.x), collapse=";")),
+        across(where(~ length(unique(.x)) > 1),
+               ~ paste(as.character(.x), collapse=";")),
         # Also attach the count of units grouped
         num_units=n(),
         .groups="drop"
