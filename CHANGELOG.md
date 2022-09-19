@@ -1,5 +1,11 @@
 CHANGELOG
 ---------
+v0.7.0:
+ - improve metadata(se)$fastqc: now includes the fastq_file_path for
+   the respective mate as well as the remainder of the columns from
+   the primary project table (for later grouping).
+ - add entire sample sheet as metadata(se)$sample_sheet
+
 v0.6.0:
  - add VP S4 object carrying pathogen data
  - fix error on empty (after qc, after human deplete) fastq

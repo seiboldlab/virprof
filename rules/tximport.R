@@ -103,9 +103,9 @@ library(lubridate)
 message("2. ----------- Loading files ----------")
 message("2.1. ----------- Loading Sample Sheet ----------")
 message("Filename = ", snakemake@input$meta)
-sample_sheet <-
-    read_tsv(snakemake@input$meta, show_col_types = FALSE) %>%
-    select(where(~!all(is.na(.)))
+
+sample_sheet <- read_tsv(snakemake@input$meta, show_col_types = FALSE) %>%
+    select(where(~!all(is.na(.))))
 
 metadata <- list(
     virprof_version = snakemake@params$version,
@@ -114,11 +114,7 @@ metadata <- list(
     sample_sheet = sample_sheet
 )
 
-message("2.2. ----------- Loading GTF ----------")
-message("Filename = ", snakemake@input$gtf)
-gr <- rtracklayer::import.gff(snakemake@input$gtf)
-
-message("2.3. ----------- Loading MultiQC Report Data ----------")
+message("2.2. ----------- Loading MultiQC Report Data ----------")
 
 # FastQC
 for (n in c(1,2)) {
@@ -139,7 +135,7 @@ for (n in c(1,2)) {
             ) %>%
             transmute(
                 # filename is just sample.R[12].fq.gz, ignoring
-                sample = sub(".R[12]$", "", Sample),
+                fastqc_id = sub(".R[12]$", "", Sample),
                 mate = if_else(str_ends(Sample, "R2"), "R2", "R1"),
                 num_reads = `Total Sequences`,
                 read_len_min,
@@ -152,6 +148,46 @@ for (n in c(1,2)) {
                 pct_unique = total_deduplicated_percentage,
                 trimmed = round == "trimmed"
             )
+        # Find columns identifying the fastqc files in sample sheet
+        fastqc_idcolumns <- names(which(sapply(sample_sheet, function(x) {
+            n_distinct(x) == length(x) && # column must be unique
+                # must identify each sample
+                all(df$fastqc_id %in% as.character(x))
+        })))
+        if (length(fastqc_idcolumns) == 0) {
+            rlang::abort(paste(
+                "Can't find columns identifying files.",
+                "Check whether {project}/qiime_mapping.csv is up to date"
+            ))
+        }
+        message("FastQC data in ", round, " identified by: ",
+                paste(fastqc_idcolumns, collapse = ", "))
+        # Extract paths
+        fastq_id_to_path <- sample_sheet %>%
+            pivot_longer(
+                cols = where(~any(str_detect(., "(fastq|fq).gz"),
+                           # must return T/F, no NA to where:
+                                  na.rm = TRUE )),
+                values_to = "fastq_file_path"
+            ) %>%
+            mutate(
+                # Deduce mate from file name
+                mate = if_else(str_detect(fastq_file_path, "R1"),
+                                     "R1", "R2")
+            ) %>%
+            # Remove anything we can't uniquely match
+            group_by(across(fastqc_idcolumns[1]), mate) %>%
+            filter(n() == 1) %>%
+            ungroup()
+        # Merge this into the fastqc df
+        df <- df %>%
+            left_join(
+                fastq_id_to_path,
+                by = c(fastqc_id = fastqc_idcolumns[[1]], "mate")
+            )
+        # Rename sample column to it's name from the sample sheet
+        df <- df %>% rename("{fastqc_idcolumns[1]}" := fastqc_id)
+
         if (is.null(metadata$fastqc)) {
             metadata$fastqc <- df
         } else {
@@ -159,6 +195,10 @@ for (n in c(1,2)) {
         }
     }
 }
+
+message("2.3. ----------- Loading GTF ----------")
+message("Filename = ", snakemake@input$gtf)
+gr <- rtracklayer::import.gff(snakemake@input$gtf)
 
 if (snakemake@params$input_type == "Salmon") {
     message("3.1. ---------- Checking for empty samples --------")
