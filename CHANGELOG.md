@@ -1,10 +1,17 @@
 CHANGELOG
 ---------
+
 v0.7.0:
  - improve metadata(se)$fastqc: now includes the fastq_file_path for
    the respective mate as well as the remainder of the columns from
    the primary project table (for later grouping).
  - add entire sample sheet as metadata(se)$sample_sheet
+
+v0.6.1:
+ - store coldata object in metadata
+ - fix PCA-for-QC calculation breaks on zeros; now uses type=poscounts
+   for estimating size factors.
+ - fix pct_* variables containing range 0 to 1 (not 0 - 100)
 
 v0.6.0:
  - add VP S4 object carrying pathogen data
@@ -18,6 +25,8 @@ v0.6.0:
 v0.5.0:
  - add workflow for extracting exon counts (with R GenomicAlignments)
  - add workflows for handling UMIs on bulk RNA-seq data
+ - convert Gencode reference fasta.gz to bgzip with index
+ - fix ulimit issue with large number of genomes detected
 
 v0.4.0:
  - changed RNA-seq pipelines to use STAR "twopassMode Basic"
