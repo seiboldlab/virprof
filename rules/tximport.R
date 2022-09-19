@@ -103,9 +103,9 @@ library(lubridate)
 message("2. ----------- Loading files ----------")
 message("2.1. ----------- Loading Sample Sheet ----------")
 message("Filename = ", snakemake@input$meta)
-sample_sheet <- read_tsv(snakemake@input$meta) %>%
-    # remove all-NA columns
-    Filter(function(x)!all(is.na(x)), sample_sheet)
+sample_sheet <-
+    read_tsv(snakemake@input$meta, show_col_types = FALSE) %>%
+    select(where(~!all(is.na(.)))
 
 metadata <- list(
     virprof_version = snakemake@params$version,
