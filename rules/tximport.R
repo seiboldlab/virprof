@@ -100,16 +100,19 @@ library(tibble)
 library(DESeq2)
 library(lubridate)
 
-metadata <- list(
-    virprof_version = snakemake@params$version,
-    pipeline = snakemake@params$label
-)
-
 message("2. ----------- Loading files ----------")
 message("2.1. ----------- Loading Sample Sheet ----------")
 message("Filename = ", snakemake@input$meta)
-sample_sheet <- read_tsv(snakemake@input$meta)
-sample_sheet <- Filter(function(x)!all(is.na(x)), sample_sheet)  # remove all-NA columns
+sample_sheet <- read_tsv(snakemake@input$meta) %>%
+    # remove all-NA columns
+    Filter(function(x)!all(is.na(x)), sample_sheet)
+
+metadata <- list(
+    virprof_version = snakemake@params$version,
+    pipeline = snakemake@params$label,
+    date = now(),
+    sample_sheet = sample_sheet
+)
 
 message("2.2. ----------- Loading GTF ----------")
 message("Filename = ", snakemake@input$gtf)
@@ -167,7 +170,8 @@ if (snakemake@params$input_type == "Salmon") {
         nrow(read_tsv(fn, n_max = 1, guess_max = 1, col_types = "cdddd")) == 0
     })
     if (any(no_data)) {
-        message("Warning: excluded ", length(which(no_data)), " empty samples:")
+        message("Warning: excluded ", length(which(no_data)),
+                " empty samples:")
         message("  ", paste(names(files[no_data]), collapse = ", "))
         metadata$excluded_empty_samples <- names(files[no_data])
         files <- files[!no_data]
@@ -180,7 +184,8 @@ if (snakemake@params$input_type == "Salmon") {
     salmon_all_meta <-
         files %>%
         gsub("/quant.sf", "/aux_info/meta_info.json", .) %>%
-        purrr::map_df(read_json_nolist, simplifyVector = TRUE, .id = "idcolumn")
+        purrr::map_df(read_json_nolist, simplifyVector = TRUE,
+                      .id = "idcolumn")
 
     # Extract data varying per sample
     extra_coldata <- salmon_all_meta %>%
@@ -236,7 +241,13 @@ message("4. ----------- Assembling SummarizedExperiment ----------")
 
 message("4.1. ----------- Preparing colData (sample sheet) -----------")
 
-# Extract the columns used with the active grouping to identify the samples:
+# Extract the sample sheet columns used to identify the samples. This
+# could be "unit", or c("unit", "sample") or something else that
+# grouping was active on when the counts where generated. We cannot
+# currently handle ids that require multiple columns to be combined.
+#
+# This needs `names(files)` to be the sample names extracted from Salmon
+# or RSEM above. Columns must be unique and containing those names.
 idcolumns <- names(which(sapply(sample_sheet, function(x) {
     n_distinct(x) == length(x) && # column must be unique
         all(names(files) %in% as.character(x)) # must identify each sample
@@ -276,8 +287,6 @@ coldata <- sample_sheet %>%
         extra_coldata,
         by = set_names("idcolumn", idcolumns[[1]])
     )
-
-metadata$date = now()
 
 if (snakemake@params$input_type == "ExonSE") {
     stopifnot(all(colnames(se) == coldata[idcolumns[[1]]]))
