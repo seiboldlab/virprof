@@ -13,6 +13,12 @@ read_json_nolist <- function(fname, ...) {
     tmp[sapply(tmp, function(x) length(x) == 1)]
 }
 
+#' from parallel package - splits list into ncl sub-lists with even
+#' length
+splitList <- function(x, ncl) {
+    lapply(splitIndices(length(x), ncl), function(i) x[i])
+}
+
 message("Importing ", snakemake@params$input_type, " data into R")
 
 message("1. ----------- Loading packages ----------")
@@ -31,6 +37,12 @@ library(tidyr)
 library(tibble)
 library(DESeq2)
 library(lubridate)
+library(parallel)
+library(future)
+library(future.apply)
+library(furrr)
+
+plan(tweak(multicore, workers = snakemake@threads))
 
 message("2. ----------- Loading files ----------")
 message("2.1. ----------- Loading Sample Sheet ----------")
@@ -138,9 +150,14 @@ if (snakemake@params$input_type == "Salmon") {
     names(files) <- gsub(".salmon", "", basename(dirname(files)))
     files <- files[order(names(files))]
 
-    no_data <- sapply(files, function(fn) {
-        nrow(read_tsv(fn, n_max = 1, guess_max = 1, col_types = "cdddd")) == 0
+    no_data <- future_sapply(files, function(fn) {
+        nrow(read_tsv(
+            fn, n_max = 1, guess_max = 1,
+            col_types = "cdddd", lazy = FALSE,
+            progress = FALSE
+        )) == 0
     })
+
     if (any(no_data)) {
         message("Warning: excluded ", length(which(no_data)),
                 " empty samples:")
@@ -149,13 +166,46 @@ if (snakemake@params$input_type == "Salmon") {
     }
 
     message("3.2. ----------- Loading quant.sf files ----------")
-    txi <- tximport(files[!no_data], type="salmon", txOut=TRUE)
+
+    # First, run tximport on threads*2 chunks in parallel as parsing
+    # the files takes quite a while (seconds per file, which adds when
+    # you have thousands of samples).
+    txi_parts <- future_lapply(
+        splitList(files[!no_data], snakemake@threads*2),
+        tximport,
+        type="salmon",
+        txOut=TRUE
+    )
+
+    # Now merge the three assays
+    txi <- list()
+    for (assay in c("abundance", "counts", "length")) {
+        txi[[assay]] <- do.call(
+            cbind,
+            lapply(txi_parts, function(x) x[[assay]])
+        )
+    }
+    txi$countsFromAbundance <- txi_parts[[1]]$countsFromAbundance
+    rm(txi_parts)
+
+    # Add fake data (zero, avg length) for the empty samples
+    if (length(metadata$empty_samples) > 0) {
+        cols <- length(metadata$empty_samples)
+        rows <- nrow(txi$abundance)
+        zeroes <- matrix(rep(0, cols * rows), ncol = cols)
+        colnames(zeroes) <- metadata$empty_samples
+        lengths <- matrix(rep(rowMeans(txi$length), cols), ncol = cols)
+        colnames(lengths) <- metadata$empty_samples
+        txi$counts <- cbind(txi$counts, zeroes)
+        txi$abundance <- cbind(txi$abundance, zeroes)
+        txi$length <- cbind(txi$length, lengths)
+    }
 
     message("3.3. ----------- Loading meta_info.json files ----------")
     salmon_all_meta <-
         files[!no_data] %>%
         gsub("/quant.sf", "/aux_info/meta_info.json", .) %>%
-        purrr::map_df(read_json_nolist, simplifyVector = TRUE,
+        future_map_dfr(read_json_nolist, simplifyVector = TRUE,
                       .id = "idcolumn")
 
     # Extract data varying per sample
@@ -190,25 +240,6 @@ if (snakemake@params$input_type == "Salmon") {
             across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1])
         ) %>%
         as.list()
-
-    if (length(metadata$empty_samples) > 0) {
-        txi$abundance <- rep(0, nrow(txi$abundance)) %>%
-            matrix(ncol = length(metadata$empty_samples)) %>%
-            set_colnames(metadata$empty_samples) %>%
-            cbind(txi$abundance, .)
-        txi$abundance <- txi$abundance[,names(files)]
-        txi$counts <- rep(0, nrow(txi$counts)) %>%
-            matrix(ncol = length(metadata$empty_samples)) %>%
-            set_colnames(metadata$empty_samples) %>%
-            cbind(txi$counts, .)
-        txi$counts <- txi$counts[,names(files)]
-        txi$length <- rep(rowMeans(txi$length),
-                          length(metadata$empty_samples)) %>%
-            matrix(ncol = length(metadata$empty_samples)) %>%
-            set_colnames(metadata$empty_samples) %>%
-            cbind(txi$length, .)
-        txi$length <- txi$length[,names(files)]
-    }
 } else if (snakemake@params$input_type == "RSEM") {
     files <- snakemake@input$transcripts
     names(files) <- gsub(".isoforms.results", "", basename(files))
@@ -276,6 +307,12 @@ coldata <- sample_sheet %>%
         by = set_names("idcolumn", idcolumns[[1]])
     )
 
+# Sort array columns to match coldata
+for (assay in c("counts", "abundance", "length")) {
+    message("Sorting ", assay)
+    txi[[assay]] <- txi[[assay]][, coldata[[ idcolumns[1] ]] ]
+}
+
 if (snakemake@params$input_type == "ExonSE") {
     stopifnot(all(colnames(se) == coldata[idcolumns[[1]]]))
     colData(se) <- as(coldata, "DataFrame")
@@ -284,13 +321,15 @@ if (snakemake@params$input_type == "ExonSE") {
     saveRDS(se, snakemake@output$counts)
     saveRDS(se, snakemake@output$transcripts)
 } else {
-
     message("4.2. ----------- Preparing rowData (gene sheet) ----------")
-    txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]  # only transcript rows
+    # only transcript rows
+    txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]
     txmeta <- subset(txmeta, select = -type)
-    rownames(txmeta) <- txmeta$transcript_id  # set names
-    txmeta <- txmeta[rownames(txi$counts), ]  # only rows for which we have counts
-    txmeta <- Filter(function(x)!all(is.na(x)), txmeta)  # remove all-NA columns
+    rownames(txmeta) <- txmeta$transcript_id
+    # only rows for which we have counts
+    txmeta <- txmeta[rownames(txi$counts), ]
+    # remove all-NA columns
+    txmeta <- Filter(function(x)!all(is.na(x)), txmeta)
 
     message("4.3. ----------- Creating object ----------")
     se <- SummarizedExperiment(

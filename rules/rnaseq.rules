@@ -18,6 +18,9 @@ Env(name="vp_rnaseq_r", base="bioconda", packages=[
     "r-fs",
     "r-stringr",
     "r-tidyr",
+    "r-future",
+    "r-future.apply",
+    "r-furrr"
 ])
 
 
@@ -73,6 +76,10 @@ with Stage("tximport_vp") as S:
             transcripts = [],
         params:
             input_type = "Salmon"
+        threads:
+            16
+        resources:
+            mem = "16G" # suffices for 700 samples
 
 
     rule vp_tximport_exon: # ymp: extends vp_tximport_rsem

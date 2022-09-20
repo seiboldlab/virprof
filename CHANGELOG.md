@@ -8,6 +8,7 @@ v0.7.0:
  - add entire sample sheet as metadata(se)$sample_sheet
  - fill assay matrix with zero or fake length for samples that failed
    salmon quantification.
+ - parallelize parsing of salmon files (speed up big projecs)
 
 v0.6.1:
  - store coldata object in metadata
