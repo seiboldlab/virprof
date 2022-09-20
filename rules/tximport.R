@@ -42,6 +42,10 @@ library(future)
 library(future.apply)
 library(furrr)
 
+# Load faster saveRDS
+snakemake@source("_rds.R")
+
+# Set threads
 plan(tweak(multicore, workers = snakemake@threads))
 
 message("2. ----------- Loading files ----------")
@@ -167,11 +171,11 @@ if (snakemake@params$input_type == "Salmon") {
 
     message("3.2. ----------- Loading quant.sf files ----------")
 
-    # First, run tximport on threads*2 chunks in parallel as parsing
+    # First, run tximport on threads chunks in parallel as parsing
     # the files takes quite a while (seconds per file, which adds when
     # you have thousands of samples).
     txi_parts <- future_lapply(
-        splitList(files[!no_data], snakemake@threads*2),
+        splitList(files[!no_data], snakemake@threads),
         tximport,
         type="salmon",
         txOut=TRUE

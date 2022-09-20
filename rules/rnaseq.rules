@@ -20,7 +20,8 @@ Env(name="vp_rnaseq_r", base="bioconda", packages=[
     "r-tidyr",
     "r-future",
     "r-future.apply",
-    "r-furrr"
+    "r-furrr",
+    "pigz"
 ])
 
 
