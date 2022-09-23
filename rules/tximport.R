@@ -14,8 +14,10 @@ read_json_nolist <- function(fname, ...) {
 }
 
 #' from parallel package - splits list into ncl sub-lists with even
-#' length
+#' length; modified to return no empty lists if |x|<ncl
+#'
 splitList <- function(x, ncl) {
+    ncl <- min(length(x), ncl)
     lapply(splitIndices(length(x), ncl), function(i) x[i])
 }
 
