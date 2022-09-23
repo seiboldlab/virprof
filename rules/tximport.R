@@ -168,7 +168,7 @@ if (snakemake@params$input_type == "Salmon") {
         message("Warning: excluded ", length(which(no_data)),
                 " empty samples:")
         message("  ", paste(names(files[no_data]), collapse = ", "))
-        metadata$empty_samples <- names(files[no_data])
+        metadata$failed_samples <- names(files[no_data])
     }
 
     message("3.2. ----------- Loading quant.sf files ----------")
