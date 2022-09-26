@@ -44,6 +44,50 @@ library(future)
 library(future.apply)
 library(furrr)
 
+if (FALSE) {
+    Snakemake <- methods::setClass(
+        "Snakemake",
+        slots = c(
+            input = "list",
+            output = "list",
+            params = "list",
+            wildcards = "list",
+            threads = "numeric",
+            log = "list",
+            resources = "list",
+            config = "list",
+            rule = "character",
+            bench_iteration = "numeric",
+            scriptdir = "character",
+            source = "function"
+        )
+    )
+    setwd("/Seibold/tmp/pipeline/work")
+    project = "gala"
+    snakemake <- Snakemake(
+        scriptdir = '/Seibold/tmp/pipeline/work/virprof/rules',
+        source = function(...){
+            wd <- getwd()
+            setwd(snakemake@scriptdir)
+            source(...)
+            setwd(wd)
+        }
+    )
+    snakemake@input$counts <- fs::dir_ls(
+        path = paste0(project, ".ref_hg38g.qc.quant_salmon_sa"),
+        glob = "*/quant.sf",
+        recurse = TRUE
+    )
+    snakemake@input$meta = file.path(project, "qiime_mapping.tsv")
+    snakemake@input$multiqc = paste0(
+        project,
+        '.ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data'
+    )
+    snakemake@threads = 16
+    snakemake@params$version = "0.0.0"
+    snakemake@params$label = "testing manually"
+}
+
 # Load faster saveRDS
 snakemake@source("_rds.R")
 
@@ -55,7 +99,7 @@ message("2.1. ----------- Loading Sample Sheet ----------")
 message("Filename = ", snakemake@input$meta)
 
 sample_sheet <- read_tsv(snakemake@input$meta, show_col_types = FALSE) %>%
-    select(where(~!all(is.na(.))))
+    dplyr::select(where(~!all(is.na(.))))
 
 metadata <- list(
     virprof_version = snakemake@params$version,
@@ -70,11 +114,12 @@ message("2.2. ----------- Loading MultiQC Report Data ----------")
 for (n in c(1,2)) {
     suffix <- c("", "_1")[n]
     round <- c("raw", "trimmed")[n]
-    fastqc_fn <- path(
+    fastqc_fn <- fs::path(
         snakemake@input$multiqc,
         str_glue("multiqc_fastqc{suffix}.txt")
     )
     if (fs::file_exists(fastqc_fn)) {
+        message("  Loading ", round, " read fastqc data")
         df <- read_tsv(fastqc_fn, show_col_types = FALSE) %>%
             # Sequence length can be `95` or `95-151`, split here
             tidyr::separate(
@@ -110,20 +155,27 @@ for (n in c(1,2)) {
                 "Check whether {project}/qiime_mapping.csv is up to date"
             ))
         }
-        message("FastQC data in ", round, " identified by: ",
+        message("    FastQC data in ", round, " identified by: ",
                 paste(fastqc_idcolumns, collapse = ", "))
         # Extract paths
+        #
+        # FIXME: This is a bad hack. We should get the detected fwd
+        #        and rev read from YMP somehow. Also, this won't work
+        #        for SRR sources.
         fastq_id_to_path <- sample_sheet %>%
             pivot_longer(
                 cols = where(~any(str_detect(., "(fastq|fq).gz"),
-                           # must return T/F, no NA to where:
+                                  # must return T/F, no NA to where:
                                   na.rm = TRUE )),
-                values_to = "fastq_file_path"
+                values_to = "fastq_file_path",
+                names_to = "path_col"
             ) %>%
             mutate(
                 # Deduce mate from file name
-                mate = if_else(str_detect(fastq_file_path, "R1"),
-                                     "R1", "R2")
+                mate = if_else(
+                    str_detect(basename(fastq_file_path), "(_|\\.)R1"),
+                    "R1", "R2"
+                )
             ) %>%
             # Remove anything we can't uniquely match
             group_by(across(fastqc_idcolumns[1]), mate) %>%
@@ -133,11 +185,19 @@ for (n in c(1,2)) {
         df <- df %>%
             left_join(
                 fastq_id_to_path,
-                by = c(fastqc_id = fastqc_idcolumns[[1]], "mate")
+                by = c(fastqc_id = fastqc_idcolumns[1], "mate")
             )
+        if (any(is.na(df$fastq_file_path))) {
+            message(
+                "WARNING: ",
+                "Failed to identify fastq file paths for all samples"
+            )
+            message("---- BEGIN fastqc data w/o file path ----")
+            print(filter(df, is.na(fastq_file_path)))
+            message("---- END fastqc data w/o file path ----")
+        }
         # Rename sample column to it's name from the sample sheet
-        df <- df %>% rename("{fastqc_idcolumns[1]}" := fastqc_id)
-
+        df <- df %>% dplyr::rename("{fastqc_idcolumns[1]}" := fastqc_id)
         if (is.null(metadata$fastqc)) {
             metadata$fastqc <- df
         } else {
