@@ -83,9 +83,11 @@ if (FALSE) {
         project,
         '.ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data'
     )
+    snakemake@input$gtf = "references/hg38g/ALL.gtf"
     snakemake@threads = 16
     snakemake@params$version = "0.0.0"
     snakemake@params$label = "testing manually"
+    snakemake@params$input_type = "salmon"
 }
 
 # Load faster saveRDS
@@ -111,6 +113,7 @@ metadata <- list(
 message("2.2. ----------- Loading MultiQC Report Data ----------")
 
 # FastQC
+metadata$fastqc <- NULL
 for (n in c(1,2)) {
     suffix <- c("", "_1")[n]
     round <- c("raw", "trimmed")[n]
@@ -211,7 +214,7 @@ message("Filename = ", snakemake@input$gtf)
 gr <- rtracklayer::import.gff(snakemake@input$gtf)
 
 if (snakemake@params$input_type == "Salmon") {
-    message("3.1. ---------- Checking for empty samples --------")
+    message("3.1. ---------- Checking for failed samples --------")
     files <- snakemake@input$counts
     names(files) <- gsub(".salmon", "", basename(dirname(files)))
     files <- files[order(names(files))]
@@ -226,7 +229,7 @@ if (snakemake@params$input_type == "Salmon") {
 
     if (any(no_data)) {
         message("Warning: excluded ", length(which(no_data)),
-                " empty samples:")
+                " failed samples:")
         message("  ", paste(names(files[no_data]), collapse = ", "))
         metadata$failed_samples <- names(files[no_data])
     }
@@ -254,14 +257,14 @@ if (snakemake@params$input_type == "Salmon") {
     txi$countsFromAbundance <- txi_parts[[1]]$countsFromAbundance
     rm(txi_parts)
 
-    # Add fake data (zero, avg length) for the empty samples
-    if (length(metadata$empty_samples) > 0) {
-        cols <- length(metadata$empty_samples)
+    # Add fake data (zero, avg length) for the failed samples
+    if (length(metadata$failed_samples) > 0) {
+        cols <- length(metadata$failed_samples)
         rows <- nrow(txi$abundance)
         zeroes <- matrix(rep(0, cols * rows), ncol = cols)
-        colnames(zeroes) <- metadata$empty_samples
+        colnames(zeroes) <- metadata$failed_samples
         lengths <- matrix(rep(rowMeans(txi$length), cols), ncol = cols)
-        colnames(lengths) <- metadata$empty_samples
+        colnames(lengths) <- metadata$failed_samples
         txi$counts <- cbind(txi$counts, zeroes)
         txi$abundance <- cbind(txi$abundance, zeroes)
         txi$length <- cbind(txi$length, lengths)
