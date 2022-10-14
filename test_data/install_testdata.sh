@@ -1,10 +1,18 @@
 #!/bin/bash
 set -e
 
-cp virprof/test_data/ymp.yml .
+SRC=${BASH_SOURCE[0]}
+while [ -L "$SRC" ]; do
+  DIR=$(cd -P "$(dirname "$SRC")" >/dev/null 2>&1 && pwd)
+  SOURCE=$(readlink "$SRC")
+  [[ $SRE != /* ]] && SRC=$DIR/$SRC
+done
+DIR=$(cd -P "$(dirname "$SRC")" >/dev/null 2>&1 && pwd)
+
+cp "$DIR/ymp.yml" .
 
 unpack() {
-    src=virprof/test_data/$1
+    src="$DIR/$1"
     dst=databases/$2
     mkdir -p $dst
     echo "Unpacking $src to $dst"
