@@ -101,14 +101,14 @@ references:
   # NCBI Taxonomy dump for classification
   NcbiTaxonomy:
     - url: http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
-      type: dir
+      type: archive
       files:
         ALL.NCBI.nodes.dmp: nodes.dmp
         ALL.NCBI.names.dmp: names.dmp
         ALL.NCBI.merged.dmp: merged.dmp
     - type: pipeline
       stages:
-        - index_vp
+        - index_taxonomy_vp
 
   # VirusHostDB from genome.jp
   VHDB:

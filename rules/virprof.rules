@@ -117,7 +117,7 @@ with Stage("get_unmapped_vp") as S:
             "fi;"
 
 
-with Stage("index_vp") as S:
+with Stage("index_taxonomy_vp") as S:
     rule vp_index_ncbi_taxonomy:
         """This rule loads the NCBI taxonomy, compiles it into a graph_tool
         tree and stores that tree in binary format. Loading the binary
@@ -129,15 +129,15 @@ with Stage("index_vp") as S:
         message:
             "{:name:}: Creating graph tool binary format tree from NCBI taxonomy"
         input:
-            ncbi_nodes = "{:prev:}/ALL.NCBI.nodes.dmp",
-            ncbi_names = "{:prev:}/ALL.NCBI.names.dmp",
-            ncbi_merged = "{:prev:}/ALL.NCBI.merged.dmp",
+            ncbi_nodes = "{:prev:}/{:target:}.NCBI.nodes.dmp",
+            ncbi_names = "{:prev:}/{:target:}.NCBI.names.dmp",
+            ncbi_merged = "{:prev:}/{:target:}.NCBI.merged.dmp",
         output:
-            "{:this:}/ALL.taxonomy.gt"
+            "{:this:}/{target}.taxonomy.gt"
         log:
-            "{:this:}/ALL.taxonomy.gt.log"
+            "{:this:}/{target}.taxonomy.gt.log"
         benchmark:
-            "benchmarks/{:name:}/{:this:}/ALL.txt"
+            "benchmarks/{:name:}/{:this:}/{target}.txt"
         threads:
             1
         resources:
@@ -209,7 +209,6 @@ with Stage("blastbin_vp") as S:
             "{:name:}: Classifying {output.result}"
         input:
             coverage = "{:prev:}/{:target:}.coverage",
-            fasta    = "{:prev:}/{:target:}.fasta.gz",
             blast7   = "{:prev:}/{:target:}.blast7.gz",
             taxonomy = "{:prev:}/{:target:}.taxonomy.gt",
         output:
@@ -239,7 +238,6 @@ with Stage("blastbin_vp") as S:
             " --ncbi-taxonomy {input.taxonomy}"
             " --in-blast7 {input.blast7}"
             " --in-coverage {params.coverage}"
-            " --in-fasta {input.fasta}"
             " --cache-path {params.cache_path}"
             " --ncbi-api-key '{params.ncbi_api_key}'"
 
