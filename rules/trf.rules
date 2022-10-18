@@ -1,6 +1,7 @@
 Env(name="trf", base="bioconda", packages=[
     "trf",
     "parallel",
+    "sed"
 ])
 
 with Stage("filter_trf") as S:
