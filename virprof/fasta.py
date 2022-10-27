@@ -105,10 +105,9 @@ class FastaFile:
         return len(self.sequences) if self.sequences else 0
 
     def _try_load_all(self) -> Optional[Dict[bytes, bytes]]:
-        if "r" not in self.mode:
-            return {}
-        fastafile = read_from_command(["gunzip", "-dc", self.iofile.name])
-        self.load_fasta(fastafile)
+        if "r" in self.mode:
+            fastafile = read_from_command(["gunzip", "-dc", self.iofile.name])
+            self.load_fasta(fastafile)
 
     def load_fasta(self, fastafile: str):
         sequences = {}
@@ -183,16 +182,16 @@ class FastaFile:
 
         # Make sure we have unique id
         if acc in self._written:
-            n = 1
-            while f"{acc}_{n}" in self._written:
-                n = n + 1
-            acc = f"{acc}_{n}"
+            num = 1
+            while f"{acc}_{num}" in self._written:
+                num = num + 1
+            acc = f"{acc}_{num}"
         self._written.add(acc)
 
         if comment is not None:
-            header = ">{} {}".format(acc, comment).encode("utf-8")
+            header = f">{acc} {comment}".encode("utf-8")
         else:
-            header = ">{}".format(acc).encode("utf-8")
+            header = f">{acc}".encode("utf-8")
         self.outzip.stdin.write(b"\n".join((header, sequence, b"")))
 
 
@@ -235,7 +234,7 @@ class Btop:
 
     @staticmethod
     def _parse_btop(btop: str):
-        ops = list()
+        ops = []
         subject_length = 0
         query_length = 0
         for match in re.finditer("([0-9]+)?([A-Z-]{2}|$)", btop):
@@ -477,7 +476,7 @@ def scaffold_contigs(
     result = {}
     # Iterate over each disjoined piece
     mappings = []
-    for section_num, (section_start, section_end, hits) in enumerate(regs):
+    for _section_num, (section_start, section_end, hits) in enumerate(regs):
         section_seqs = []  # aligned contig fragments
         section_inserts = []  # matching insert positions
         section_subjs = []  # aligned subject fragments
