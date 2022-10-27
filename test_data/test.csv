@@ -3,4 +3,5 @@ A1,A,test_A1.R1.fq.gz,test_A1.R2.fq.gz,cov
 A2,A,test_A2.R1.fq.gz,test_A2.R2.fq.gz,hku
 B,B,test_B.R1.fq.gz,test_B.R2.fq.gz,cov
 C,C,test_C.R1.fq.gz,test_C.R2.fq.gz,cov+hku
-D,D,test_D.R1.fq.gz,test_D.R2.fq.gz,
+D,D,test_D.R1.fq.gz,test_D.R2.fq.gz,hku
+E,E,test_E.R1.fq.gz,test_E.R2.fq.gz
