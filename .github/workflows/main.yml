@@ -50,8 +50,10 @@ jobs:
         mamba install flake8
         # stop the build if there are Python syntax errors or undefined names
         flake8 virprof --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 virprof --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        # exit-zero treats all errors as warnings. black will have made line length 88
+        # also disable E203 (space before :) since that's how black likes it
+        flake8 virprof --count --exit-zero --max-complexity=15 --ignore=E203 \
+          --max-line-length=88 --statistics
 
     ## INSTALL ##
     - name: Install YMP
