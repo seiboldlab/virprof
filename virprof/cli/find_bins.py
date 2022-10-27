@@ -10,6 +10,7 @@ from ..fasta import FastaFile
 
 LOG = logging.getLogger(__name__)
 
+
 def load_bins(fnames, filter_lineage, bin_by, out, out_bins):
     # Make sure this file is created even if it's empty
     out_bins.open()

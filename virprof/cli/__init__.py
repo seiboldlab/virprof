@@ -15,7 +15,7 @@ import tqdm  # type: ignore
 
 
 #: Increase CSV field size limit to 2GB
-csv.field_size_limit(2 ** 31)
+csv.field_size_limit(2**31)
 
 
 class TqdmHandler(logging.Handler):
@@ -117,14 +117,16 @@ class AutoLoadCommand(click.MultiCommand):
         self.commands_folder = os.path.dirname(__file__)
 
     def list_commands(self, ctx):
-        return sorted([
-            filename[:-3].replace("_", "-")
-            for filename in os.listdir(self.commands_folder)
-            if filename.endswith(".py")
-            and not filename == "__init__.py"
-            and not filename.startswith(".")
-            and not filename.startswith("_")
-        ])
+        return sorted(
+            [
+                filename[:-3].replace("_", "-")
+                for filename in os.listdir(self.commands_folder)
+                if filename.endswith(".py")
+                and not filename == "__init__.py"
+                and not filename.startswith(".")
+                and not filename.startswith("_")
+            ]
+        )
 
     def get_command(self, ctx, cmd_name):
         mod = import_module("." + cmd_name.replace("-", "_"), __name__)
@@ -136,15 +138,18 @@ class AutoLoadCommand(click.MultiCommand):
 
 @click.command(cls=AutoLoadCommand)
 @click.option(
-    "--profile", is_flag=True, expose_value=False,
+    "--profile",
+    is_flag=True,
+    expose_value=False,
     callback=setup_profiling,
-    help="Dump profiling info; requires yappi installed"
+    help="Dump profiling info; requires yappi installed",
 )
 @click.option(
     "--traceback-on-usr1",
-    is_flag=True, expose_value=False,
+    is_flag=True,
+    expose_value=False,
     callback=setup_debug,
-    help="Dump stack trace on receiving signal SIGUSR1"
+    help="Dump stack trace on receiving signal SIGUSR1",
 )
 def main() -> None:
     """Use any of the subcommands"""

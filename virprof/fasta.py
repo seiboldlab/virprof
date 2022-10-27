@@ -159,10 +159,14 @@ class FastaFile:
             stop = len(seq)
         return seq[start - 1 : stop]
 
-    def count_bp(self, acc: str, start: int = 1, stop: int = None,
-                 chars: Sequence[bytes] = (b"A", b"G", b"C", b"T")) -> int:
-        """Count number of basepairs in sequence
-        """
+    def count_bp(
+        self,
+        acc: str,
+        start: int = 1,
+        stop: int = None,
+        chars: Sequence[bytes] = (b"A", b"G", b"C", b"T"),
+    ) -> int:
+        """Count number of basepairs in sequence"""
         sequence = self.get(acc, start, stop)
         return sum(sequence.count(base) for base in chars)
 

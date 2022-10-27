@@ -131,7 +131,7 @@ def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
     "--out-features",
     "--of",
     type=click.File("w"),
-    help="Output CSV file containing reference feature annotation (one row per feature)"
+    help="Output CSV file containing reference feature annotation (one row per feature)",
 )
 @click.option(
     "--ncbi-taxonomy",

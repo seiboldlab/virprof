@@ -39,11 +39,9 @@ def get_fnames_from_file(fdes):
     """Fetch newline separated filenames from a file"""
     with open(fdes, "r", encoding="utf-8") as filedes:
         fnames = [line.strip() for line in filedes.readlines()]
-    missing = [fname for fname in fnames
-               if not os.path.exists(fname)]
+    missing = [fname for fname in fnames if not os.path.exists(fname)]
     if missing:
         raise RuntimeError(
-            f"Missing files listed in {fdes.name}:\n"
-            f"{', '.join(missing)}\n"
+            f"Missing files listed in {fdes.name}:\n" f"{', '.join(missing)}\n"
         )
     return fnames
