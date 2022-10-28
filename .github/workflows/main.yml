@@ -97,7 +97,7 @@ jobs:
     ## RUN ##
     - name: Run pipeline analysis rnaseq salmon selective alignment
       run: |
-        make ymp test.ref_hg38gtest.rnaseq_salmon -j2 -vp
+        ymp make test.ref_hg38gtest.rnaseq_salmon -j2 -vp
         ls -l test.ref_hg38gtest.rnaseq_salmon
     - name: Run pipeline analysis rnaseq star + salmon
       run: |
