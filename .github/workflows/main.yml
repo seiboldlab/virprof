@@ -97,20 +97,24 @@ jobs:
     ## RUN ##
     - name: Run pipeline analysis rnaseq salmon selective alignment
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon -j8
-        ls -l test.rnaseq_salmon test.rnaseq_salmon
+        make ymp test.ref_hg38gtest.rnaseq_salmon -j2 -vp
+        ls -l test.ref_hg38gtest.rnaseq_salmon
     - name: Run pipeline analysis rnaseq star + salmon
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_star_salmon -j8
-        ls -l test.rnaseq_salmon test.rnaseq_star_salmon
+        ymp make test.ref_hg38gtest.rnaseq_star_salmon -j2 -vp
+        ls -l test.ref_hg38gtest.rnaseq_star_salmon
     - name: Run pipeline analysis rnaseq star + rsem
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_star_rsem -j8
-        ls -l test.rnaseq_salmon test.rnaseq_star_rsem
-    - name: Run pipeline analysis pathogen
+        ymp make test.ref_hg38gtest.rnaseq_star_rsem -j2 -vp
+        ls -l test.ref_hg38gtest.rnaseq_star_rsem
+    - name: Run pipeline analysis salmon + pathogen
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen -j8
-        ls -l test.rnaseq_salmon test.rnaseq_salmon.pathogen
+        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen -j2 -vp
+        ls -l test.ref_hg38gtest.rnaseq_salmon.pathogen
+    - name: Run pipeline analysis star + pathogen
+      run: |
+        ymp make test.ref_hg38gtest.rnaseq_star.pathogen -j2 -vp
+        ls -l test.ref_hg38gtest.rnaseq_star.pathogen
 
     ## LOG ##
     - name: Save pipeline reports
