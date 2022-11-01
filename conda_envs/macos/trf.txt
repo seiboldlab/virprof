@@ -1,0 +1,10 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: osx-64
+@EXPLICIT
+https://conda.anaconda.org/bioconda/osx-64/trf-4.09.1-ha5712d3_2.tar.bz2#9eb38c8b2c8366958370af400d0fba83
+https://conda.anaconda.org/conda-forge/osx-64/libiconv-1.17-hac89ed1_0.tar.bz2#691d103d11180486154af49c037b7ed9
+https://conda.anaconda.org/conda-forge/osx-64/perl-5.32.1-2_h0d85af4_perl5.tar.bz2#dd13a8c2fac0cd8e102fcdc7bca1f077
+https://conda.anaconda.org/conda-forge/osx-64/gettext-0.21.1-h8a4c099_0.tar.bz2#1e3aff29ce703d421c43f371ad676cc5
+https://conda.anaconda.org/conda-forge/osx-64/parallel-20220922-h694c41f_0.tar.bz2#7868376eccb3e0aa64a8dc89781208e4
+https://conda.anaconda.org/conda-forge/osx-64/sed-4.7-h3efe00b_1000.tar.bz2#12e92b1d4ac4f839fcdd66289caea89f

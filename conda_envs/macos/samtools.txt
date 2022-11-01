@@ -2,21 +2,21 @@
 # $ conda create --name <env> --file <this file>
 # platform: osx-64
 @EXPLICIT
-https://conda.anaconda.org/conda-forge/osx-64/bzip2-1.0.8-hc929b4f_4.tar.bz2#521b82c700a64bac7d8da27539422e91
-https://conda.anaconda.org/conda-forge/osx-64/c-ares-1.17.1-hc929b4f_0.tar.bz2#24fc0b91a6eacc6753fef90514d67ce9
-https://conda.anaconda.org/conda-forge/osx-64/ca-certificates-2020.12.5-h033912b_0.tar.bz2#4483d8ea13bd57b52e3539e741501a7d
-https://conda.anaconda.org/conda-forge/osx-64/libcxx-11.0.0-h4c3b8ed_1.tar.bz2#6a22f1c899bcf110c39cd6d959a8555e
-https://conda.anaconda.org/conda-forge/osx-64/libdeflate-1.6-h0b31af3_0.tar.bz2#ddb0ca6a4ede3850eec49ec7b21d9fee
+https://conda.anaconda.org/conda-forge/osx-64/bzip2-1.0.8-h0d85af4_4.tar.bz2#37edc4e6304ca87316e160f5ca0bd1b5
+https://conda.anaconda.org/conda-forge/osx-64/c-ares-1.18.1-h0d85af4_0.tar.bz2#00b3e98a61e6430808fe7a2534681f28
+https://conda.anaconda.org/conda-forge/osx-64/ca-certificates-2022.9.24-h033912b_0.tar.bz2#67b268c32433047914482def1ce215c2
+https://conda.anaconda.org/conda-forge/osx-64/libcxx-14.0.6-hccf4f1f_0.tar.bz2#208a6a874b073277374de48a782f6b10
+https://conda.anaconda.org/conda-forge/osx-64/libdeflate-1.13-h775f41a_0.tar.bz2#9751c945d288bc6cebcf91e934efd4aa
 https://conda.anaconda.org/conda-forge/osx-64/libev-4.33-haf1e3a3_1.tar.bz2#79dc2be110b2a3d1e97ec21f691c50ad
-https://conda.anaconda.org/conda-forge/osx-64/ncurses-6.2-h2e338ed_4.tar.bz2#9cef1910395d1543527583e73dba30f1
-https://conda.anaconda.org/conda-forge/osx-64/xz-5.2.5-haf1e3a3_1.tar.bz2#41116deb499e9bc58048c297d6403ce6
-https://conda.anaconda.org/conda-forge/osx-64/zlib-1.2.11-h7795811_1010.tar.bz2#7d39e47e16ed0107f37c7224d5b5be8b
+https://conda.anaconda.org/conda-forge/osx-64/libzlib-1.2.13-hfd90126_4.tar.bz2#35eb3fce8d51ed3c1fd4122bad48250b
+https://conda.anaconda.org/conda-forge/osx-64/ncurses-6.3-h96cf925_1.tar.bz2#76217ebfbb163ff2770a261f955a5861
+https://conda.anaconda.org/conda-forge/osx-64/xz-5.2.6-h775f41a_0.tar.bz2#a72f9d4ea13d55d745ff1ed594747f10
 https://conda.anaconda.org/conda-forge/osx-64/libedit-3.1.20191231-h0678c8f_2.tar.bz2#6016a8a1d0e63cac3de2c352cd40208b
-https://conda.anaconda.org/conda-forge/osx-64/openssl-1.1.1i-h35c211d_0.tar.bz2#f26df9ccde4b41ff4d2b18c83c4d0fd3
-https://conda.anaconda.org/conda-forge/osx-64/tk-8.6.10-h0419947_1.tar.bz2#9a79a432473acddd936ff8bab8b86145
-https://conda.anaconda.org/conda-forge/osx-64/krb5-1.17.2-h60d9502_0.tar.bz2#abf2add2a1ade1920b25a8f3327a1aa0
-https://conda.anaconda.org/conda-forge/osx-64/libnghttp2-1.41.0-h7580e61_2.tar.bz2#1731a2e73e2d68d455a1b8b8de0265dc
-https://conda.anaconda.org/conda-forge/osx-64/libssh2-1.9.0-h8a08a2b_5.tar.bz2#2e0e86262d3c9a11230ab55fc0468e49
-https://conda.anaconda.org/conda-forge/osx-64/libcurl-7.71.1-h9bf37e3_8.tar.bz2#1a136204085b4c620fe2ed74fb1112bf
-https://conda.anaconda.org/bioconda/osx-64/htslib-1.11-h422799e_1.tar.bz2#04137f803cfa0e6aad8af88dba62956e
-https://conda.anaconda.org/bioconda/osx-64/samtools-1.11-h725deca_0.tar.bz2#d6607f54867ecf644fc424289ba26930
+https://conda.anaconda.org/conda-forge/osx-64/openssl-3.0.7-hfd90126_0.tar.bz2#78d8266753a5db378ef0f9302be9990f
+https://conda.anaconda.org/conda-forge/osx-64/zlib-1.2.13-hfd90126_4.tar.bz2#be90e6223c74ea253080abae19b3bdb1
+https://conda.anaconda.org/conda-forge/osx-64/krb5-1.19.3-hb98e516_0.tar.bz2#8acf20165e07870bc65510a363ff45bb
+https://conda.anaconda.org/conda-forge/osx-64/libnghttp2-1.47.0-h5aae05b_1.tar.bz2#19d5ae4be3e4b3cfa5696f3667e8c631
+https://conda.anaconda.org/conda-forge/osx-64/libssh2-1.10.0-h47af595_3.tar.bz2#5a28624eeb7812b585b9e2d75f846ba2
+https://conda.anaconda.org/conda-forge/osx-64/libcurl-7.86.0-h581aaea_0.tar.bz2#2fed2006d68eb12f8aef504f81c75ab9
+https://conda.anaconda.org/bioconda/osx-64/htslib-1.16-h567f53e_0.tar.bz2#bd9c90cc85661d07c6e86294e59d3051
+https://conda.anaconda.org/bioconda/osx-64/samtools-1.16.1-h7e39424_1.tar.bz2#a65669266b75d5a7bdc5b62caceba094
