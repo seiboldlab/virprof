@@ -11,9 +11,9 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v2
-        - uses: psf/black@stable
+    steps:
+      - uses: actions/checkout@v2
+      - uses: psf/black@stable
   build-linux:
     strategy:
       max-parallel: 5
@@ -92,23 +92,23 @@ jobs:
     ## RUN ##
     - name: Run pipeline analysis rnaseq salmon selective alignment
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon -j2 -p --no-temp
+        ymp make test.ref_hg38gtest.rnaseq_salmon -j2 -p --notemp
         ls -l test.ref_hg38gtest.rnaseq_salmon
     - name: Run pipeline analysis salmon + pathogen
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen -j2 -p --no-temp
+        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen -j2 -p --notemp
         ls -l test.ref_hg38gtest.rnaseq_salmon.pathogen
     - name: Run pipeline analysis rnaseq star + salmon
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_star_salmon -j2 -p --no-temp
+        ymp make test.ref_hg38gtest.rnaseq_star_salmon -j2 -p --notemp
         ls -l test.ref_hg38gtest.rnaseq_star_salmon
     - name: Run pipeline analysis star + pathogen
       run: |
-        ymp make test.ref_hg38gtest.rnaseq_star.pathogen -j2 -p --no-temp
+        ymp make test.ref_hg38gtest.rnaseq_star.pathogen -j2 -p --notemp
         ls -l test.ref_hg38gtest.rnaseq_star.pathogen
     #- name: Run pipeline analysis rnaseq star + rsem
     #  run: |
-    #    ymp make test.ref_hg38gtest.rnaseq_star_rsem -j2 -p --no-temp
+    #    ymp make test.ref_hg38gtest.rnaseq_star_rsem -j2 -p --notemp
     #    ls -l test.ref_hg38gtest.rnaseq_star_rsem
 
     ## LOG ##
