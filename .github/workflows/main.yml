@@ -17,28 +17,21 @@ jobs:
           - ubuntu-latest
           - macos-latest
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -l {0}
     steps:
-    ## SETUP ##
     - uses: actions/checkout@v2
       with:
         path: virprof
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v2
+    - uses: conda-incubator/setup-miniconda@v2
       with:
-        python-version: 3.8
-    - name: Fix Github Conda Permissions on OSX
-      if: matrix.os == 'macos-latest'
-      run: |
-        sudo chown -R $USER $CONDA
-    - name: Set up Biconda & Mamba
-      run: |
-        # $CONDA is an environment variable pointing to the root of the miniconda directory
-        echo $CONDA/bin >> $GITHUB_PATH
-        export PATH=$CONDA/bin:$PATH
-        conda config --add channels defaults
-        conda config --add channels bioconda
-        conda config --add channels conda-forge
-        conda install mamba
+        channels: conda-forge,bioconda
+        channel-priority: strict
+        activate-environment: virprof
+        environment-file: virprof/environment.yml
+        mamba-version: "*"
+        python-version: "3.10"
 
     ## LINT ##
     - name: Lint Python with black
