@@ -58,6 +58,7 @@ jobs:
     ## INSTALL ##
     - name: Install YMP
       run: |
+        mamba update conda
         mamba env update --file virprof/environment.yml --name base
     - name: Setup pipeline with test data
       run: |
