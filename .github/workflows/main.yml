@@ -12,15 +12,49 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: psf/black@stable
-  build-linux:
+      - uses: actions/setup-python@v4
+      - name: Flake8 Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+      - name: Flake8 Run
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. black will have made line length 88
+          # also disable E203 (space before :) since that's how black likes it
+          flake8 . --count --exit-zero --max-complexity=15 --ignore=E203 \
+            --max-line-length=88 --statistics
+
+  unit_test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v3
+      - name: Pytest Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install -r requirements.txt
+      - name: Pytest Run
+        run: |
+          pytest
+
+  run:
+    needs: [lint, unit_test]
     strategy:
       max-parallel: 5
       matrix:
         os:
           - ubuntu-latest
           - macos-latest
+        target:
+          - test.ref_hg38gtest.rnaseq_salmon
+          - test.ref_hg38gtest.rnaseq_star_salmon
+          - test.ref_hg38gtest.rnaseq_star_rsem
+          - test.ref_hg38gtest.rnaseq_salmon.pathogen
+      fail-fast: false
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -37,85 +71,28 @@ jobs:
         environment-file: virprof/environment.yml
         mamba-version: "*"
         python-version: "3.10"
-
-    ## LINT ##
-    - name: Lint Python with flake8
-      run: |
-        mamba install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 virprof --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. black will have made line length 88
-        # also disable E203 (space before :) since that's how black likes it
-        flake8 virprof --count --exit-zero --max-complexity=15 --ignore=E203 \
-          --max-line-length=88 --statistics
-
-    ## INSTALL ##
     - name: Install YMP
       run: |
         mamba update conda
         mamba env update --file virprof/environment.yml --name base
-    - name: Setup pipeline with test data
+    - name: Install Test Data
       run: |
         ./virprof/test_data/install_testdata.sh
-    - name: Install Python Env
+    - name: Dry-Run
       run: |
-        ymp env list virprof_\*
-        ymp env install virprof_py -vvv
-    - name: Test Python with pytest
+        ymp make -n ${{matrix.target}}
+    - name: Install deps
       run: |
-        ymp env run virprof_py mamba install pytest
-        ymp env run virprof_py pytest
-
-    ## DRY RUNS ##
-    - name: Run pipeline dry-run rnaseq salmon selective alignment
+        ymp env prepare ${{matrix.target}}
+    - name: Run Pipeline
       run: |
-        ymp make -n test.ref_hg38gtest.rnaseq_salmon
-    - name: Run pipeline dry-run rnaseq star + salmon
-      run: |
-        ymp make -n test.ref_hg38gtest.rnaseq_star_salmon
-    - name: Run pipeline dry-run rnaseq star + rsem
-      run: |
-        ymp make -n test.ref_hg38gtest.rnaseq_star_rsem
-    - name: Run pipeline dry-run pathogen
-      run: |
-        ymp make -n test.ref_hg38gtest.rnaseq_salmon.pathogen
-
-    ## INSTALL ENVS ##
-    - name: Run pipeline software install
-      run: |
-        ymp env prepare \
-        test.ref_hg38gtest.rnaseq_salmon \
-        test.ref_hg38gtest.rnaseq_star_salmon \
-        test.ref_hg38gtest.rnaseq_star_rsem \
-        test.ref_hg38gtest.rnaseq_salmon.pathogen
-
-    ## RUN ##
-    - name: Run pipeline analysis rnaseq salmon selective alignment
-      run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon -j2 -p --notemp
-        ls -l test.ref_hg38gtest.rnaseq_salmon
-    - name: Run pipeline analysis salmon + pathogen
-      run: |
-        ymp make test.ref_hg38gtest.rnaseq_salmon.pathogen -j2 -p --notemp
-        ls -l test.ref_hg38gtest.rnaseq_salmon.pathogen
-    - name: Run pipeline analysis rnaseq star + salmon
-      run: |
-        ymp make test.ref_hg38gtest.rnaseq_star_salmon -j2 -p --notemp
-        ls -l test.ref_hg38gtest.rnaseq_star_salmon
-    - name: Run pipeline analysis star + pathogen
-      run: |
-        ymp make test.ref_hg38gtest.rnaseq_star.pathogen -j2 -p --notemp
-        ls -l test.ref_hg38gtest.rnaseq_star.pathogen
-    #- name: Run pipeline analysis rnaseq star + rsem
-    #  run: |
-    #    ymp make test.ref_hg38gtest.rnaseq_star_rsem -j2 -p --notemp
-    #    ls -l test.ref_hg38gtest.rnaseq_star_rsem
+        ymp make ${{matrix.target}} -j2 -p
 
     ## LOG ##
     - name: Save pipeline reports
       uses: actions/upload-artifact@v2
       with:
-        name: results-${{ matrix.os }}
+        name: results-${{ matrix.os }}-${{ matrix.target }}
         path: reports/
         # Note: Not saving the actual test.generic directory because
         # it is a symlink and actions/upload-artifact@v2 has problems
