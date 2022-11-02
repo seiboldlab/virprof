@@ -10,7 +10,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - uses: actions/checkout@v3
     - uses: psf/black@stable
@@ -28,7 +28,7 @@ jobs:
           --max-line-length=88 --statistics
 
   unit_test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: lint
     steps:
     - uses: actions/checkout@v3
@@ -50,15 +50,17 @@ jobs:
       max-parallel: 5
       matrix:
         os:
-          - ubuntu-latest
-          - macos-latest
+          - linux
+          - macOS
         target:
           - test.ref_hg38gtest.rnaseq_salmon
           - test.ref_hg38gtest.rnaseq_star_salmon
           - test.ref_hg38gtest.rnaseq_star_rsem
           - test.ref_hg38gtest.rnaseq_salmon.pathogen
       fail-fast: false
-    runs-on: ${{ matrix.os }}
+    runs-on:
+      - self-hosted
+      - ${{ matrix.os }}
     defaults:
       run:
         shell: bash -l {0}
