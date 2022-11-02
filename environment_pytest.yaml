@@ -1,0 +1,11 @@
+name: virprof_pytest
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - pytest
+  - graph-tool >=2.34
+  - biopython
+  - click
+  - tqdm
+  - requests
