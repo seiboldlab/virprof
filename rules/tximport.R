@@ -528,7 +528,8 @@ if (snakemake@params$input_type == "ExonSE") {
             by = idcolumns[[1]]
         ) %>%
         transmute(
-            across(all_of(idcolumns[[1]])),
+            across(all_of(idcolumns)),
+            mapped_read_count = count_total,
             pct_mito = count_mito / count_total * 100,
             pct_ribo = count_ribo / count_total * 100,
             pct_noncoding = count_noncoding / count_total * 100,
