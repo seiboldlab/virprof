@@ -4,19 +4,19 @@
 #' `snakemake` object with `snakemake@input` etc containing paths.
 
 #' We also need to redirect our output to log ourselves...
-logfile <- file(snakemake@log[[1]], open="wt")
+logfile <- file(snakemake@log[[1]], open = "wt")
 sink(logfile)
-sink(logfile, type="message")
+sink(logfile, type = "message")
 
 read_json_nolist <- function(fname, ...) {
-    tmp<-jsonlite::read_json(fname, ...)
+    tmp <- jsonlite::read_json(fname, ...)
     tmp[sapply(tmp, function(x) length(x) == 1)]
 }
 
 #' from parallel package - splits list into ncl sub-lists with even
 #' length; modified to return no empty lists if |x|<ncl
 #'
-splitList <- function(x, ncl) {
+split_list <- function(x, ncl) {
     ncl <- min(length(x), ncl)
     lapply(splitIndices(length(x), ncl), function(i) x[i])
 }
@@ -63,10 +63,10 @@ if (FALSE) {
         )
     )
     setwd("/Seibold/tmp/pipeline/work")
-    project = "gala"
+    project <- "gala"
     snakemake <- Snakemake(
-        scriptdir = '/Seibold/tmp/pipeline/work/virprof/rules',
-        source = function(...){
+        scriptdir = "/Seibold/tmp/pipeline/work/virprof/rules",
+        source = function(...) {
             wd <- getwd()
             setwd(snakemake@scriptdir)
             source(...)
@@ -78,16 +78,16 @@ if (FALSE) {
         glob = "*/quant.sf",
         recurse = TRUE
     )
-    snakemake@input$meta = file.path(project, "qiime_mapping.tsv")
-    snakemake@input$multiqc = paste0(
+    snakemake@input$meta <- file.path(project, "qiime_mapping.tsv")
+    snakemake@input$multiqc <- paste0(
         project,
-        '.ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data'
+        ".ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data"
     )
-    snakemake@input$gtf = "references/hg38g/ALL.gtf"
-    snakemake@threads = 16
-    snakemake@params$version = "0.0.0"
-    snakemake@params$label = "testing manually"
-    snakemake@params$input_type = "salmon"
+    snakemake@input$gtf <- "references/hg38g/ALL.gtf"
+    snakemake@threads <- 16
+    snakemake@params$version <- "0.0.0"
+    snakemake@params$label <- "testing manually"
+    snakemake@params$input_type <- "salmon"
 }
 
 # Load faster saveRDS
@@ -240,10 +240,10 @@ if (snakemake@params$input_type == "Salmon") {
     # the files takes quite a while (seconds per file, which adds when
     # you have thousands of samples).
     txi_parts <- future_lapply(
-        splitList(files[!no_data], snakemake@threads),
+        split_list(files[!no_data], snakemake@threads),
         tximport,
-        type="salmon",
-        txOut=TRUE
+        type = "salmon",
+        txOut = TRUE
     )
 
     # Now merge the three assays
@@ -295,7 +295,7 @@ if (snakemake@params$input_type == "Salmon") {
     )
 
     if (length(intersect(colnames(extra_coldata), must_be_identical)) > 0) {
-        errorfn = paste0(logfile, ".error.csv")
+        errorfn <- paste0(logfile, ".error.csv")
         message("Samples were run with multiple references or ",
                 "varied parameters. Refusing to aggregate.",
                 "Writing coldata to ", errorfn)
@@ -364,10 +364,10 @@ coldata <- sample_sheet %>%
         across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1]),
         # Columns with multiple values get them semi colon separated
         across(where(~ length(unique(.x)) > 1),
-               ~ paste(as.character(.x), collapse=";")),
+               ~ paste(as.character(.x), collapse = ";")),
         # Also attach the count of units grouped
-        num_units=n(),
-        .groups="drop"
+        num_units = n(),
+        .groups = "drop"
     ) %>%
     arrange(across(all_of(idcolumns))) %>%
     # Merge in the extra_coldata gathered above
@@ -392,13 +392,13 @@ if (snakemake@params$input_type == "ExonSE") {
 } else {
     message("4.2. ----------- Preparing rowData (gene sheet) ----------")
     # only transcript rows
-    txmeta <- mcols(gr)[mcols(gr)$type=="transcript", ]
+    txmeta <- mcols(gr)[mcols(gr)$type == "transcript", ]
     txmeta <- subset(txmeta, select = -type)
     rownames(txmeta) <- txmeta$transcript_id
     # only rows for which we have counts
     txmeta <- txmeta[rownames(txi$counts), ]
     # remove all-NA columns
-    txmeta <- Filter(function(x)!all(is.na(x)), txmeta)
+    txmeta <- Filter(function(x) !all(is.na(x)), txmeta)
 
     message("4.3. ----------- Creating object ----------")
     se <- SummarizedExperiment(
@@ -418,25 +418,32 @@ if (snakemake@params$input_type == "ExonSE") {
     saveRDS(se, snakemake@output$transcripts)
 
     if (snakemake@params$input_type == "Salmon") {
-        message("6. ----------- Summarizing transcript counts to gene counts ----------")
-        txi_genes <- summarizeToGene(txi, txmeta[,c("transcript_id", "gene_id")])
+        message("6. ----------- Summarizing transcript counts to gene counts",
+                " ----------")
+        txi_genes <- summarizeToGene(
+            txi, txmeta[, c("transcript_id", "gene_id")]
+        )
     } else if (snakemake@params$input_type == "RSEM") {
         gene_files <- snakemake@input$counts
         names(gene_files) <- gsub(".genes.results", "", basename(gene_files))
-        txi_genes <- tximport(gene_files, type = "rsem", txIn = FALSE, txOut = FALSE)
+        txi_genes <- tximport(gene_files, type = "rsem",
+                              txIn = FALSE, txOut = FALSE)
 
         ## Something inside of tximport seems to reset the log sink on the
         ## second call. Resetting it here:
         sink(logfile)
-        sink(logfile, type="message")
+        sink(logfile, type = "message")
     }
 
     message("7. ----------- Assembling SummarizedExperiment ----------")
-    gmeta <-  mcols(gr)[mcols(gr)$type=="gene", ]  # only transcript rows
+    # only transcript rows:
+    gmeta <-  mcols(gr)[mcols(gr)$type == "gene", ]
     gmeta <- subset(gmeta, select = -type)
-    rownames(gmeta) <- gmeta$gene_id  # set names
-    gmeta <- gmeta[rownames(txi_genes$counts), ]  # only rows for which we have counts
-    gmeta <- Filter(function(x)!all(is.na(x)), gmeta)  # remove all-NA columns
+    rownames(gmeta) <- gmeta$gene_id
+    # only rows for which we have counts:
+    gmeta <- gmeta[rownames(txi_genes$counts), ]
+    # remove all-NA columns:
+    gmeta <- Filter(function(x) !all(is.na(x)), gmeta)
 
     gse <- SummarizedExperiment(
         assays = txi_genes[c("counts", "abundance", "length")],
@@ -445,7 +452,8 @@ if (snakemake@params$input_type == "ExonSE") {
         metadata = c(
             metadata,
             list(
-                countsFromAbundance = txi_genes$countsFromAbundance  # should be no
+                # (should be 'no')
+                countsFromAbundance = txi_genes$countsFromAbundance
             )
         )
     )
@@ -459,16 +467,20 @@ if (snakemake@params$input_type == "ExonSE") {
     ## checked inside of deseq/tximeta, let's do check here as well).
     if (snakemake@params$input_type == "Salmon") {
         if (txi_genes$countsFromAbundance == "no") {
-            message("Renaming length assay to avgTxLength so DESeq2 will use for size estimation")
+            message("Renaming length assay to avgTxLength so DESeq2",
+                    " will use for size estimation")
             assayNames(gse)[assayNames(gse) == "length"] <- "avgTxLength"
         }
     }
 
     message("8. ----------- Collecting mapping metadata ----------")
 
-    mito_genes <- rowData(gse) %>%
+    mito_genes <-
+        rowData(gse) %>%
         as_tibble() %>%
-        filter(str_detect(gene_name, "^MT-")) %>%
+        filter(
+            str_detect(gene_name, "^MT-")
+        ) %>%
         pull(gene_id)
 
     ribo_genes <-
@@ -481,8 +493,8 @@ if (snakemake@params$input_type == "ExonSE") {
         rowData(gse) %>%
         as_tibble() %>%
         filter(
-            gene_type != "protein_coding",
-            !gene_id %in% c(mito_genes, ribo_genes)
+            !gene_id %in% c(mito_genes, ribo_genes),
+            gene_type != "protein_coding"
         ) %>%
         pull(gene_id)
 
@@ -496,22 +508,22 @@ if (snakemake@params$input_type == "ExonSE") {
     mapping <- colSums(assay(gse)) %>%
         enframe(name = idcolumns[[1]], value = "count_total") %>%
         left_join(
-            colSums(assay(gse)[mito_genes,]) %>%
+            colSums(assay(gse)[mito_genes, ]) %>%
                 enframe(name = idcolumns[[1]], value = "count_mito"),
             by = idcolumns[[1]]
         ) %>%
         left_join(
-            colSums(assay(gse)[ribo_genes,]) %>%
+            colSums(assay(gse)[ribo_genes, ]) %>%
                 enframe(name = idcolumns[[1]], value = "count_ribo"),
             by = idcolumns[[1]]
         ) %>%
         left_join(
-            colSums(assay(gse)[non_coding_genes,]) %>%
+            colSums(assay(gse)[non_coding_genes, ]) %>%
                 enframe(name = idcolumns[[1]], value = "count_noncoding"),
             by = idcolumns[[1]]
         ) %>%
         left_join(
-            colSums(assay(gse)[coding_genes,] > 0) %>%
+            colSums(assay(gse)[coding_genes, ] > 0) %>%
                 enframe(name = idcolumns[[1]], value = "num_expr_genes"),
             by = idcolumns[[1]]
         ) %>%
@@ -526,9 +538,9 @@ if (snakemake@params$input_type == "ExonSE") {
     message("8. ----------- Try Generating PCA data ----------")
 
     tryCatch({
-        dds <- DESeqDataSet(gse[coding_genes,], design = ~ 1)
-        dds <- dds[ , colSums(counts(dds)) > 0 ]
-        dds <- dds[ rowSums(counts(dds)) > 0, ]
+        dds <- DESeqDataSet(gse[coding_genes, ], design = ~ 1)
+        dds <- dds[, colSums(counts(dds)) > 0]
+        dds <- dds[rowSums(counts(dds)) > 0, ]
         # Using poscounts type size factor estimation so we don't fail
         # if there is no gene without zeros.
         dds <- estimateSizeFactors(dds, type = "poscounts")
