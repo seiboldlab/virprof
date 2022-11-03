@@ -8,19 +8,6 @@ logfile <- file(snakemake@log[[1]], open = "wt")
 sink(logfile)
 sink(logfile, type = "message")
 
-read_json_nolist <- function(fname, ...) {
-    tmp <- jsonlite::read_json(fname, ...)
-    tmp[sapply(tmp, function(x) length(x) == 1)]
-}
-
-#' from parallel package - splits list into ncl sub-lists with even
-#' length; modified to return no empty lists if |x|<ncl
-#'
-split_list <- function(x, ncl) {
-    ncl <- min(length(x), ncl)
-    lapply(splitIndices(length(x), ncl), function(i) x[i])
-}
-
 message("Importing ", snakemake@params$input_type, " data into R")
 
 message("1. ----------- Loading packages ----------")
@@ -44,87 +31,44 @@ library(future)
 library(future.apply)
 library(furrr)
 
-if (FALSE) {
-    Snakemake <- methods::setClass(
-        "Snakemake",
-        slots = c(
-            input = "list",
-            output = "list",
-            params = "list",
-            wildcards = "list",
-            threads = "numeric",
-            log = "list",
-            resources = "list",
-            config = "list",
-            rule = "character",
-            bench_iteration = "numeric",
-            scriptdir = "character",
-            source = "function"
-        )
-    )
-    setwd("/Seibold/tmp/pipeline/work")
-    project <- "gala"
-    snakemake <- Snakemake(
-        scriptdir = "/Seibold/tmp/pipeline/work/virprof/rules",
-        source = function(...) {
-            wd <- getwd()
-            setwd(snakemake@scriptdir)
-            source(...)
-            setwd(wd)
-        }
-    )
-    snakemake@input$counts <- fs::dir_ls(
-        path = paste0(project, ".ref_hg38g.qc.quant_salmon_sa"),
-        glob = "*/quant.sf",
-        recurse = TRUE
-    )
-    snakemake@input$meta <- file.path(project, "qiime_mapping.tsv")
-    snakemake@input$multiqc <- paste0(
-        project,
-        ".ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data"
-    )
-    snakemake@input$gtf <- "references/hg38g/ALL.gtf"
-    snakemake@threads <- 16
-    snakemake@params$version <- "0.0.0"
-    snakemake@params$label <- "testing manually"
-    snakemake@params$input_type <- "salmon"
-}
-
 # Load faster saveRDS
 snakemake@source("_rds.R")
 
 # Set threads
 plan(tweak(multicore, workers = snakemake@threads))
 
-message("2. ----------- Loading files ----------")
-message("2.1. ----------- Loading Sample Sheet ----------")
-message("Filename = ", snakemake@input$meta)
+get_idcols <- function(table, ids) {
+    names(which(sapply(table, function(x) {
+        (
+            # column must be unique:
+            n_distinct(x) == length(x)
+            # and must list all ids
+            && all(ids %in% as.character(x))
+        )
+    })))
+}
 
-sample_sheet <- read_tsv(snakemake@input$meta, show_col_types = FALSE) %>%
-    dplyr::select(where(~!all(is.na(.))))
-
-metadata <- list(
-    virprof_version = snakemake@params$version,
-    pipeline = snakemake@params$label,
-    date = now(),
-    sample_sheet = sample_sheet
-)
-
-message("2.2. ----------- Loading MultiQC Report Data ----------")
-
-# FastQC
-metadata$fastqc <- NULL
-for (n in c(1, 2)) {
-    suffix <- c("", "_1")[n]
-    trimmed <- n == 2
-    fastqc_fn <- fs::path(
-        snakemake@input$multiqc,
-        str_glue("multiqc_fastqc{suffix}.txt")
-    )
-    if (!fs::file_exists(fastqc_fn)) {
-        next
+load_all_fastqc <- function(sample_sheet, path) {
+    fastqc <- NULL
+    for (n in c(1, 2)) {
+        suffix <- c("", "_1")[n]
+        trimmed <- n == 2
+        fastqc_fn <- fs::path(
+            path,
+            str_glue("multiqc_fastqc{suffix}.txt")
+        )
+        if (fs::file_exists(fastqc_fn)) {
+            fastqc_data <- load_fastqc(fastqc_fn, trimmed)
+            if (is.null(fastqc)) {
+                fastqc <- fastqc_data
+            } else {
+                fastqc <- bind_rows(fastqc, fastqc_data)
+            }
+       }
     }
+}
 
+load_fastqc <- function(fastqc_fn, trimmed) {
     message("  Loading ", if (trimmed) "trimmed" else "raw",
             " read fastqc data")
     fastqc_data <- read_tsv(fastqc_fn, show_col_types = FALSE) %>%
@@ -153,14 +97,7 @@ for (n in c(1, 2)) {
 
     message("  Determining sample sheet column matching fastqc ids")
     # Find columns identifying the fastqc files in sample sheet
-    fastqc_idcolumns <- names(which(sapply(sample_sheet, function(x) {
-        (
-            # column must be unique:
-            n_distinct(x) == length(x)
-            # and must list all fastqc_id's
-            && all(fastqc_data$fastqc_id %in% as.character(x))
-        )
-    })))
+    fastqc_idcolumns <- get_idcols(sample_sheet, fastqc_data$fastqc_id)
     if (length(fastqc_idcolumns) == 0) {
         rlang::abort(paste(
             "Can't find columns identifying files.",
@@ -220,51 +157,32 @@ for (n in c(1, 2)) {
         print(filter(fastqc_data, is.na(fastq_file_path)))
         message("---- END fastqc data w/o file path ----")
     }
-
-    # Add to metadata
-    if (is.null(metadata$fastqc)) {
-        metadata$fastqc <- fastqc_data
-    } else {
-        metadata$fastqc <- bind_rows(metadata$fastqc, fastqc_data)
-    }
-}
-if (!is.null(metadata$fastqc)) {
-    # Show this (tibble, so will be short)
-    print(metadata$fastqc)
+    fastqc_data
 }
 
-message("2.3. ----------- Loading GTF ----------")
-message("Filename = ", snakemake@input$gtf)
-gr <- rtracklayer::import.gff(snakemake@input$gtf)
-
-if (snakemake@params$input_type == "Salmon") {
-    message("3.1. ---------- Checking for failed samples --------")
-    files <- snakemake@input$counts
-    names(files) <- gsub(".salmon", "", basename(dirname(files)))
-    files <- files[order(names(files))]
-
-    no_data <- future_sapply(files, function(fn) {
+is_header_only_csv <- function(files, col_types) {
+    future_sapply(files, function(fn) {
         nrow(read_tsv(
             fn, n_max = 1, guess_max = 1,
             col_types = "cdddd", lazy = FALSE,
             progress = FALSE
         )) == 0
     })
+}
 
-    if (any(no_data)) {
-        message("Warning: excluded ", length(which(no_data)),
-                " failed samples:")
-        message("  ", paste(names(files[no_data]), collapse = ", "))
-        metadata$failed_samples <- names(files[no_data])
+# First, run tximport on threads chunks in parallel as parsing
+# the files takes quite a while (seconds per file, which adds when
+# you have thousands of samples).
+parallel_load_txi <- function(files, threads) {
+    # from parallel package - splits list into ncl sub-lists with even
+    # length; modified to return no empty lists if |x|<ncl
+    split_list <- function(x, ncl) {
+        ncl <- min(length(x), ncl)
+        lapply(splitIndices(length(x), ncl), function(i) x[i])
     }
 
-    message("3.2. ----------- Loading quant.sf files ----------")
-
-    # First, run tximport on threads chunks in parallel as parsing
-    # the files takes quite a while (seconds per file, which adds when
-    # you have thousands of samples).
     txi_parts <- future_lapply(
-        split_list(files[!no_data], snakemake@threads),
+        split_list(files, threads),
         tximport,
         type = "salmon",
         txOut = TRUE
@@ -279,60 +197,125 @@ if (snakemake@params$input_type == "Salmon") {
         )
     }
     txi$countsFromAbundance <- txi_parts[[1]]$countsFromAbundance
-    rm(txi_parts)
+    return(txi)
+}
 
+txi_add_zero_samples <- function(txi, samples) {
     # Add fake data (zero, avg length) for the failed samples
-    if (length(metadata$failed_samples) > 0) {
-        cols <- length(metadata$failed_samples)
-        rows <- nrow(txi$abundance)
-        zeroes <- matrix(rep(0, cols * rows), ncol = cols)
-        colnames(zeroes) <- metadata$failed_samples
-        lengths <- matrix(rep(rowMeans(txi$length), cols), ncol = cols)
-        colnames(lengths) <- metadata$failed_samples
-        txi$counts <- cbind(txi$counts, zeroes)
-        txi$abundance <- cbind(txi$abundance, zeroes)
-        txi$length <- cbind(txi$length, lengths)
+    if (length(samples) == 0) {
+        return(txi)
     }
+    cols <- length(samples)
+    rows <- nrow(txi$abundance)
+    zeroes <- matrix(rep(0, cols * rows), ncol = cols)
+    colnames(zeroes) <- samples
+    lengths <- matrix(rep(rowMeans(txi$length), cols), ncol = cols)
+    colnames(lengths) <- samples
+    txi$counts <- cbind(txi$counts, zeroes)
+    txi$abundance <- cbind(txi$abundance, zeroes)
+    txi$length <- cbind(txi$length, lengths)
+    return(txi)
+}
 
-    message("3.3. ----------- Loading meta_info.json files ----------")
-    salmon_all_meta <-
-        files[!no_data] %>%
+salmon_load_meta <- function(files, consistency_check = TRUE, logfile = NULL) {
+    res <- list()
+    read_json_nolist <- function(fname, ...) {
+        tmp <- jsonlite::read_json(fname, ...)
+        tmp[sapply(tmp, function(x) length(x) == 1)]
+    }
+    res$all <- files %>%
         gsub("/quant.sf", "/aux_info/meta_info.json", .) %>%
-        future_map_dfr(read_json_nolist, simplifyVector = TRUE,
-                      .id = "idcolumn")
-
-    # Extract data varying per sample
-    extra_coldata <- salmon_all_meta %>%
+        future_map_dfr(
+            read_json_nolist,
+            simplifyVector = TRUE,
+            .id = "idcolumn"
+        )
+    res$varying <- res$all %>%
         select(where(~ length(unique(.x)) != 1)) %>%
         select(-start_time, -end_time)
-
-    must_be_identical <- c(
-        "index_decoy_seq_hash",
-        "index_decoy_name_hash",
-        "num_decoy_targets",
-        "index_seq_hash",
-        "index_name_hash",
-        "num_valid_targets",
-        "seq_bias_correct",
-        "gc_bias_correct",
-        "salmon_version"
-    )
-
-    if (length(intersect(colnames(extra_coldata), must_be_identical)) > 0) {
-        errorfn <- paste0(logfile, ".error.csv")
-        message("Samples were run with multiple references or ",
-                "varied parameters. Refusing to aggregate.",
-                "Writing coldata to ", errorfn)
-        readr::write_csv(extra_coldata, errorfn)
-        stop()
-    }
-
-    # Extract data constant across dataset
-    metadata$salmon <- salmon_all_meta %>%
+    res$constant <- res$all %>%
         summarize(
             across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1])
         ) %>%
         as.list()
+    if (consistency_check) {
+        must_be_constant <- c(
+            "index_decoy_seq_hash",
+            "index_decoy_name_hash",
+            "num_decoy_targets",
+            "index_seq_hash",
+            "index_name_hash",
+            "num_valid_targets",
+            "seq_bias_correct",
+            "gc_bias_correct",
+            "salmon_version"
+        )
+        if (any(colnames(res$varying) %in% must_be_constant)) {
+            if (!is.null(logfile)) {
+                errorfn <- paste0(logfile, ".error.csv")
+                message("Writing salmon metadata to ", errorfn)
+                readr::write_csv(res$all, errorfn)
+            }
+            rlang::abort(
+                "Samples were run with multiple references or ",
+                "varied parameters. Refusing to aggregate."
+            )
+        }
+    }
+    res
+}
+
+message("2. ----------- Loading files ----------")
+message("2.1. ----------- Loading Sample Sheet ----------")
+message("Filename = ", snakemake@input$meta)
+
+sample_sheet <- read_tsv(snakemake@input$meta, show_col_types = FALSE) %>%
+    dplyr::select(where(~!all(is.na(.))))
+
+metadata <- list(
+    virprof_version = snakemake@params$version,
+    pipeline = snakemake@params$label,
+    date = now(),
+    sample_sheet = sample_sheet
+)
+
+message("2.2. ----------- Loading MultiQC Report Data ----------")
+
+metadata$fastqc <- load_all_fastqc(sample_sheet, snakemake@input$multiqc)
+if (!is.null(metadata$fastqc)) {
+    # Show this (tibble, so will be short)
+    print(metadata$fastqc)
+}
+
+message("2.3. ----------- Loading GTF ----------")
+message("Filename = ", snakemake@input$gtf)
+gr <- rtracklayer::import.gff(snakemake@input$gtf)
+
+if (snakemake@params$input_type == "Salmon") {
+    files <- snakemake@input$counts
+    names(files) <- gsub(".salmon", "", basename(dirname(files)))
+    files <- files[order(names(files))]
+
+    message("3.1. ---------- Checking for failed samples --------")
+    no_data <- is_header_only_csv(files, col_types = "cdddd")
+    metadata$failed_samples <- if (any(no_data)) {
+        message("Warning: excluded ", length(which(no_data)),
+                " failed samples:")
+        message("  ", paste(names(files[no_data]), collapse = ", "))
+        names(files[no_data])
+    } else {
+        c()
+    }
+
+    message("3.2. ----------- Loading quant.sf files ----------")
+    txi <- parallel_load_txi(files[!no_data], snakemake@threads)
+    txi <- txi_add_zero_samples(txi, metadata$failed_samples)
+
+
+    message("3.3. ----------- Loading meta_info.json files ----------")
+    salmon_meta <- salmon_load_meta(files[!no_data], logfile = logfile)
+    extra_coldata <- salmon_meta$varying
+    metadata$salmon <- salmon_meta$constant
 } else if (snakemake@params$input_type == "RSEM") {
     files <- snakemake@input$transcripts
     names(files) <- gsub(".isoforms.results", "", basename(files))
@@ -362,11 +345,7 @@ message("4.1. ----------- Preparing colData (sample sheet) -----------")
 #
 # This needs `names(files)` to be the sample names extracted from Salmon
 # or RSEM above. Columns must be unique and containing those names.
-idcolumns <- names(which(sapply(sample_sheet, function(x) {
-    n_distinct(x) == length(x) && # column must be unique
-        all(names(files) %in% as.character(x)) # must identify each sample
-})))
-
+idcolumns <- get_idcols(sample_sheet, names(files))
 if (length(idcolumns) == 0) {
     message("The sample sheet columns and file names didn't match up.",
             " Something is wrong. Bailing out.")
@@ -597,3 +576,53 @@ if (snakemake@params$input_type == "ExonSE") {
     saveRDS(metadata(gse), snakemake@output$stats)
 }
 message("done")
+q()
+
+
+if (FALSE) {
+    # This creates a snakemake object such as is passed to us from
+    # snakemake. Useful for debugging interactively.
+    Snakemake <- methods::setClass(
+        "Snakemake",
+        slots = c(
+            input = "list",
+            output = "list",
+            params = "list",
+            wildcards = "list",
+            threads = "numeric",
+            log = "list",
+            resources = "list",
+            config = "list",
+            rule = "character",
+            bench_iteration = "numeric",
+            scriptdir = "character",
+            source = "function"
+        )
+    )
+    setwd("/Seibold/tmp/pipeline/work")
+    project <- "gala"
+    snakemake <- Snakemake(
+        scriptdir = "/Seibold/tmp/pipeline/work/virprof/rules",
+        source = function(...) {
+            wd <- getwd()
+            setwd(snakemake@scriptdir)
+            source(...)
+            setwd(wd)
+        }
+    )
+    snakemake@input$counts <- fs::dir_ls(
+        path = paste0(project, ".ref_hg38g.qc.quant_salmon_sa"),
+        glob = "*/quant.sf",
+        recurse = TRUE
+    )
+    snakemake@input$meta <- file.path(project, "qiime_mapping.tsv")
+    snakemake@input$multiqc <- paste0(
+        project,
+        ".ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data"
+    )
+    snakemake@input$gtf <- "references/hg38g/ALL.gtf"
+    snakemake@threads <- 16
+    snakemake@params$version <- "0.0.0"
+    snakemake@params$label <- "testing manually"
+    snakemake@params$input_type <- "salmon"
+}
