@@ -486,7 +486,10 @@ if (snakemake@params$input_type == "ExonSE") {
     ribo_genes <-
         rowData(gse) %>%
         as_tibble() %>%
-        filter(gene_type %in% c("rRNA", "rRNA_pseudogene")) %>%
+        filter(
+            !gene_id %in% c(mito_genes),
+            gene_type %in% c("rRNA", "rRNA_pseudogene")
+        ) %>%
         pull(gene_id)
 
     non_coding_genes <-
