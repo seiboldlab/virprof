@@ -114,98 +114,116 @@ message("2.2. ----------- Loading MultiQC Report Data ----------")
 
 # FastQC
 metadata$fastqc <- NULL
-for (n in c(1,2)) {
+for (n in c(1, 2)) {
     suffix <- c("", "_1")[n]
-    round <- c("raw", "trimmed")[n]
+    trimmed <- n == 2
     fastqc_fn <- fs::path(
         snakemake@input$multiqc,
         str_glue("multiqc_fastqc{suffix}.txt")
     )
-    if (fs::file_exists(fastqc_fn)) {
-        message("  Loading ", round, " read fastqc data")
-        df <- read_tsv(fastqc_fn, show_col_types = FALSE) %>%
-            # Sequence length can be `95` or `95-151`, split here
-            tidyr::separate(
-                col = `Sequence length`,
-                into = c("read_len_min", "read_len_max"),
-                convert = TRUE,
-                fill = "right"
-            ) %>%
-            transmute(
-                # filename is just sample.R[12].fq.gz, ignoring
-                fastqc_id = sub(".R[12]$", "", Sample),
-                mate = if_else(str_ends(Sample, "R2"), "R2", "R1"),
-                num_reads = `Total Sequences`,
-                read_len_min,
-                read_len_max = ifelse(
-                    is.na(read_len_max), read_len_min, read_len_max
-                ),
-                read_len_avg = avg_sequence_length,
-                pct_gc = `%GC`,
-                # This is the percentage of unique reads (dedup/total)
-                pct_unique = total_deduplicated_percentage,
-                trimmed = round == "trimmed"
-            )
-        # Find columns identifying the fastqc files in sample sheet
-        fastqc_idcolumns <- names(which(sapply(sample_sheet, function(x) {
-            n_distinct(x) == length(x) && # column must be unique
-                # must identify each sample
-                all(df$fastqc_id %in% as.character(x))
-        })))
-        if (length(fastqc_idcolumns) == 0) {
-            rlang::abort(paste(
-                "Can't find columns identifying files.",
-                "Check whether {project}/qiime_mapping.csv is up to date"
-            ))
-        }
-        message("    FastQC data in ", round, " identified by: ",
-                paste(fastqc_idcolumns, collapse = ", "))
-        # Extract paths
-        #
-        # FIXME: This is a bad hack. We should get the detected fwd
-        #        and rev read from YMP somehow. Also, this won't work
-        #        for SRR sources.
-        fastq_id_to_path <- sample_sheet %>%
-            pivot_longer(
-                cols = where(~any(str_detect(., "(fastq|fq).gz"),
-                                  # must return T/F, no NA to where:
-                                  na.rm = TRUE )),
-                values_to = "fastq_file_path",
-                names_to = "path_col"
-            ) %>%
-            mutate(
-                # Deduce mate from file name
-                mate = if_else(
-                    str_detect(basename(fastq_file_path), "(_|\\.)R1"),
-                    "R1", "R2"
-                )
-            ) %>%
-            # Remove anything we can't uniquely match
-            group_by(across(fastqc_idcolumns[1]), mate) %>%
-            filter(n() == 1) %>%
-            ungroup()
-        # Merge this into the fastqc df
-        df <- df %>%
-            left_join(
-                fastq_id_to_path,
-                by = c(fastqc_id = fastqc_idcolumns[1], "mate")
-            )
-        if (any(is.na(df$fastq_file_path))) {
-            message(
-                "WARNING: ",
-                "Failed to identify fastq file paths for all samples"
-            )
-            message("---- BEGIN fastqc data w/o file path ----")
-            print(filter(df, is.na(fastq_file_path)))
-            message("---- END fastqc data w/o file path ----")
-        }
-        # Rename sample column to it's name from the sample sheet
-        df <- df %>% dplyr::rename("{fastqc_idcolumns[1]}" := fastqc_id)
-        if (is.null(metadata$fastqc)) {
-            metadata$fastqc <- df
-        } else {
-            metadata$fastqc <- bind_rows(metadata$fastqc, df)
-        }
+    if (!fs::file_exists(fastqc_fn)) {
+        next
+    }
+
+    message("  Loading ", if (trimmed) "trimmed" else "raw",
+            " read fastqc data")
+    fastqc_data <- read_tsv(fastqc_fn, show_col_types = FALSE) %>%
+        # Sequence length can be `95` or `95-151`, split here
+        tidyr::separate(
+            col = `Sequence length`,
+            into = c("read_len_min", "read_len_max"),
+            convert = TRUE,
+            fill = "right"
+        ) %>%
+        transmute(
+            # filename is just sample.R[12].fq.gz, ignoring
+            fastqc_id = sub(".R[12]$", "", Sample),
+            mate = if_else(str_ends(Sample, "R2"), "R2", "R1"),
+            num_reads = `Total Sequences`,
+            read_len_min,
+            read_len_max = ifelse(
+                is.na(read_len_max), read_len_min, read_len_max
+            ),
+            read_len_avg = avg_sequence_length,
+            pct_gc = `%GC`,
+            # This is the percentage of unique reads (dedup/total)
+            pct_unique = total_deduplicated_percentage,
+            trimmed = trimmed
+        )
+
+    message("  Determining sample sheet column matching fastqc ids")
+    # Find columns identifying the fastqc files in sample sheet
+    fastqc_idcolumns <- names(which(sapply(sample_sheet, function(x) {
+        (
+            # column must be unique:
+            n_distinct(x) == length(x)
+            # and must list all fastqc_id's
+            && all(fastqc_data$fastqc_id %in% as.character(x))
+        )
+    })))
+    if (length(fastqc_idcolumns) == 0) {
+        rlang::abort(paste(
+            "Can't find columns identifying files.",
+            "Check whether {project}/qiime_mapping.csv is up to date"
+        ))
+    }
+    message("  FastQC files identified by: ",
+            paste(fastqc_idcolumns, collapse = ", "))
+
+    # Extract paths
+    #
+    # FIXME: This is a bad hack. We should get the detected fwd
+    #        and rev read from YMP somehow. Also, this won't work
+    #        for SRR sources.
+    fastq_id_to_path <- sample_sheet %>%
+        # One row per FQ file
+        pivot_longer(
+            cols = where(
+                ~any(str_detect(., "(fastq|fq).gz$"), na.rm = TRUE)
+            ),
+            values_to = "fastq_file_path",
+            names_to = "path_col"
+        ) %>%
+        mutate(
+            # Make sure ID columns are character
+            across(all_of(fastqc_idcolumns), as.character),
+            # Deduce mate from file name
+            mate = if_else(
+                str_detect(basename(fastq_file_path), "(_|\\.)R1"),
+                "R1", "R2"
+            ),
+            # Pick ID column
+            fastqc_id = as.character(.data[[fastqc_idcolumns[1]]])
+        ) %>%
+        # Remove anything we can't uniquely match
+        group_by(fastqc_id, mate) %>%
+        filter(n() == 1) %>%
+        ungroup()
+
+    # Merge this into the fastqc df
+    fastqc_data <- fastqc_data %>%
+        left_join(
+            fastq_id_to_path,
+            by = c("fastqc_id", "mate")
+        ) %>%
+        # move ids to front
+        relocate(any_of(fastqc_idcolumns))
+
+    if (any(is.na(fastqc_data$fastq_file_path))) {
+        message(
+            "WARNING: ",
+            "Failed to identify fastq file paths for all samples"
+        )
+        message("---- BEGIN fastqc data w/o file path ----")
+        print(filter(fastqc_data, is.na(fastq_file_path)))
+        message("---- END fastqc data w/o file path ----")
+    }
+
+    # Add to metadata
+    if (is.null(metadata$fastqc)) {
+        metadata$fastqc <- fastqc_data
+    } else {
+        metadata$fastqc <- bind_rows(metadata$fastqc, fastqc_data)
     }
 }
 if (!is.null(metadata$fastqc)) {
