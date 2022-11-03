@@ -207,7 +207,9 @@ for (n in c(1, 2)) {
             by = c("fastqc_id", "mate")
         ) %>%
         # move ids to front
-        relocate(any_of(fastqc_idcolumns))
+        relocate(any_of(fastqc_idcolumns)) %>%
+        # remove convenience fastqc_id
+        select(-fastqc_id)
 
     if (any(is.na(fastqc_data$fastq_file_path))) {
         message(
