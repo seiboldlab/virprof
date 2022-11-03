@@ -208,6 +208,10 @@ for (n in c(1,2)) {
         }
     }
 }
+if (!is.null(metadata$fastqc)) {
+    # Show this (tibble, so will be short)
+    print(metadata$fastqc)
+}
 
 message("2.3. ----------- Loading GTF ----------")
 message("Filename = ", snakemake@input$gtf)
@@ -352,6 +356,8 @@ if (length(idcolumns) == 0) {
     print(as.data.frame(files))
     stop("Unable to determine id columns")
 }
+message("Samples in output identified by: ",
+        paste(idcolumns, collapse = ", "))
 
 coldata <- sample_sheet %>%
     # Make sure all idcolumns are character type (we don't want these
@@ -375,11 +381,13 @@ coldata <- sample_sheet %>%
         extra_coldata,
         by = set_names("idcolumn", idcolumns[[1]])
     )
+message("Coldata:")
+print(coldata)
 
 # Sort array columns to match coldata
 for (assay in c("counts", "abundance", "length")) {
     message("Sorting ", assay)
-    txi[[assay]] <- txi[[assay]][, coldata[[ idcolumns[1] ]] ]
+    txi[[assay]] <- txi[[assay]][, coldata[[idcolumns[1]]]]
 }
 
 if (snakemake@params$input_type == "ExonSE") {
