@@ -231,8 +231,8 @@ salmon_load_meta <- function(files, consistency_check = TRUE, logfile = NULL) {
             .id = "idcolumn"
         )
     res$varying <- res$all %>%
-        select(where(~ length(unique(.x)) != 1)) %>%
-        select(-start_time, -end_time)
+        select(-start_time, -end_time) %>%
+        select(where(~ length(unique(.x)) != 1))
     res$constant <- res$all %>%
         summarize(
             across(where(~ length(unique(.x)) == 1), ~ unique(.x)[1])
@@ -374,19 +374,23 @@ coldata <- sample_sheet %>%
         num_units = n(),
         .groups = "drop"
     ) %>%
-    arrange(across(all_of(idcolumns))) %>%
+    arrange(across(all_of(idcolumns)))
+
+if (idcolumns[[1]] %in% colnames(extra_coldata)) {
     # Merge in the extra_coldata gathered above
-    left_join(
+    coldata <- coldata %>% left_join(
         extra_coldata,
         by = set_names("idcolumn", idcolumns[[1]])
     )
+}
+
 message("Coldata:")
 print(coldata)
 
 # Sort array columns to match coldata
 for (assay in c("counts", "abundance", "length")) {
     message("Sorting ", assay)
-    txi[[assay]] <- txi[[assay]][, coldata[[idcolumns[1]]]]
+    txi[[assay]] <- txi[[assay]][, coldata[[idcolumns[1]]], drop = FALSE]
 }
 
 if (snakemake@params$input_type == "ExonSE") {
@@ -518,22 +522,22 @@ if (snakemake@params$input_type == "ExonSE") {
     mapping <- colSums(assay(gse)) %>%
         enframe(name = idcolumns[[1]], value = "count_total") %>%
         left_join(
-            colSums(assay(gse)[mito_genes, ]) %>%
+            colSums(assay(gse)[mito_genes, , drop = FALSE]) %>%
                 enframe(name = idcolumns[[1]], value = "count_mito"),
             by = idcolumns[[1]]
         ) %>%
         left_join(
-            colSums(assay(gse)[ribo_genes, ]) %>%
+            colSums(assay(gse)[ribo_genes, , drop = FALSE]) %>%
                 enframe(name = idcolumns[[1]], value = "count_ribo"),
             by = idcolumns[[1]]
         ) %>%
         left_join(
-            colSums(assay(gse)[non_coding_genes, ]) %>%
+            colSums(assay(gse)[non_coding_genes, , drop = FALSE]) %>%
                 enframe(name = idcolumns[[1]], value = "count_noncoding"),
             by = idcolumns[[1]]
         ) %>%
         left_join(
-            colSums(assay(gse)[coding_genes, ] > 0) %>%
+            colSums(assay(gse)[coding_genes, , drop = FALSE] > 0) %>%
                 enframe(name = idcolumns[[1]], value = "num_expr_genes"),
             by = idcolumns[[1]]
         ) %>%
@@ -549,9 +553,9 @@ if (snakemake@params$input_type == "ExonSE") {
     message("8. ----------- Try Generating PCA data ----------")
 
     tryCatch({
-        dds <- DESeqDataSet(gse[coding_genes, ], design = ~ 1)
-        dds <- dds[, colSums(counts(dds)) > 0]
-        dds <- dds[rowSums(counts(dds)) > 0, ]
+        dds <- DESeqDataSet(gse[coding_genes, , drop = FALSE], design = ~ 1)
+        dds <- dds[, colSums(counts(dds)) > 0, drop = FALSE]
+        dds <- dds[rowSums(counts(dds)) > 0, , drop = FALSE]
         # Using poscounts type size factor estimation so we don't fail
         # if there is no gene without zeros.
         dds <- estimateSizeFactors(dds, type = "poscounts")
@@ -624,5 +628,5 @@ if (FALSE) {
     snakemake@threads <- 16
     snakemake@params$version <- "0.0.0"
     snakemake@params$label <- "testing manually"
-    snakemake@params$input_type <- "salmon"
+    snakemake@params$input_type <- "Salmon"
 }
