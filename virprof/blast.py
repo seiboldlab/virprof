@@ -7,13 +7,12 @@ Parsers for blast output formats 6 (CSV) and 7 (CSV with comments between querie
 import logging
 
 from collections import namedtuple
-from typing import List
+from typing import List, NamedTuple, Iterator, Mapping, Callable
+
+LOG = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
-log = logging.getLogger(__name__)  # pylint: disable=invalid-name
-
-
-def reader(fileobj, t: int = 7) -> "BlastParser":
+def reader(fileobj, fmt: int = 7) -> "BlastParser":
     """
     Creates a reader for files in BLAST format
 
@@ -24,17 +23,16 @@ def reader(fileobj, t: int = 7) -> "BlastParser":
 
     Args:
       fileobj: iterable yielding lines in blast format
-      t: number of blast format type
+      fmt: number of blast format type
     """
-    if t == 7:
+    if fmt == 7:
         return Fmt7Parser(fileobj)
-    elif t == 6:
+    if fmt == 6:
         return Fmt6Parser(fileobj)
-    else:
-        raise NotImplementedError()
+    raise NotImplementedError()
 
 
-def writer(fileobj, t: int = 7) -> "BlastWriter":
+def writer(fileobj, fmt: int = 7) -> "BlastWriter":
     """
     Creates a writer for files in BLAST format
 
@@ -43,22 +41,23 @@ def writer(fileobj, t: int = 7) -> "BlastWriter":
     >>>    for hit in hits:
     >>>       writer.write_hit(hit)
     """
-    if t == 7:
+    if fmt == 7:
         return Fmt7Writer(fileobj)
-    else:
-        raise NotImplementedError()
+    raise NotImplementedError()
 
 
-class BlastBase(object):
+class BlastBase:
     "Base class for BLAST readers and writers"
 
+    @staticmethod
     def tupleofint(text):
+        """Converts semicolon separated character string into tuple of int"""
         if text == "N/A":
             return tuple()
         try:
             return tuple(int(i) for i in text.split(";"))
         except ValueError:
-            log.warning(f"Error parsing BLAST file at line='{text}'")
+            LOG.warning("Error parsing BLAST file at line='%s'", text)
             return tuple()
 
     #: Map between field short and long names
@@ -101,7 +100,8 @@ class BlastBase(object):
         # "": "scomname",  # Subject Common Name
         # "": "sblastname",  # Subject Blast Name
         # "": "sskingdom",  # Subject Super Kingdom
-        "subject tax ids": "staxids",  # sorted unique ';'-separated Subject Taxonomy ID(s)
+        "subject tax ids": "staxids",  # sorted unique ';'-separated
+                                       # Subject Taxonomy ID(s)
         # "": "sscinames",  # unique Subject Scientific Name(s)
         # "": "scomnames",  # unique Subject Common Name(s)
         # "": "sblastnames",  # unique Subject Blast Name(s)
@@ -118,7 +118,7 @@ class BlastBase(object):
     FIELD_REV_MAP = {value: key for key, value in FIELD_MAP.items()}
 
     #: Map defining types of fields
-    FIELD_TYPE = {
+    FIELD_TYPE: Mapping[str, Callable] = {
         "pident": float,
         "length": int,
         "mismatch": int,
@@ -138,20 +138,42 @@ class BlastBase(object):
     }
 
 
+class BlastHit(NamedTuple):
+    # pylint: disable=too-few-public-methods
+    """Base type for a BLAST hit
+
+    This class is only used for type checking.
+    """
+    qacc: str
+    score: float
+    sacc: str
+    send: int
+    sstart: int
+    qstart: int
+    qend: int
+    qlen: int
+    pident: float
+    length: int
+    stitle: str
+    staxids: List[int]
+    bitscore: int
+    btop: str
+
+
 class BlastParser(BlastBase):
     """Base class for BLAST readers"""
 
     def get_fields(self):
         raise NotImplementedError()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[BlastHit]:
         raise NotImplementedError()
 
 
 class BlastWriter(BlastBase):
     """Base class for BLAST writers"""
 
-    def write_hit(self, hit):
+    def write_hit(self, hit: BlastHit):
         raise NotImplementedError()
 
 
@@ -170,6 +192,7 @@ class Fmt7Parser(BlastParser):
         self.fields = None
         self.query = "undefined"
         self.database = "undefined"
+        self.Hit = None
         if "BLAST" not in fileobj.readline():
             raise ValueError("not a BLAST7 formatted file")
 
@@ -185,7 +208,7 @@ class Fmt7Parser(BlastParser):
         """
         return self.fields
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[BlastHit]:
         for line in self.fileobj:
             if line.startswith(self.FIELDS):
                 self.fields = [

@@ -99,6 +99,17 @@ def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
     return result
 
 
+def classify_contigs(hitgroups: Iterable[List[BlastHit]], taxonomy):
+    """Classify each input contig"""
+    result = {}
+    for hitgroup in hitgroups:
+        lca = taxonomy.get_lca(
+            (hit.staxids[0], hit.bitscore) for hit in hitgroup
+        )
+        result[hitgroup[0].qacc] = lca
+    return result
+
+
 @click.command()
 @click.option(
     "--in-blast7",
@@ -271,6 +282,7 @@ def cli(
     taxonomy = load_taxonomy(ncbi_taxonomy)
 
     if not no_standard_excludes:
+        # Prune uninformative hits
         prefilter += (
             "artificial sequences",
             "unclassified sequences",
@@ -280,12 +292,12 @@ def cli(
             "uncultured phage",
             "uncultured virus",
         )
+        # Exclude results hitting humans
         exclude += ("Hominidae",)
-
-    LOG.info(f"Excluding: {exclude}")
-
     taxfilter_pre = taxonomy.make_filter(exclude=prefilter)
     taxfilter = taxonomy.make_filter(include, exclude)
+    taxfilter_preclass = taxonomy.make_filter(exclude=("Boreoeutheria","Euteleostomi"))
+    LOG.info(f"Excluding from final results: {' '.join(exclude)}")
 
     LOG.info("Writing bins to: %s", out.name)
     fields = ["sample", "words"] + chain_tpl.fields + ["taxid"]
@@ -317,11 +329,20 @@ def cli(
         sum(len(hitgroup) for hitgroup in hitgroups),
     )
 
-    # Filter
+    # Filter minimum read coverage
     if in_coverage:
         assert isinstance(chain_tpl, CoverageHitChain)
         hitgroups = list(chain_tpl.filter_hitgroups(hitgroups, min_read_count))
-    filtered_hits = prefilter_hits_taxonomy(hitgroups, taxfilter_pre)
+
+    contig_lcas = classify_contigs(hitgroups, taxonomy)
+    filtered_hits = [
+        hitgroup for hitgroup in hitgroups
+        if taxfilter_preclass(contig_lcas[hitgroup[0].qacc].classify()[0])
+    ]
+    LOG.info("Removed %i contigs classified into exclusion taxa",
+             len(hitgroups) - len(filtered_hits))
+
+    filtered_hits = prefilter_hits_taxonomy(filtered_hits, taxfilter_pre)
     filtered_hits = prefilter_hits_score(filtered_hits)
     LOG.info(
         "After prefiltering, %i contigs with %i hits remain",

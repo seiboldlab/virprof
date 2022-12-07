@@ -2,12 +2,12 @@
 
 import os
 
-from typing import List, Iterator
+from typing import List, Iterator, Iterable
 
-from ..blastbin import BlastHit
+from ..blast import BlastHit
 
 
-def group_hits_by_qacc(hits: List[BlastHit]) -> Iterator[List[BlastHit]]:
+def group_hits_by_qacc(hits: Iterable[BlastHit]) -> Iterator[List[BlastHit]]:
     """Groups input hits into lists with same query accession
 
     Assumes that the hits are sorted by qacc (as is the case for BLAST)

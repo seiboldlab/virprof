@@ -5,7 +5,6 @@ import logging
 import math
 from collections import defaultdict
 from typing import (
-    NamedTuple,
     List,
     Sequence,
     Set,
@@ -19,7 +18,8 @@ from typing import (
 
 import tqdm  # type: ignore
 
-from virprof.regionlist import RegionList
+from .regionlist import RegionList
+from .blast import BlastHit
 
 LOG = logging.getLogger(__name__)
 
@@ -71,28 +71,6 @@ def bitscore(score: float, blast: str = "blastn") -> float:
     """
     blast_l, blast_k = BLAST_CONSTANTS[blast]
     return -round((-blast_l * score + math.log(blast_k)) / math.log(2), 2)
-
-
-class BlastHit(NamedTuple):
-    # pylint: disable=too-few-public-methods
-    """Base type for a BLAST hit
-
-    This class is only used for type checking.
-    """
-    qacc: str
-    score: float
-    sacc: str
-    send: int
-    sstart: int
-    qstart: int
-    qend: int
-    qlen: int
-    pident: float
-    length: int
-    stitle: str
-    staxids: List[int]
-    bitscore: int
-    btop: str
 
 
 class OverlapException(Exception):
@@ -373,9 +351,6 @@ class HitChain:
     def to_dict(self) -> Dict[str, Any]:
         """Convert class to dict for writing to CSV"""
 
-        def range_str(ranges):
-            return ";".join("{}-{}".format(*rang) for rang in ranges)
-
         return {
             "log_evalue": self.log10_evalue,
             "slen": self.slen,
@@ -578,7 +553,8 @@ class CoverageHitChain(HitChain):
                 yield hitgroup
             else:
                 filtered += 1
-        LOG.info(f"Removed {filtered} contigs having < {min_read_count} reads")
+        LOG.info("Removed %i contigs having < %i reads",
+                 filtered, min_read_count)
 
     def to_dict(self) -> Dict[str, Any]:
         res = super().to_dict()
