@@ -553,8 +553,7 @@ class CoverageHitChain(HitChain):
                 yield hitgroup
             else:
                 filtered += 1
-        LOG.info("Removed %i contigs having < %i reads",
-                 filtered, min_read_count)
+        LOG.info("Removed %i contigs having < %i reads", filtered, min_read_count)
 
     def to_dict(self) -> Dict[str, Any]:
         res = super().to_dict()

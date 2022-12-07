@@ -15,7 +15,7 @@ import tqdm  # type: ignore
 
 
 #: Increase CSV field size limit to 2GB
-csv.field_size_limit(2**31)
+csv.field_size_limit(2 ** 31)
 
 
 class TqdmHandler(logging.Handler):

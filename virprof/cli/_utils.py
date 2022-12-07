@@ -1,10 +1,14 @@
 """Helper functions common to cli code"""
 
 import os
+import logging
 
-from typing import List, Iterator, Iterable
+from typing import List, Iterator, Iterable, Callable
 
 from ..blast import BlastHit
+
+
+LOG = logging.getLogger(__name__)
 
 
 def group_hits_by_qacc(hits: Iterable[BlastHit]) -> Iterator[List[BlastHit]]:
@@ -45,3 +49,41 @@ def get_fnames_from_file(fdes):
             f"Missing files listed in {fdes.name}:\n" f"{', '.join(missing)}\n"
         )
     return fnames
+
+
+def filter_contigs(
+    hitgroups: Iterable[List[BlastHit]], prefilter: Callable[[int], bool]
+) -> List[List[BlastHit]]:
+    """Filter BLAST search results at query level
+
+    The input hitgroups are expected to each comprise HSPs from the
+    same query sequence. Query sequences (i.e. the group of HSPs) are
+    removed based the return value of the ``prefilter`` function. For
+    each query, the taxids of the matched subject sequence are fed to
+    the function. If it returns `False` for more than half of the
+    matches within 90% bitscore of the best match, the query/hitgroup
+    is excluded from the output.
+
+    Args:
+      hitgroups: BlastHits grouped by query accession
+      prefilter: function flagging NCBI taxids to keep
+
+    Returns:
+      Filtered subset of hitgroups
+
+    """
+    n_filtered = 0
+    result = []
+    for hitgroup in hitgroups:
+        minscore = max(hit.bitscore for hit in hitgroup) * 0.9
+        top_keep = [
+            all(prefilter(taxid) for taxid in hit.staxids)
+            for hit in hitgroup
+            if hit.bitscore > minscore
+        ]
+        if top_keep.count(True) >= len(top_keep) / 2:
+            result.append(hitgroup)
+        else:
+            n_filtered += 1
+    LOG.info("Removed %i contigs matching prefilter taxonomy branches", n_filtered)
+    return result

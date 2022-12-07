@@ -16,7 +16,7 @@ from typing import (
     Optional,
     Union,
     List,
-    cast
+    cast,
 )
 from collections import Counter
 
@@ -200,8 +200,7 @@ class Taxonomy(ABC):
 
     @abstractmethod
     def get_lca(
-            self,
-            tax_ids: Union[Iterable[int], Iterable[Tuple[int, int]]]
+        self, tax_ids: Union[Iterable[int], Iterable[Tuple[int, int]]]
     ) -> "LCA":
         """Create an LCA object"""
         raise NotImplementedError()
@@ -418,8 +417,7 @@ class TaxonomyGT(Taxonomy):
         return "Unknown"
 
     def get_lca(
-            self,
-            tax_ids: Union[Iterable[int], Iterable[Tuple[int, int]]]
+        self, tax_ids: Union[Iterable[int], Iterable[Tuple[int, int]]]
     ) -> "LCA":
         """Create an LCA object"""
         return LcaGt(self).add(tax_ids)

@@ -14,7 +14,7 @@ import os
 import csv
 import gzip
 
-from typing import Callable, Iterable, List, Tuple, Optional
+from typing import Iterable, List, Tuple, Optional, Callable, Dict, Any
 
 import click
 
@@ -23,52 +23,63 @@ from ..entrez import FeatureTables, GenomeSizes
 from .. import blast  # type: ignore
 from ..wordscore import WordScorer
 from ..taxonomy import load_taxonomy
-from ._utils import group_hits_by_qacc
+from ._utils import group_hits_by_qacc, filter_contigs
 
 LOG = logging.getLogger(__name__)
 
 
-def prefilter_hits_taxonomy(
-    hitgroups: Iterable[List[BlastHit]], prefilter: Callable[[int], bool]
-) -> List[List[BlastHit]]:
-    """Filter ``hitgroups`` using ``prefilter`` function.
+def prefilter_blast_hits(
+    hitgroups: List[List[BlastHit]],
+    prefilter: Tuple[str, ...],
+    prefilter_contigs: Tuple[str, ...],
+    no_standard_excludes: bool,
+    taxonomy,
+    contig_lcas,
+):
+    """Applies filtering to input blast hits"""
+    # LCA based filtering of entire contigs
+    if not no_standard_excludes:
+        prefilter_contigs += ("Euteleostomi",)
+    if "None" in prefilter_contigs:
+        prefilter_contigs = ()
+    taxfilter_preclass = taxonomy.make_filter(exclude=prefilter_contigs)
+    filtered_hits = [
+        hitgroup
+        for hitgroup in hitgroups
+        if taxfilter_preclass(contig_lcas[hitgroup[0].qacc].classify()[0])
+    ]
+    LOG.info(
+        "Removed %i contigs classified into exclusion taxa",
+        len(hitgroups) - len(filtered_hits),
+    )
 
-    The input hitgroups are expected to each comprise HSPs from the
-    same query sequence. Query sequences (i.e. the group of HSPs) are
-    removed based the return value of the ``prefilter`` function. For
-    each query, the taxids of the matched subject sequence are fed to
-    the function. If it returns `False` for more than half of the
-    matches within 90% bitscore of the best match, the query/hitgroup
-    is excluded from the output.
+    # Prefiltering of using top taxonomy hits
+    if not no_standard_excludes:
+        # Prune uninformative hits
+        prefilter += (
+            "artificial sequences",
+            "unclassified sequences",
+            "uncultured bacterium",
+            "uncultured eukaryote",
+            "uncultured fungus",
+            "uncultured phage",
+            "uncultured virus",
+        )
+    if "None" in prefilter:
+        prefilter = ()
+    filtered_hits = filter_contigs(
+        filtered_hits, taxonomy.make_filter(exclude=prefilter)
+    )
 
-    Args:
-      hitgroups: BlastHits grouped by query accession
-      prefilter: function flagging NCBI taxids to keep
+    # Prefiltering based on score
+    filtered_hits = prefilter_hits_score(filtered_hits)
+    LOG.info(
+        "After prefiltering, %i contigs with %i hits remain",
+        len(filtered_hits),
+        sum(len(hitgroup) for hitgroup in filtered_hits),
+    )
 
-    Returns:
-      Filtered subset of hitgroups
-
-    """
-    n_filtered = 0
-    result = []
-    for hitgroup in hitgroups:
-        minscore = max(hit.bitscore for hit in hitgroup) * 0.9
-        top_keep = [
-            all(prefilter(taxid) for taxid in hit.staxids)
-            for hit in hitgroup
-            if hit.bitscore > minscore
-        ]
-        if top_keep.count(True) >= len(top_keep) / 2:
-            filtered = [
-                hit
-                for hit in hitgroup
-                if all(prefilter(taxid) for taxid in hit.staxids)
-            ]
-            result.append(filtered)
-        else:
-            n_filtered += 1
-    LOG.info(f"Removed {n_filtered} contigs matching prefilter taxonomy branches")
-    return result
+    return filtered_hits
 
 
 def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
@@ -95,7 +106,7 @@ def prefilter_hits_score(hitgroups: Iterable[List[BlastHit]]):
             else:
                 n_filtered += len(hitset)
         result.append(result_group)
-    LOG.info(f"Removed {n_filtered} hits with comparatively low score")
+    LOG.info("Removed %i hits with comparatively low score", n_filtered)
     return result
 
 
@@ -103,11 +114,114 @@ def classify_contigs(hitgroups: Iterable[List[BlastHit]], taxonomy):
     """Classify each input contig"""
     result = {}
     for hitgroup in hitgroups:
-        lca = taxonomy.get_lca(
-            (hit.staxids[0], hit.bitscore) for hit in hitgroup
-        )
+        lca = taxonomy.get_lca((hit.staxids[0], hit.bitscore) for hit in hitgroup)
         result[hitgroup[0].qacc] = lca
     return result
+
+
+def make_genome_size_fetch_function(
+    cache_path: str, ncbi_api_key: Optional[str], genome_size: bool, fields: List[str]
+) -> Callable[[Dict[str, Any], int], None]:
+    """Makes a function to add genome sizes to result if requested"""
+    if not genome_size:
+
+        def dummy_fetcher(_row: Dict[str, Any], _taxid: int) -> None:
+            return
+
+        return dummy_fetcher
+
+    api = GenomeSizes(cache_path=cache_path, api_key=ncbi_api_key)
+    fields.extend(["genome_size_source", "genome_size"])
+
+    def genome_size_fetcher(row: Dict[str, Any], taxid: int) -> None:
+        row["genome_size_source"], row["genome_size"] = api.get(taxid)
+
+    return genome_size_fetcher
+
+
+def make_taxonomy_annotate_function(
+    taxonomy, fields: List[str]
+) -> Callable[[Dict[str, Any], int], None]:
+    """Makes a function to add taxonomy information to result"""
+    fields += ["taxname", "species", "lineage", "lineage_ranks"]
+
+    def taxonomy_annotator(row: Dict[str, Any], taxid: int) -> None:
+        row.update(
+            {
+                "lineage": "; ".join(taxonomy.get_lineage(taxid)),
+                "lineage_ranks": "; ".join(taxonomy.get_lineage_ranks(taxid)),
+                "taxname": taxonomy.get_name(taxid),
+                "species": taxonomy.get_rank(taxid, "species"),
+            }
+        )
+
+    return taxonomy_annotator
+
+
+def make_hitchain_template(
+    in_coverage: Tuple[click.utils.LazyFile, ...], chain_penalty: int
+) -> HitChain:
+    """Creates hitchain template object
+
+    Return can be a CoverageHitChain if we have coverages, otherwise
+    it's a regular HitChain.
+    """
+    if not in_coverage:
+        return HitChain(chain_penalty=chain_penalty)
+
+    chain_tpl = CoverageHitChain(chain_penalty=chain_penalty)
+    cov = {}
+    for cov_fd in in_coverage:
+        fname = os.path.basename(cov_fd.name)
+        cov_sample, _, ext = fname.rpartition(".")
+        if ext != "coverage":
+            LOG.warning(
+                "Parsing of filename '%s' failed. Should end in .coverage", fname
+            )
+        LOG.info("Loading coverage file %s", cov_sample)
+        cov_reader = csv.DictReader(cov_fd, delimiter="\t")
+        cov_data = {row["#rname"]: row for row in cov_reader}
+        cov[cov_sample] = cov_data
+        cov_fd.close()
+    chain_tpl.set_coverage(cov)
+    return chain_tpl
+
+
+def make_writer(
+    description: str, lfile: click.utils.LazyFile, fields: List[str]
+) -> csv.DictWriter:
+    """Makes a dict writer and logs about it"""
+    LOG.info("Writing %s to: %s", description, lfile.name)
+    LOG.info("  output fields: %s", " ".join(fields))
+    writer = csv.DictWriter(lfile, fields)
+    writer.writeheader()
+    return writer
+
+
+def create_blast_reader(
+    in_blast7: click.utils.LazyFile,
+) -> Tuple[str, Iterable[BlastHit]]:
+    """Open input Blast7 file and determine sample name"""
+    fname = os.path.basename(in_blast7.name)
+    if fname.endswith(".gz"):
+        sample, _, ext = fname[:-3].rpartition(".")
+        if ext != "blast7":
+            LOG.warning(
+                "Parsing of filename '%s' failed. Should end in .blast7.gz", fname
+            )
+        unzip = gzip.open(in_blast7.name, "rt")
+        if unzip.read(1) == "":
+            reader: Iterable[BlastHit] = []
+        else:
+            unzip.seek(0)
+            reader = blast.reader(unzip)
+    else:
+        sample, _, ext = fname.rpartition(".")
+        if ext != "blast7":
+            LOG.warning("Parsing of filename '%s' failed. Should end in .blast7")
+        reader = blast.reader(in_blast7)
+    LOG.info("Using sample=%s", sample)
+    return sample, reader
 
 
 @click.command()
@@ -142,34 +256,49 @@ def classify_contigs(hitgroups: Iterable[List[BlastHit]], taxonomy):
     "--out-features",
     "--of",
     type=click.File("w"),
-    help="Output CSV file containing reference feature annotation (one row per feature)",
+    help="Output CSV file containing reference feature annotation"
+    " (one row per feature)",
 )
 @click.option(
     "--ncbi-taxonomy",
     "-t",
     type=click.Path(),
+    required=True,
     help="Path to NCBI taxonomy (tree or raw)",
-)
-@click.option(
-    "--include",
-    "-i",
-    multiple=True,
-    help="Scientific name of NCBI taxonomy node identifying"
-    " subtree to include in output",
 )
 @click.option(
     "--exclude",
     "-e",
     multiple=True,
-    help="Scientific name of NCBI taxonomy node identifying"
-    " subtree to exclude from output",
+    help="Add NCBI taxonomy scientific names to list of taxa"
+    " omitted from final results."
+    " Use 'None' to disable default (Hominidae)",
 )
 @click.option(
-    "--prefilter",
-    "-e",
+    "--include",
+    "-i",
     multiple=True,
-    help="Scientific name of NCBI taxonomy node identifying"
-    " subtree to exclude from input",
+    help="Add NCBI taxonomy scientific names to list of taxa"
+    " included in final results.",
+)
+@click.option(
+    "--prefilter-hits",
+    multiple=True,
+    help="Add NCBI taxonomy scientific names to list of taxa"
+    " filtered from input BLAST search results."
+    " If within 90% bitscore of the top hit more than half"
+    " the hits are removed by this filter, the entire contig"
+    " is excluded."
+    " Use 'None' to disable default (various artificial,"
+    " unclassified and uncultured taxonomy nodes).",
+)
+@click.option(
+    "--prefilter-contigs",
+    multiple=True,
+    help="Add NCBI taxonomy scientific names to list of taxa"
+    " filtered from input contigs as classified by relaxed LCA"
+    " on input BLAST results."
+    " Use 'None' to disable default (Euteleostomi).",
 )
 @click.option(
     "--no-standard-excludes",
@@ -208,12 +337,13 @@ def classify_contigs(hitgroups: Iterable[List[BlastHit]], taxonomy):
 )
 def cli(
     in_blast7: click.utils.LazyFile,
-    in_coverage: click.utils.LazyFile,
+    in_coverage: Tuple[click.utils.LazyFile, ...],
     out: click.utils.LazyFile,
     out_hits: click.utils.LazyFile,
     include: Tuple[str, ...],
     exclude: Tuple[str, ...],
-    prefilter: Tuple[str, ...],
+    prefilter_hits: Tuple[str, ...],
+    prefilter_contigs: Tuple[str, ...],
     out_features: click.utils.LazyFile = None,
     ncbi_taxonomy: Optional[str] = None,
     no_standard_excludes: bool = False,
@@ -228,100 +358,33 @@ def cli(
     """Merge and classify contigs based on BLAST search results"""
     LOG.info("Executing blastbin")
 
+    sample, reader = create_blast_reader(in_blast7)
+    taxonomy = load_taxonomy(ncbi_taxonomy)
+    wordscorer = WordScorer(keepwords=num_words)
+    chain_tpl = make_hitchain_template(in_coverage, chain_penalty)
+
+    fields = chain_tpl.fields
+    add_genome_sizes = make_genome_size_fetch_function(
+        cache_path, ncbi_api_key, genome_size, fields
+    )
+    add_taxonomy_info = make_taxonomy_annotate_function(taxonomy, fields)
+
+    fields = ["sample", "words"] + fields + ["taxid"]
+
+    bin_writer = make_writer("bins", out, fields)
+    hits_writer = make_writer(
+        "contig hit details", out_hits, ["sample", "sacc"] + chain_tpl.hit_fields
+    )
+
+    # Set up feature output writer
     if out_features is not None:
         features = FeatureTables(cache_path=cache_path, api_key=ncbi_api_key)
+        feature_writer = make_writer("feature details", out_features, features.fields)
     else:
         features = None
 
-    if genome_size:
-        genome_sizes = GenomeSizes(cache_path=cache_path, api_key=ncbi_api_key)
-    else:
-        genome_sizes = None
-
-    if not in_coverage:
-        chain_tpl = HitChain(chain_penalty=chain_penalty)
-    else:
-        chain_tpl = CoverageHitChain(chain_penalty=chain_penalty)
-        cov = {}
-        for cov_fd in in_coverage:
-            fname = os.path.basename(cov_fd.name)
-            cov_sample, _, ext = fname.rpartition(".")
-            if ext != "coverage":
-                LOG.warning(
-                    "Parsing of filename '%s' failed. Should end in .coverage", fname
-                )
-            LOG.info("Loading coverage file %s", cov_sample)
-            cov_reader = csv.DictReader(cov_fd, delimiter="\t")
-            cov_data = {row["#rname"]: row for row in cov_reader}
-            cov[cov_sample] = cov_data
-            cov_fd.close()
-        chain_tpl.set_coverage(cov)
-
-    fname = os.path.basename(in_blast7.name)
-    if fname.endswith(".gz"):
-        sample, _, ext = fname[:-3].rpartition(".")
-        if ext != "blast7":
-            LOG.warning(
-                "Parsing of filename '%s' failed. Should end in .blast7.gz", fname
-            )
-        # unzip = read_from_command(["gunzip", "-dc", in_blast7.name])
-        unzip = gzip.open(in_blast7.name, "rt")
-        if unzip.read(1) == "":
-            reader = []
-        else:
-            unzip.seek(0)
-            reader = blast.reader(unzip)
-    else:
-        sample, _, ext = fname.rpartition(".")
-        if ext != "blast7":
-            LOG.warning("Parsing of filename '%s' failed. Should end in .blast7")
-        reader = blast.reader(in_blast7)
-    LOG.info("Using sample=%s", sample)
-
-    wordscorer = WordScorer(keepwords=num_words)
-    taxonomy = load_taxonomy(ncbi_taxonomy)
-
-    if not no_standard_excludes:
-        # Prune uninformative hits
-        prefilter += (
-            "artificial sequences",
-            "unclassified sequences",
-            "uncultured bacterium",
-            "uncultured eukaryote",
-            "uncultured fungus",
-            "uncultured phage",
-            "uncultured virus",
-        )
-        # Exclude results hitting humans
-        exclude += ("Hominidae",)
-    taxfilter_pre = taxonomy.make_filter(exclude=prefilter)
-    taxfilter = taxonomy.make_filter(include, exclude)
-    taxfilter_preclass = taxonomy.make_filter(exclude=("Boreoeutheria","Euteleostomi"))
-    LOG.info(f"Excluding from final results: {' '.join(exclude)}")
-
-    LOG.info("Writing bins to: %s", out.name)
-    fields = ["sample", "words"] + chain_tpl.fields + ["taxid"]
-    if genome_sizes is not None:
-        fields += ["genome_size_source", "genome_size"]
-    if not taxonomy.is_null():
-        fields += ["taxname", "species", "lineage", "lineage_ranks"]
-    LOG.info("  output fields: %s", " ".join(fields))
-    bin_writer = csv.DictWriter(out, fields)
-    bin_writer.writeheader()
-
-    LOG.info("Writing contig hit details to: %s", out_hits.name)
-    fields = ["sample", "sacc"] + chain_tpl.hit_fields
-    LOG.info("  output fields: %s", " ".join(fields))
-    hits_writer = csv.DictWriter(out_hits, fields)
-    hits_writer.writeheader()
-
-    if features:
-        LOG.info("Writing feature details to: %s", out_features.name)
-        fields = features.fields
-        LOG.info("  output fields: %s", " ".join(fields))
-        feature_writer = csv.DictWriter(out_features, fields)
-        feature_writer.writeheader()
-
+    # Load BLAST hits
+    LOG.info("Loading blast result...")
     hitgroups = list(group_hits_by_qacc(reader))
     LOG.info(
         "Found %i contigs with %i hits",
@@ -329,82 +392,65 @@ def cli(
         sum(len(hitgroup) for hitgroup in hitgroups),
     )
 
-    # Filter minimum read coverage
-    if in_coverage:
-        assert isinstance(chain_tpl, CoverageHitChain)
+    # Filter by minimum read coverage
+    if isinstance(chain_tpl, CoverageHitChain):
         hitgroups = list(chain_tpl.filter_hitgroups(hitgroups, min_read_count))
 
+    # Classify each contig
+    LOG.info("Classifying each contig...")
     contig_lcas = classify_contigs(hitgroups, taxonomy)
-    filtered_hits = [
-        hitgroup for hitgroup in hitgroups
-        if taxfilter_preclass(contig_lcas[hitgroup[0].qacc].classify()[0])
-    ]
-    LOG.info("Removed %i contigs classified into exclusion taxa",
-             len(hitgroups) - len(filtered_hits))
 
-    filtered_hits = prefilter_hits_taxonomy(filtered_hits, taxfilter_pre)
-    filtered_hits = prefilter_hits_score(filtered_hits)
-    LOG.info(
-        "After prefiltering, %i contigs with %i hits remain",
-        len(filtered_hits),
-        sum(len(hitgroup) for hitgroup in filtered_hits),
+    # Apply hit/contig prefiltering
+    filtered_hits = prefilter_blast_hits(
+        hitgroups,
+        prefilter_hits,
+        prefilter_contigs,
+        no_standard_excludes,
+        taxonomy,
+        contig_lcas,
     )
 
+    # Prepare output filter
+    if not no_standard_excludes:
+        # Exclude results hitting humans
+        exclude += ("Hominidae",)
+    if "None" in exclude:
+        exclude = ()
+    LOG.info("Excluding from final results: %s", " ".join(exclude))
+    LOG.info("Including in final results: %s", " ".join(include))
+    taxfilter = taxonomy.make_filter(include, exclude)
+
+    # Prepare generator for all chains
     all_chains = chain_tpl.make_chains(
         hit for hitgroup in filtered_hits for hit in hitgroup
     )
+    # Select best chains greedily
     best_chains = greedy_select_chains(all_chains)
 
+    # Run through and output result for each selected chain
     for chains in best_chains:
         taxid = wordscorer.score_taxids(chains)
+        words = wordscorer.score(chains)
+
         if not taxfilter(taxid):
-            taxname = taxonomy.get_name(taxid)
-            words = wordscorer.score(chains)
-            LOG.info("Excluding %s -- %s", taxname, words)
+            LOG.info("Excluding %s -- %s", taxonomy.get_name(taxid), words)
             continue
 
-        if features is not None:
-            saccs = [chain.sacc for chain in chains]
-            fdata = features.get(saccs, [])
-            # FIXME: finish this - merge features from multiple references where useful
+        top_chain = chains[0]
+        row = top_chain.to_dict()
+        row.update({"sample": sample, "taxid": taxid, "words": words})
+        add_genome_sizes(row, taxid)
+        add_taxonomy_info(row, taxid)
 
-        selected_chain = chains[0]
-
-        row = selected_chain.to_dict()
-        row.update(
-            {
-                "sample": sample,
-                "taxid": taxid,
-                "words": wordscorer.score(chains),
-            }
-        )
-
-        if genome_sizes is not None:
-            row["genome_size_source"], row["genome_size"] = genome_sizes.get(taxid)
-
-        if not taxonomy.is_null():
-            row.update(
-                {
-                    "lineage": "; ".join(taxonomy.get_lineage(taxid)),
-                    "lineage_ranks": "; ".join(taxonomy.get_lineage_ranks(taxid)),
-                    "taxname": taxonomy.get_name(taxid),
-                    "species": taxonomy.get_rank(taxid, "species"),
-                }
-            )
         LOG.info("Found     %s -- %s", row.get("taxname", ""), row["words"])
         bin_writer.writerow(row)
 
-        for row in selected_chain.hits_to_dict():
-            row.update(
-                {
-                    "sample": sample,
-                    "sacc": selected_chain.sacc,
-                }
-            )
+        for row in top_chain.hits_to_dict():
+            row.update({"sample": sample, "sacc": top_chain.sacc})
             hits_writer.writerow(row)
 
         if features is not None:
-            ftable = features.get(selected_chain.sacc, ["gene/gene", "CDS/product"])
+            ftable = features.get(top_chain.sacc, ["gene/gene", "CDS/product"])
             for row in ftable:
                 feature_writer.writerow(row)
 

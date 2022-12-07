@@ -101,7 +101,7 @@ class BlastBase:
         # "": "sblastname",  # Subject Blast Name
         # "": "sskingdom",  # Subject Super Kingdom
         "subject tax ids": "staxids",  # sorted unique ';'-separated
-                                       # Subject Taxonomy ID(s)
+        # Subject Taxonomy ID(s)
         # "": "sscinames",  # unique Subject Scientific Name(s)
         # "": "scomnames",  # unique Subject Common Name(s)
         # "": "sblastnames",  # unique Subject Blast Name(s)

@@ -12,10 +12,10 @@ import xml.etree.ElementTree as ET
 from random import randint
 from typing import Optional, Set, Dict, Iterator, Union, List, Any, Tuple
 
-from requests import Session
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
-from requests.exceptions import RequestException
+from requests import Session  # type: ignore
+from requests.adapters import HTTPAdapter  # type: ignore
+from requests.packages.urllib3.util.retry import Retry  # type: ignore
+from requests.exceptions import RequestException  # type: ignore
 
 
 LOG = logging.getLogger(__name__)
