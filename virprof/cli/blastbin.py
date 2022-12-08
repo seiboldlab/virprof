@@ -429,7 +429,12 @@ def cli(
 
     # Run through and output result for each selected chain
     for chains in best_chains:
-        taxid = wordscorer.score_taxids(chains)
+        lca = taxonomy.get_lca(
+            taxid
+            for chain in chains
+            for taxid in chain.staxids
+        )
+        taxid, _score = lca.classify(quorum=0.9, majority=0.9)
         words = wordscorer.score(chains)
 
         if not taxfilter(taxid):
