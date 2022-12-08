@@ -51,7 +51,7 @@ def get_fnames_from_file(fdes):
     return fnames
 
 
-def filter_contigs(
+def filter_hits(
     hitgroups: Iterable[List[BlastHit]], prefilter: Callable[[int], bool]
 ) -> List[List[BlastHit]]:
     """Filter BLAST search results at query level
@@ -82,7 +82,12 @@ def filter_contigs(
             if hit.bitscore > minscore
         ]
         if top_keep.count(True) >= len(top_keep) / 2:
-            result.append(hitgroup)
+            filtered = [
+                hit
+                for hit in hitgroup
+                if all(prefilter(taxid) for taxid in hit.staxids)
+            ]
+            result.append(filtered)
         else:
             n_filtered += 1
     LOG.info("Removed %i contigs matching prefilter taxonomy branches", n_filtered)

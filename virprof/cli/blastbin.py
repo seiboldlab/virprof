@@ -23,7 +23,7 @@ from ..entrez import FeatureTables, GenomeSizes
 from .. import blast  # type: ignore
 from ..wordscore import WordScorer
 from ..taxonomy import load_taxonomy
-from ._utils import group_hits_by_qacc, filter_contigs
+from ._utils import group_hits_by_qacc, filter_hits
 
 LOG = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def prefilter_blast_hits(
         )
     if "None" in prefilter:
         prefilter = ()
-    filtered_hits = filter_contigs(
+    filtered_hits = filter_hits(
         filtered_hits, taxonomy.make_filter(exclude=prefilter)
     )
 
