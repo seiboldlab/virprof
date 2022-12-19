@@ -49,7 +49,6 @@ def writer(fileobj, fmt: int = 7) -> "BlastWriter":
 class BlastBase:
     "Base class for BLAST readers and writers"
 
-    @staticmethod
     def tupleofint(text):
         """Converts semicolon separated character string into tuple of int"""
         if text == "N/A":
