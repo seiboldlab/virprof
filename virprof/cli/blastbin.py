@@ -425,7 +425,7 @@ def cli(
         hit for hitgroup in filtered_hits for hit in hitgroup
     )
     # Select best chains greedily
-    best_chains = greedy_select_chains(all_chains)
+    best_chains = greedy_select_chains(all_chains, alt=0.8)
 
     # Run through and output result for each selected chain
     for chains in best_chains:
@@ -442,6 +442,7 @@ def cli(
             continue
 
         top_chain = chains[0]
+
         row = top_chain.to_dict()
         row.update({"sample": sample, "taxid": taxid, "words": words})
         add_genome_sizes(row, taxid)
@@ -449,7 +450,27 @@ def cli(
 
         LOG.info("Found     %s -- %s", row.get("taxname", ""), row["words"])
         bin_writer.writerow(row)
+        from pprint import pprint
+        pprint(row)
 
+        LOG.info("Comprised of %i parts, total score %i",
+                 len(top_chain.qaccs), top_chain.score)
+        LOG.info("New: %i %s", taxid, taxonomy.get_name(taxid))
+        LOG.info("#chains: %i", len(chains))
+        for chain, n in zip(chains, range(5)):
+            LOG.info("chain %i: %s", n, chain)
+
+        alternate_chains = chain_tpl.make_chains(
+            hit
+            for hitgroup in filtered_hits
+            for hit in hitgroup
+            if hit.sacc != top_chain.sacc
+            and hit.qacc in top_chain.qaccs
+        )
+        for best_alternate_chains in greedy_select_chains(alternate_chains):
+            top_alt_chain = best_alternate_chains[0]
+            LOG.info("Alternate: %s %s", taxonomy.get_name(top_alt_chain.staxids[0]), top_alt_chain)
+            
         for row in top_chain.hits_to_dict():
             row.update({"sample": sample, "sacc": top_chain.sacc})
             hits_writer.writerow(row)

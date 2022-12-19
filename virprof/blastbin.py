@@ -588,20 +588,20 @@ def greedy_select_chains(
     90% of the same query sequences.
 
     """
+    orig_chains = chains
     while chains:
         best_chain_idx = max(range(len(chains)), key=lambda i: chains[i].score)
         best_chain = chains.pop(best_chain_idx)
         qaccs = set(best_chain.qaccs)
+        min_score = best_chain.score * alt
+        min_shared_qaccs = int(len(qaccs) / 10) + 1
 
-        # find similarly soring chains
+        # find similarly scoring chains
         extra_chains = [
             chain
-            for chain in chains
-            if chain.score > alt * best_chain.score
-            and chain.log10_evalue < alt * best_chain.log10_evalue
-            and chain.slen > alt * best_chain.slen
-            and chain.qlen > alt * best_chain.qlen
-            and (len(qaccs.intersection(set(chain.qaccs))) > len(qaccs) / 10)
+            for chain in orig_chains
+            if chain.score > min_score
+            and len(qaccs.intersection(set(chain.qaccs))) >= min_shared_qaccs
         ]
         extra_chains.sort(key=lambda res: res.log10_evalue)
 

@@ -1,6 +1,12 @@
 CHANGELOG
 ---------
 
+v0.8.0:
+ - rename empty_samples to failed samples
+ - fix num_threads must be smaller than num_samples
+ - fix unit tests broken over time
+ - add lca classifier to pathogen pipeline
+
 v0.7.0:
  - improve metadata(se)$fastqc: now includes the fastq_file_path for
    the respective mate as well as the remainder of the columns from
