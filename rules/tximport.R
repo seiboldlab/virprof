@@ -66,6 +66,7 @@ load_all_fastqc <- function(sample_sheet, path) {
             }
        }
     }
+    fastqc
 }
 
 load_fastqc <- function(fastqc_fn, trimmed) {
