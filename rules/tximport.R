@@ -377,7 +377,7 @@ coldata <- sample_sheet %>%
     ) %>%
     arrange(across(all_of(idcolumns)))
 
-if (idcolumns[[1]] %in% colnames(extra_coldata)) {
+if ("idcolumn" %in% colnames(extra_coldata)) {
     # Merge in the extra_coldata gathered above
     coldata <- coldata %>% left_join(
         extra_coldata,
