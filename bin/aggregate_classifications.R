@@ -40,12 +40,16 @@ respiratory_viruses <- c(
 
 #' Write Excel workbook with column widths adjusted
 write_xlsx <- function(sheets, file,
-                       colWidths = "auto", maxWidth = 80, ...) {
+                       colWidths = "auto", maxWidth = 80,
+                       firstCol = TRUE, firstRow = TRUE,
+                       ...) {
     message("Writing XLSX...")
     message("... output: ", file)
     mw <- getOption("openxslx.maxWidth")
     options(openxlsx.maxWidth = maxWidth)
-    write.xlsx(sheets, file, colWidths = colWidths, ...)
+    write.xlsx(sheets, file, colWidths = colWidths,
+               firstCol=firstCol, firstRow=firstRow,
+               ...)
     options(openxlsx.maxWidth = mw)
     message("... done")
 }
