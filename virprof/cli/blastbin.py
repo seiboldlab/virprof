@@ -114,7 +114,14 @@ def classify_contigs(hitgroups: Iterable[List[BlastHit]], taxonomy):
     """Classify each input contig"""
     result = {}
     for hitgroup in hitgroups:
-        lca = taxonomy.get_lca((hit.staxids[0], hit.bitscore) for hit in hitgroup)
+        taxids = set()
+        for hit in hitgroup:
+            if not hit.staxids:
+                LOG.warning("Hit to %s on %s had no taxids",
+                            hit.sacc, hit.qacc)
+                continue
+            taxids.add((hit.staxids[0], hit.bitscore))
+        lca = taxonomy.get_lca(taxids)
         result[hitgroup[0].qacc] = lca
     return result
 
