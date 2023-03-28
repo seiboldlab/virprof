@@ -12,6 +12,7 @@ library(tibble)
 suppressPackageStartupMessages(library(BiocGenerics))
 suppressPackageStartupMessages(library(S4Vectors))
 suppressPackageStartupMessages(library(stats4))
+library(lubridate)
 
 libdir <- file.path(
     dirname(dirname(
@@ -223,10 +224,26 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
         make_option(c("--in-basecov-list"),
                     metavar = "FILE",
                     help = "File with list of base coverage input files"
+                    ),
         make_option(c("--in-rnaseq-stats"),
                     metavar = "FILE",
                     help = "Stats summary file (.stats.rds) from rnaseq pipeline"
                     ),
+        make_option(c("--set-project"),
+                    metavar = "STRING",
+                    help = "Set project variable for export"
+                    ),
+        make_option(c("--set-label"),
+                    metavar = "STRING",
+                    help = "Set label variable for export"
+                    ),
+        make_option(c("--set-version"),
+                    metavar = "STRING",
+                    help = "Set version variable for export"
+                    ),
+        make_option(c("--set-pipeline"),
+                    metavar = "STRING",
+                    help = "Set pipeline variable for export"
                     )
     )
 
@@ -534,6 +551,18 @@ if (!interactive()) {
     opt <- parse_options()
 
     results <- list()
+    results$`Run Info` <- list(
+        virprof_version = opt$options$set_version,
+        project = opt$options$set_project,
+        label = opt$options$set_label,
+        date = now(),
+        pipeline = opt$options$set_pipeline,
+        respiratory_viruses = respiratory_viruses,
+        filter_host = opt$options$filter_host,
+        min_bp = opt$options$min_bp,
+        min_reads = opt$options$min_reads
+    )
+
     summary <- tibble(
         Description=character(),
         Count=numeric(),
@@ -648,6 +677,12 @@ if (!interactive()) {
         message("Loading RNA-Seq stats...")
         message("... file=", opt$options$in_rnaseq_stats)
         stats <- readRDS(opt$options$in_rnaseq_stats)
+        results$`Run Info`$rnaseq_run_info <- list(
+            virprof_version = stats$virprof_version,
+            pipeline = stats$pipeline,
+            date = stats$date
+        )
+
         sample_sheet <- stats$sample_sheet %>%
             left_join(as_tibble(stats$coldata), by = c("unit", "sample")) %>%
             group_by(sample) %>%
@@ -679,6 +714,17 @@ if (!interactive()) {
         saveRDS(results, opt$options$out_rds)
     }
 
+    for (i in seq_along(results)) {
+        if (!is.data.frame(results[[i]])) {
+            results[[i]] %<>%
+                enframe(name="property") %>%
+                rowwise() %>%
+                mutate(
+                    value = paste(collapse=", ", value)
+                )
+        }
+    }
+
     if (!is.null(opt$options$out_csv)) {
         message("Writing CSVs...")
         for (name in names(results)) {
@@ -692,7 +738,11 @@ if (!interactive()) {
     if (!is.null(opt$options$out_excel)) {
         message("Writing Excel")
         for (i in seq_along(results)) {
-            results[[i]] %<>% rename_with(rename_fields)
+            if (!is.data.frame(results[[i]])) {
+                results[[i]] <- NULL
+            } else {
+                results[[i]] %<>% rename_with(rename_fields)
+            }
         }
 
         results$Summary %<>% mutate(

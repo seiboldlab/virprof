@@ -443,6 +443,10 @@ with Stage("summarize_vp") as S:
             filter_host = "Homo sapiens",
             min_bp      = 200,
             min_reads   = 3,
+            project = "{:project:}",
+            label = make_label,
+            version = ymp.get_config()._config.userdata.virprof.version,
+            pipeline = "{:this:}"
         threads:
             1
         resources:
@@ -458,6 +462,10 @@ with Stage("summarize_vp") as S:
             "echo '{params.scaffolds}' > {output.scaffold_files};\n"
             "\n"
             "{BIN}/aggregate_classifications.R"
+            "  --set-project {params.project}"
+            "  --set-label {params.label}"
+            "  --set-version {params.version}"
+            "  --set-pipeline {params.pipeline}"
             "  --virushostdb '{input.virushostdb}'"
             "  --filter-host '{params.filter_host}'"
             "  --min-bp '{params.min_bp}'"
