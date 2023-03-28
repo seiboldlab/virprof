@@ -428,6 +428,7 @@ with Stage("summarize_vp") as S:
             basecov_files=temp("{:this:}/{target}.basecov_flist"),
             scaffold_files=temp("{:this:}/{target}.scaffold_flist"),
             excel="{:this:}/{target}.pathogens.xlsx",
+            rds="{:this:}/{target}.pathogens.rds",
         benchmark:
             "benchmarks/{:name:}/{:this:}/{target}.txt"
         log:
@@ -462,6 +463,7 @@ with Stage("summarize_vp") as S:
             "  --min-reads '{params.min_reads}'"
             "  --out-excel '{output.excel}'"
             "  --out-csv '{params.csv_out}'"
+            "  --out-rds '{output.rds}'"
             "  --in-list {output.call_files}"
             "  --in-coverage-list {output.coverage_files}"
             "  --in-scaffold-list {output.scaffold_files}"

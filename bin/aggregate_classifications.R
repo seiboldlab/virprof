@@ -178,6 +178,11 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     default = "result.xlsx",
                     help = "Output in Excel format (default: %default)"
                     ),
+        make_option(c("--out-rds"),
+                    metavar = "FILE",
+                    default = "result.rds",
+                    help = "Output in RDS format (default: %default)"
+                    ),
         make_option(c("-p", "--pattern"),
                     metavar = "REGEX",
                     default = "(.*)\\.virus\\.csv",
@@ -629,6 +634,11 @@ if (!interactive()) {
         )
 
     results$`Summary` <- summary
+
+    if (!is.null(opt$options$out_rds)) {
+        message("Writing RDS...")
+        saveRDS(results, opt$options$out_rds)
+    }
 
     if (!is.null(opt$options$out_csv)) {
         message("Writing CSVs...")
