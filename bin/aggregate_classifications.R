@@ -168,12 +168,12 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     default = "Homo sapiens",
                     help = "Select only viruses targeting this host (default: '%default')"
                     ),
-        make_option(c("-o", "--out"),
+        make_option(c("-o", "--out-csv"),
                     metavar = "FILE",
                     default = "result_%s.csv",
                     help = "Output file pattern (default: %default)"
                     ),
-        make_option(c("--excel-out"),
+        make_option(c("--out-excel"),
                     metavar = "FILE",
                     default = "result.xlsx",
                     help = "Output in Excel format (default: %default)"
@@ -420,28 +420,21 @@ load_scaffolds <- function(calls, scaffold_filelist_file) {
         group_by(sample, sacc, sstart, send) %>%
         mutate(bp = mean(bp)/length(bp)) %>%
         group_by(sample, sacc) %>%
-        summarize(
-            bp = sum(bp)
-        )
+        summarize(bp = sum(bp), .groups="drop")
 
     left_join(calls, scaffolds, by=c("sample", "sacc")) %>%
-        relocate(
-            bp,
-            .after = pident
-        )
+        relocate(bp, .after = pident)
 }
 
 #' Basic hit filtering
 filter_hits <- function(samples, opt) {
     message("Filtering accession level bins...")
+    message("... input detection count: ", nrow(samples))
     message("... minimum `bp`: ", opt$option$min_bp)
+    samples <- filter(samples, bp >= opt$option$min_bp)
+    message("... remaining detections: ", nrow(samples))
     message("... minimum read count: ", opt$option$min_reads)
-
-    samples <- samples %>%
-        filter(
-            bp >= opt$option$min_bp,
-            numreads >= opt$option$min_reads
-        )
+    samples <- filter(samples, numreads >= opt$option$min_reads)
     message("... remaining detections: ", nrow(samples))
     samples
 }
@@ -533,10 +526,11 @@ if (!interactive()) {
 
     ## Determine file locations from arguments
     files <- locate_files(opt)
+    message("... units processed: ", nrow(files))
     summary %<>%
         add_row(
             Count=nrow(files),
-            Description="Units (files) processed",
+            Description="Files processed",
             Tab=""
         )
 
@@ -545,7 +539,7 @@ if (!interactive()) {
     summary %<>%
         add_row(
             Count=nrow(calls),
-            Description="Total detections",
+            Description="Raw Detections",
             Tab=""
         )
     if (!is.null(opt$options$in_coverage_list)) {
@@ -575,7 +569,7 @@ if (!interactive()) {
     summary %<>%
         add_row(
             Count=nrow(filtered_calls),
-            Description="Filtered detections",
+            Description="Filtered Detections",
             Tab="Detections"
         ) %>%
         add_row(
@@ -636,17 +630,32 @@ if (!interactive()) {
 
     results$`Summary` <- summary
 
-    for (i in seq_along(results)) {
-        results[[i]] %<>% rename_with(rename_fields)
+    if (!is.null(opt$options$out_csv)) {
+        message("Writing CSVs...")
+        for (name in names(results)) {
+            fname <- tolower(sub(" ", "_", name))
+            fn <- sprintf(opt$options$out_csv, fname)
+            message("... ", fn)
+            write_csv(results[[name]], fn)
+        }
     }
 
-    write_xlsx(rev(results), opt$options$excel)
-    message("Writing CSVs...")
-    for (name in names(results)) {
-        fname <- tolower(sub(" ", "_", name))
-        fn <- sprintf(opt$options$out, fname)
-        message("... ", fn)
-        write_csv(results[[name]], fn)
-    }
+    if (!is.null(opt$options$out_excel)) {
+        message("Writing Excel")
+        for (i in seq_along(results)) {
+            results[[i]] %<>% rename_with(rename_fields)
+        }
 
+        results$Summary %<>% mutate(
+            Tab = if_else(
+                Tab=="", "",
+                makeHyperlinkString(Tab, text = paste("[", Tab, "]")
+            )
+        ))
+        class(results$Summary$Tab) <- c(class(results$Summary$Tab), "formula")
+        results$Summary$"Link to Sheet" <- results$Summary$Tab
+        results$Summary$Tab <- NULL
+        write_xlsx(rev(results), opt$options$out_excel,
+                   zoom=c(1.5, 1, 1, 1, 1, 1)*100)
+    }
 }
