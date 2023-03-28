@@ -511,23 +511,6 @@ with Stage("summarize_vp") as S:
 
 
 with Stage("report_pathogen_vp") as S:
-    def make_label(wildcards):
-        # keep in sync with pipelines.yml
-        version = str(ymp.get_config()._config.userdata.virprof.version)
-        prefix = wildcards._YMP_DIR
-        pipeline = []
-        if "star" in prefix:
-            pipeline += ["star"]
-        if "rnaseq_salmon" in prefix:
-            pipeline += ["salmon_sa"]
-        elif "salmon" in prefix:
-            pipeline += ["salmon"]
-        if "rsem" in prefix:
-            pipeline += ["rsem"]
-        if "dedup_umi_vp" in prefix:
-            pipeline += ["umi"]
-        return "_".join(pipeline or ["unknown"]) + "." + version
-
     localrules: vp_pathogen_report
     rule vp_pathogen_report:
         message: "Copying results to reports directory"

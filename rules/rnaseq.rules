@@ -122,25 +122,6 @@ with Stage("quant_exon_vp") as S:
 
 
 with Stage("report_vp") as S:
-    def make_label(wildcards):
-        # keep in sync with virprof.rules
-        version = str(ymp.get_config()._config.userdata.virprof.version)
-        prefix = wildcards._YMP_DIR
-        pipeline = []
-        if "map_star" in prefix:
-            pipeline += ["star"]
-        if "quant_salmon_sa" in prefix:
-            pipeline += ["salmon_sa"]
-        elif "quant_salmon" in prefix:
-            pipeline += ["salmon"]
-        if "quant_rsem" in prefix:
-            pipeline += ["rsem"]
-        if "quant_exon_vp" in prefix:
-            pipeline += ["exon"]
-        if "dedup_umi_vp" in prefix:
-            pipeline += ["umi"]
-        return "_".join(pipeline or ["unknown"]) + "." + version
-
     localrules: vp_rnaseq_report
     rule vp_rnaseq_report:
         message:

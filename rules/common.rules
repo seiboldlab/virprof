@@ -1,0 +1,42 @@
+def make_label(wildcards):
+    """Creates a short label from active stage stack and version
+
+    Format is [star_][salmon|salmon_sa|rsem|exon][_umi].<version>
+
+    Note: Keep this in sync with pipeline.yml
+    """
+    version = str(ymp.get_config()._config.userdata.virprof.version)
+    prefix = wildcards._YMP_DIR
+
+    pipeline = []
+
+    if "map_star" in prefix:
+        pipeline += ["star"]
+
+    if "quant_salmon_sa" in prefix:
+        pipeline += ["salmon_sa"]
+    elif "quant_salmon" in prefix:
+        pipeline += ["salmon"]
+    elif "quant_rsem" in prefix:
+        pipeline += ["rsem"]
+    elif "quant_exon_vp" in prefix:
+        pipeline += ["exon"]
+
+    if "dedup_umi_vp" in prefix:
+        pipeline += ["umi"]
+
+    # For pathogen part, grab the pipeline shorthand from
+    # the "rnaseq_xyz" stage.
+    if not pipeline and "rnaseq_" in prefix:
+        start = prefix.index("rnaseq_") + len("rnaseq_")
+        end = prefix.index(".", start)
+        name = prefix[start:end]
+        # Fix name of rnaseq_salmon pipeline which really
+        # should be rnaseq_salmon_sa. Only, if we change that,
+        # we have to re-run a lot of stuff. So leaving it as is.
+        if name == "salmon":
+            name = "salmon_sa"
+        pipeline += [name]
+
+    return "_".join(pipeline or ["unknown"]) + "." + version
+
