@@ -528,12 +528,14 @@ with Stage("report_pathogen_vp") as S:
         message: "Copying results to reports directory"
         input:
             "{:prev:}/{:target:}.pathogens.xlsx",
+            "{:prev:}/{:target:}.pathogens.rds",
             directory("{:prev:}/{:target:}.genomes"),
             #"{:prev:}/{:target:}.vp.rds",
             "{:prev:}/multiqc_report.html",
             directory("{:prev:}/multiqc_report_data"),
         output:
             "{:this:}/{target}.pathogens.xlsx",
+            "{:this:}/{target}.pathogens.rds",
             directory("{:this:}/{target}.genomes"),
             #"{:this:}/{target}.vp.rds",
             "{:this:}/{target}.vp_multiqc_report.html",
