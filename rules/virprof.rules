@@ -422,6 +422,7 @@ with Stage("summarize_vp") as S:
             coverages="{:prev:}/{:target:}.coverage",
             basecov="{:prev:}/{:target:}.basecov.bg",
             scaffolds="{:prev:}/{:target:}.scaffolds.csv",
+            rnaseq_stats="{:prev:}/{:target:}.stats.rds",
         output:
             call_files=temp("{:this:}/{target}.call_flist"),
             coverage_files=temp("{:this:}/{target}.coverage_flist"),
@@ -464,6 +465,7 @@ with Stage("summarize_vp") as S:
             "  --out-excel '{output.excel}'"
             "  --out-csv '{params.csv_out}'"
             "  --out-rds '{output.rds}'"
+            "  --in-rnaseq-stats '{input.rnaseq_stats}'"
             "  --in-list {output.call_files}"
             "  --in-coverage-list {output.coverage_files}"
             "  --in-scaffold-list {output.scaffold_files}"

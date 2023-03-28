@@ -9,6 +9,9 @@ library(stringr)
 library(openxlsx)
 library(fuzzyjoin)
 library(tibble)
+suppressPackageStartupMessages(library(BiocGenerics))
+suppressPackageStartupMessages(library(S4Vectors))
+suppressPackageStartupMessages(library(stats4))
 
 libdir <- file.path(
     dirname(dirname(
@@ -93,7 +96,11 @@ field_name_map <- list(
     "% Aligned" = "contig_coverage",
     "Positive Samples" = "positive_samples",
     "Host" = "host",
-    "Known Respiratory Virus" = "respiratory"
+    "Known Respiratory Virus" = "respiratory",
+    "Sequencing Units" = "unit_names",
+    "Unit Count" = "num_units",
+    "Trimmed Reads" = "trimmed_read_count",
+    "Mapped Reads" = "mapped_read_count"
 )
 
 #' Convert code to natural names
@@ -216,6 +223,10 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
         make_option(c("--in-basecov-list"),
                     metavar = "FILE",
                     help = "File with list of base coverage input files"
+        make_option(c("--in-rnaseq-stats"),
+                    metavar = "FILE",
+                    help = "Stats summary file (.stats.rds) from rnaseq pipeline"
+                    ),
                     )
     )
 
@@ -632,6 +643,34 @@ if (!interactive()) {
             Description="Positive Samples",
             Tab="Positive Samples"
         )
+
+    if (!is.null(opt$options$in_rnaseq_stats)) {
+        message("Loading RNA-Seq stats...")
+        message("... file=", opt$options$in_rnaseq_stats)
+        stats <- readRDS(opt$options$in_rnaseq_stats)
+        sample_sheet <- stats$sample_sheet %>%
+            left_join(as_tibble(stats$coldata), by = c("unit", "sample")) %>%
+            group_by(sample) %>%
+            summarize(
+                unit_names = paste(unit, collapse=", "),
+                num_units = n(),
+                trimmed_read_count = sum(num_processed),
+                mapped_read_count = sum(num_mapped),
+                .groups = "drop"
+            ) %>%
+            left_join(
+                positive_samples %>%
+                    select(sample, taxnames, numreadss2, pidents, genome_coverages),
+                by = "sample"
+            )
+        results$`Samples` <- sample_sheet
+        summary %<>%
+            add_row(
+                Count=nrow(sample_sheet),
+                Description="Analyzed Samples",
+                Tab="Samples"
+            )
+    }
 
     results$`Summary` <- summary
 
