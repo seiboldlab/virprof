@@ -37,15 +37,30 @@ snakemake@source("_rds.R")
 # Set threads
 plan(tweak(multicore, workers = snakemake@threads))
 
-get_idcols <- function(table, ids) {
-    names(which(sapply(table, function(x) {
+get_idcols <- function(table, ids, allow_short = FALSE) {
+    ids <- unique(ids)
+    if (length(ids) > nrow(table) && !allow_short) {
+        rlang::abort("Sampe sheet has fewer entries than unique ids to match")
+    }
+    res <- names(which(sapply(table, function(x) {
         (
             # column must be unique:
             n_distinct(x) == length(x)
-            # and must list all ids
-            && all(ids %in% as.character(x))
+            # and must match ids
+            && all(as.character(x) %in% as.character(ids))
         )
     })))
+    if (length(res) == 0) {
+        print("Sample Sheet:")
+        print(as.data.frame(table))
+        print("IDs:")
+        print(ids)
+        rlang::abort(paste(
+            "Can't find column in sample sheet matching IDs.",
+            "Check whether {project}/qiime_mapping.csv is up to date"
+        ))
+    }
+    res
 }
 
 load_all_fastqc <- function(sample_sheet, path) {
@@ -98,13 +113,8 @@ load_fastqc <- function(fastqc_fn, trimmed) {
 
     message("  Determining sample sheet column matching fastqc ids")
     # Find columns identifying the fastqc files in sample sheet
-    fastqc_idcolumns <- get_idcols(sample_sheet, fastqc_data$fastqc_id)
-    if (length(fastqc_idcolumns) == 0) {
-        rlang::abort(paste(
-            "Can't find columns identifying files.",
-            "Check whether {project}/qiime_mapping.csv is up to date"
-        ))
-    }
+    fastqc_idcolumns <- get_idcols(sample_sheet, fastqc_data$fastqc_id,
+                                   allow_short = TRUE)
     message("  FastQC files identified by: ",
             paste(fastqc_idcolumns, collapse = ", "))
 
@@ -347,15 +357,6 @@ message("4.1. ----------- Preparing colData (sample sheet) -----------")
 # This needs `names(files)` to be the sample names extracted from Salmon
 # or RSEM above. Columns must be unique and containing those names.
 idcolumns <- get_idcols(sample_sheet, names(files))
-if (length(idcolumns) == 0) {
-    message("The sample sheet columns and file names didn't match up.",
-            " Something is wrong. Bailing out.")
-    message("samples:")
-    print(as.data.frame(sample_sheet))
-    message("files:")
-    print(as.data.frame(files))
-    stop("Unable to determine id columns")
-}
 message("Samples in output identified by: ",
         paste(idcolumns, collapse = ", "))
 
