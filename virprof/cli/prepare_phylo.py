@@ -28,12 +28,34 @@ LOG = logging.getLogger(__name__)
     "If given, species names will not be autodetected from input fasta file names",
     multiple=True,
 )
-@click.option("--in-filter", type=str)
-@click.option("--add-outgroup/--no-add-outgroup", is_flag=True, default=False)
-@click.option("--add-references/--no-add-references", is_flag=True, default=True)
-@click.option("--add-all-genomes/--no-add-all-genomes", is_flag=True, default=False)
-@click.option("--add-short/--no-add-short", is_flag=True, default=False)
-@click.option("--add-full/--no-add-full", is_flag=True, default=True)
+@click.option(
+    "--in-filter",
+    type=str,
+    help="Specify regex to filter FASTA input sequences by name"
+)
+@click.option(
+    "--add-outgroup/--no-add-outgroup",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Not implemented"
+)
+@click.option(
+    "--add-references/--no-add-references",
+    is_flag=True, default=True, show_default=True,
+    help="Add reference sequences to output"
+)
+@click.option(
+    "--only-references",
+    is_flag=True, default=False,
+    help="Only export reference sequences"
+)
+@click.option(
+    "--add-all-genomes/--no-add-all-genomes", is_flag=True, default=False, show_default=True,
+    help="Add all NCBI genomes for selected species to output"
+)
+@click.option("--include-short/--exclude-short", is_flag=True, default=False, show_default=True)
+@click.option("--include-full/--exclude-full", is_flag=True, default=True, show_default=True)
 @click.option(
     "--out-fasta",
     "-o",
@@ -41,7 +63,8 @@ LOG = logging.getLogger(__name__)
     help="Output FASTA file for alignment+treeing",
     required=True,
 )
-@click.option("--min-bp", type=int, help="Minimum number of unambious base pairs")
+@click.option("--min-bp", "override_min_bp", type=int, help="Minimum number of unambious base pairs. [default: 80% detected genome size]")
+@click.option("--min-bp", "override_max_bp", type=int, help="Maximum number of unambious base pairs (for reference include only). [default: 120% detected genome size]")
 @click.option("--ncbi-api-key", type=str, help="NCBI API Key")
 def cli(
     in_fasta,
@@ -50,10 +73,12 @@ def cli(
     out_fasta,
     add_outgroup,
     add_references,
+    only_references,
     add_all_genomes,
-    add_short,
-    add_full,
-    min_bp,
+    include_short,
+    include_full,
+    override_min_bp,
+    override_max_bp,
     ncbi_api_key,
 ):
     """
@@ -85,55 +110,74 @@ def cli(
     elif in_fasta:
         species = []
         for fafd in in_fasta:
-            match = re.search(r"([^.]+)\.fasta.gz", fafd.name)
+            match = re.search(r"(^|/)([^.]+)\.fasta.gz", fafd.name)
             if not match:
                 raise click.UsageError(
                     "Unable to detect organism name from input fasta file. "
                     "Use --species flag to specify the species name(s) explicitly"
                 )
-            name = match.group(1).replace("_", " ")
+            name = match.group(2).replace("_", " ")
             species.append(name)
     else:
         raise click.UsageError("Please specify input file(s) or species name(s)")
 
     for infile, name in zip(in_fasta, species):
+        LOG.info("Processing file %s", infile.name)
         LOG.info("Fetching taxid for %s", name)
         taxid = genome_sizes.get_taxid(name)
         if not taxid:
             raise click.UsageError("Unknown Species")
-        LOG.info("Getting size for %s (%s)", name, taxid)
+
+        LOG.info("Determining genome size for %s (taxid=%s)", name, taxid)
         genome_method, genome_size = genome_sizes.get(taxid)
         if not genome_size:
             raise click.UsageError("Failed to determine genome size.")
         LOG.info("Found genome size %i using method %s", genome_size, genome_method)
-        min_bp = int(genome_size * 0.8)
-        max_bp = int(genome_size * 1.2)
+
+        if override_min_bp is None:
+            min_bp = int(genome_size * 0.8)
+        else:
+            min_bp = override_min_bp
+        if override_max_bp is None:
+            max_bp = int(genome_size * 1.2)
+        else:
+            max_bp = override_max_bp
         LOG.info(
-            "Full output sequences must have >= %i (and <=%i bases)", min_bp, max_bp
+            "Full output sequences must have >= %i AGCT bases", min_bp
         )
+        LOG.info(
+            "Reference sequences must also have between %i and %i bases", min_bp, max_bp
+        )
+
         if infile:
             genomes = FastaFile(infile)
             LOG.info("Found %i sequences in file '%s'", len(genomes), infile.name)
             count = 0
             for acc in genomes:
-                if in_filter and not re.search(in_filter, acc):
-                    continue
                 sequence = genomes.get(acc)
-                bp = sum(sequence.count(base) for base in (b"A", b"G", b"C", b"T"))
-                if not (bp < min_bp and add_short) and not (bp >= min_bp and add_full):
-                    continue
                 comment = genomes.comments.get(acc.encode("utf-8"))
-                if acc.endswith("_pilon"):
-                    acc = acc[: -len("_pilon")]
-                sample, _, acc = acc.partition(".")
-                if bp < min_bp:
+                sample, _, ref_acc = acc.removesuffix("_pilon").partition(".")
+                comment += f" [ref={ref_acc}] [species={name}]"
+                if in_filter and not re.search(in_filter, sample):
+                    LOG.info("Skipping in-filter mismatch %s - %s", sample, comment)
+                    continue
+                bp = sum(sequence.count(base) for base in (b"A", b"G", b"C", b"T"))
+                is_short = bp < min_bp
+                if is_short:
                     sample = sample + "_partial"
-                comment += f" [ref={acc}]"
-                out.put(sample, sequence, comment)
+                if is_short and not include_short:
+                    LOG.info("Skipping short %s - %s", sample, comment)
+                    continue
+                if not is_short and not include_full:
+                    LOG.info("Skipping full %s - %s", sample, comment)
+                    continue
+                LOG.info("Using %s - %s", sample, comment)
+                if not only_references:
+                    out.put(sample, sequence, comment)
                 count += 1
                 if add_references:
-                    references.add(acc)
-            LOG.info("Exported %i/%i sequences with ok length", count, len(genomes))
+                    references.add(ref_acc)
+            LOG.info("Found %i/%i sequences with desired length", count, len(genomes))
             total_count += count
 
         if add_all_genomes:
