@@ -39,10 +39,14 @@ class TqdmHandler(logging.Handler):
             self.handleError(record)
 
 
-def setup_logging() -> None:
+def setup_logging(verbosity) -> None:
     """Sets up python logging facility"""
+    level = logging.INFO
+    level -= verbosity * logging.DEBUG
+    level = max(logging.DEBUG, level)
+
     logging.basicConfig(
-        level=logging.INFO,
+        level=level,
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%m/%d/%Y %I:%M:%S",
         handlers=[TqdmHandler()],
@@ -151,6 +155,11 @@ class AutoLoadCommand(click.MultiCommand):
     callback=setup_debug,
     help="Dump stack trace on receiving signal SIGUSR1",
 )
-def main() -> None:
+@click.option(
+    "-v", "--verbose",
+    count = True,
+    help = "Increase verbosity"
+)
+def main(verbose) -> None:
     """Use any of the subcommands"""
-    setup_logging()
+    setup_logging(verbose)
