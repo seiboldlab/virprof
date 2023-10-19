@@ -31,31 +31,41 @@ LOG = logging.getLogger(__name__)
 @click.option(
     "--in-filter",
     type=str,
-    help="Specify regex to filter FASTA input sequences by name"
+    help="Specify regex to filter FASTA input sequences by name",
 )
 @click.option(
     "--add-outgroup/--no-add-outgroup",
     is_flag=True,
     default=False,
     show_default=True,
-    help="Not implemented"
+    help="Not implemented",
 )
 @click.option(
     "--add-references/--no-add-references",
-    is_flag=True, default=True, show_default=True,
-    help="Add reference sequences to output"
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Add reference sequences to output",
 )
 @click.option(
     "--only-references",
-    is_flag=True, default=False,
-    help="Only export reference sequences"
+    is_flag=True,
+    default=False,
+    help="Only export reference sequences",
 )
 @click.option(
-    "--add-all-genomes/--no-add-all-genomes", is_flag=True, default=False, show_default=True,
-    help="Add all NCBI genomes for selected species to output"
+    "--add-all-genomes/--no-add-all-genomes",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Add all NCBI genomes for selected species to output",
 )
-@click.option("--include-short/--exclude-short", is_flag=True, default=False, show_default=True)
-@click.option("--include-full/--exclude-full", is_flag=True, default=True, show_default=True)
+@click.option(
+    "--include-short/--exclude-short", is_flag=True, default=False, show_default=True
+)
+@click.option(
+    "--include-full/--exclude-full", is_flag=True, default=True, show_default=True
+)
 @click.option(
     "--out-fasta",
     "-o",
@@ -63,8 +73,18 @@ LOG = logging.getLogger(__name__)
     help="Output FASTA file for alignment+treeing",
     required=True,
 )
-@click.option("--min-bp", "override_min_bp", type=int, help="Minimum number of unambious base pairs. [default: 80% detected genome size]")
-@click.option("--min-bp", "override_max_bp", type=int, help="Maximum number of unambious base pairs (for reference include only). [default: 120% detected genome size]")
+@click.option(
+    "--min-bp",
+    "override_min_bp",
+    type=int,
+    help="Minimum number of unambious base pairs. [default: 80% detected genome size]",
+)
+@click.option(
+    "--min-bp",
+    "override_max_bp",
+    type=int,
+    help="Maximum number of unambious base pairs (for reference include only). [default: 120% detected genome size]",
+)
 @click.option("--ncbi-api-key", type=str, help="NCBI API Key")
 def cli(
     in_fasta,
@@ -142,9 +162,7 @@ def cli(
             max_bp = int(genome_size * 1.2)
         else:
             max_bp = override_max_bp
-        LOG.info(
-            "Full output sequences must have >= %i AGCT bases", min_bp
-        )
+        LOG.info("Full output sequences must have >= %i AGCT bases", min_bp)
         LOG.info(
             "Reference sequences must also have between %i and %i bases", min_bp, max_bp
         )

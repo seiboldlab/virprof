@@ -150,7 +150,7 @@ class WordScorer:
             words = self.filter_stopwords(words)
 
             for idx, word in enumerate(words):
-                word_scores[word] += chain.log10_evalue / self.orderweight ** idx
+                word_scores[word] += chain.log10_evalue / self.orderweight**idx
 
         sorted_words = sorted(word_scores.items(), key=lambda k: k[1])
 

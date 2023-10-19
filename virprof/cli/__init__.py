@@ -15,7 +15,7 @@ import tqdm  # type: ignore
 
 
 #: Increase CSV field size limit to 2GB
-csv.field_size_limit(2 ** 31)
+csv.field_size_limit(2**31)
 
 
 class TqdmHandler(logging.Handler):
@@ -155,11 +155,7 @@ class AutoLoadCommand(click.MultiCommand):
     callback=setup_debug,
     help="Dump stack trace on receiving signal SIGUSR1",
 )
-@click.option(
-    "-v", "--verbose",
-    count = True,
-    help = "Increase verbosity"
-)
+@click.option("-v", "--verbose", count=True, help="Increase verbosity")
 def main(verbose) -> None:
     """Use any of the subcommands"""
     setup_logging(verbose)

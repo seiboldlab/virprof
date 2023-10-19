@@ -67,9 +67,7 @@ def prefilter_blast_hits(
         )
     if "None" in prefilter:
         prefilter = ()
-    filtered_hits = filter_hits(
-        filtered_hits, taxonomy.make_filter(exclude=prefilter)
-    )
+    filtered_hits = filter_hits(filtered_hits, taxonomy.make_filter(exclude=prefilter))
 
     # Prefiltering based on score
     filtered_hits = prefilter_hits_score(filtered_hits)
@@ -117,8 +115,7 @@ def classify_contigs(hitgroups: Iterable[List[BlastHit]], taxonomy):
         taxids = set()
         for hit in hitgroup:
             if not hit.staxids:
-                LOG.warning("Hit to %s on %s had no taxids",
-                            hit.sacc, hit.qacc)
+                LOG.warning("Hit to %s on %s had no taxids", hit.sacc, hit.qacc)
                 continue
             taxids.add((hit.staxids[0], hit.bitscore))
         lca = taxonomy.get_lca(taxids)
@@ -436,11 +433,7 @@ def cli(
 
     # Run through and output result for each selected chain
     for chains in best_chains:
-        lca = taxonomy.get_lca(
-            taxid
-            for chain in chains
-            for taxid in chain.staxids
-        )
+        lca = taxonomy.get_lca(taxid for chain in chains for taxid in chain.staxids)
         taxid, _score = lca.classify(quorum=0.9, majority=0.9)
         words = wordscorer.score(chains)
 
