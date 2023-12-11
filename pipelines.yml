@@ -169,6 +169,13 @@ pipelines:
       - quant_salmonG
       - rnaseq_report
 
+  rnaseq_star_umi_salmon:
+    stages:
+      - qc
+      - umimap_starT
+      - quant_salmonG
+      - rnaseq_report
+
   rnaseq_umi_star_rsem:
     stages:
       - extract_umi_vp
