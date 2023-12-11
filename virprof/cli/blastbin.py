@@ -253,6 +253,7 @@ def create_blast_reader(
 @click.option(
     "--out-hits",
     "--oc",
+    required=True,
     type=click.File("w"),
     help="Output CSV file containining contig details (one row per hit)",
 )
@@ -429,7 +430,7 @@ def cli(
         hit for hitgroup in filtered_hits for hit in hitgroup
     )
     # Select best chains greedily
-    best_chains = greedy_select_chains(all_chains)
+    best_chains = list(greedy_select_chains(all_chains))
 
     # Run through and output result for each selected chain
     for chains in best_chains:
