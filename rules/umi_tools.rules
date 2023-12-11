@@ -52,6 +52,7 @@ with Stage("dedup_umi_vp"):
             "benchmarks/{:name:}/{:this:}/{target}.txt"
         params:
             prefix = "{:this:}/{target}",
+            sep = ":"
         resources:
             mem = "16G",
         threads:
@@ -60,6 +61,12 @@ with Stage("dedup_umi_vp"):
             "vp_umi_tools"
         shell:
             "exec >{log} 2>&1;"
+            "has_reads=\"$(set +o pipefail; samtools view {input.bam} | head -n 1 | wc -l)\";"
+            "if [ \"$has_reads\" -eq 0 ]; then"
+            "  cp {input.bam} {output.bam};"
+            "  echo YMP: Input BAM empty, copying as dedup will fail;"
+            "  exit 0;"
+            "fi;"
             "umi_tools dedup"
             "  --stdin={input.bam}"
             "  --stdout={output.bam}"
@@ -69,6 +76,7 @@ with Stage("dedup_umi_vp"):
             "  --unpaired-reads discard"
             "  --chimeric-pairs discard"
             "  --unmapped-reads discard"
+            "  --umi-separator={params.sep}"
 
 
 with Stage("fix_umi_vp"):
@@ -93,6 +101,12 @@ with Stage("fix_umi_vp"):
             "vp_umi_tools"
         shell:
             "exec >{log} 2>&1;"
+            "has_reads=\"$(set +o pipefail; samtools view {input.bam} | head -n 1 | wc -l)\";"
+            "if [ \"$has_reads\" -eq 0 ]; then"
+            "  cp {input.bam} {output.bam};"
+            "  echo YMP: Input BAM empty, copying as dedup will fail;"
+            "  exit 0;"
+            "fi;"
             "umi_tools prepare-for-rsem"
             "  --stdin={input.bam}"
             "  --stdout={output.bam}"
