@@ -228,7 +228,8 @@ txi_add_zero_samples <- function(txi, samples) {
     return(txi)
 }
 
-salmon_load_meta <- function(files, consistency_check = TRUE, logfile = NULL) {
+salmon_load_meta <- function(files, consistency_check = TRUE,
+                             logfile_name = NULL) {
     res <- list()
     read_json_nolist <- function(fname, ...) {
         tmp <- jsonlite::read_json(fname, ...)
@@ -261,10 +262,12 @@ salmon_load_meta <- function(files, consistency_check = TRUE, logfile = NULL) {
             "gc_bias_correct",
             "salmon_version"
         )
-        if (any(colnames(res$varying) %in% must_be_constant)) {
-            if (!is.null(logfile)) {
-                errorfn <- paste0(logfile, ".error.csv")
-                message("Writing salmon metadata to ", errorfn)
+        pcols = intersect(colnames(res$varying), must_be_constant)
+        if (length(pcols) > 0) {
+            if (!is.null(logfile_name)) {
+                errorfn <- paste0(logfile_name, ".error.csv")
+                message("Writing salmon ERROR information to ", errorfn)
+                message(str_glue("Column(s) {pcols} vary but should not"))
                 readr::write_csv(res$all, errorfn)
             }
             rlang::abort(
@@ -318,15 +321,16 @@ if (snakemake@params$input_type == "Salmon") {
         c()
     }
 
-    message("3.2. ----------- Loading quant.sf files ----------")
-    txi <- parallel_load_txi(files[!no_data], snakemake@threads)
-    txi <- txi_add_zero_samples(txi, metadata$failed_samples)
-
-
-    message("3.3. ----------- Loading meta_info.json files ----------")
-    salmon_meta <- salmon_load_meta(files[!no_data], logfile = logfile)
+    message("3.2. ----------- Loading meta_info.json files ----------")
+    # This will abort if there were mismatches in version or reference
+    salmon_meta <- salmon_load_meta(files[!no_data],
+                                    logfile = snakemake@log[[1]])
     extra_coldata <- salmon_meta$varying
     metadata$salmon <- salmon_meta$constant
+
+    message("3.3. ----------- Loading quant.sf files ----------")
+    txi <- parallel_load_txi(files[!no_data], snakemake@threads)
+    txi <- txi_add_zero_samples(txi, metadata$failed_samples)
 } else if (snakemake@params$input_type == "RSEM") {
     files <- snakemake@input$transcripts
     names(files) <- gsub(".isoforms.results", "", basename(files))
