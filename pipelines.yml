@@ -69,6 +69,8 @@ pipelines:
     stages:
       - annotate_blastE2MegaBest:
           hide: true
+      - fastaqc_vp:
+          hide: true
       - blastfilter_vpU200:
           hide: true
       - ref_NT:
@@ -90,20 +92,21 @@ pipelines:
       - polish_pilonSIL:
           hide: true
       - coverage
+      - fastaqc_vp
       - group_ALL
       - bin_vpSpecies
 
   summarize:
     stages:
-      - ref_VHDB
       - collect_vp
+      - qc_multiqc
+      - ref_VHDB
       - group_ALL
       - summarize_vp
-      - qc_multiqc
       - group_ALL
       - report_pathogen_vp
 
-  # Re-Assemble created bins
+  # Re-Assemble created bins (unused)
   reassemble:
     stages:
       - enrich:

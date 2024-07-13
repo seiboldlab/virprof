@@ -155,6 +155,36 @@ with Stage("index_taxonomy_vp") as S:
             "  --out {output}"
 
 
+with Stage("fastaqc_vp") as S:
+    rule vp_fasta_qc:
+        message:
+            "{:name:}: Collecting contig QC data to {output}"
+        input:
+            fasta = "{:prev:}/{:target:}.fasta.gz",
+        output:
+            csv = "{:this:}/{target}.fasta.qc.csv",
+        log:
+            "{:this:}/{target}.fasta.qc.log",
+        benchmark:
+            "benchmarks/{:name:}/{:this:}/{target}.contig_qc.txt",
+        params:
+            entropy_k_sizes = "1,2,3,4,6,10",
+            homopolymer_min_size = 5
+        threads:
+            1
+        resources:
+            mem="1g"
+        conda:
+            "virprof_py"
+        shell:
+            "exec >{log} 2>&1;"
+            "{BIN}/virprof fasta-qc"
+            " --in-fasta {input.fasta}"
+            " --out-csv {output.csv}"
+            " --entropy-k-sizes {params.entropy_k_sizes}"
+            " --homopolymer-min-size {params.homopolymer_min_size}"
+
+
 with Stage("blastfilter_vp") as S:
     S.add_param("U", typ="int", name="min_unaligned_bp", default=0)
     S.doc("""This stage filters input FASTA based on BLAST hits to a
@@ -178,7 +208,7 @@ with Stage("blastfilter_vp") as S:
         threads:
             1
         resources:
-            mem="8g"
+            mem="1g"
         conda:
             "virprof_py"
         shell:"""
@@ -212,16 +242,18 @@ with Stage("blastbin_vp") as S:
             coverage = "{:prev:}/{:target:}.coverage",
             blast7   = "{:prev:}/{:target:}.blast7.gz",
             taxonomy = "{:prev:}/{:target:}.taxonomy.gt",
+            fastaqc  = "{:prev:}/{:target:}.fasta.qc.csv",
         output:
             result   = "{:this:}/{target}.virus.csv",
             hits     = "{:this:}/{target}.hits.csv",
             features = "{:this:}/{target}.features.csv",
         log:
-                         "{:this:}/{target}.log"
+                       "{:this:}/{target}.log"
         benchmark:
             "benchmarks/{:name:}/{:this:}/{target}.blastbin.txt"
         params:
             coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage)),
+            fastaqc = lambda wc, input: " --in-fastaqc ".join(ensure_list(input.fastaqc)),
             cache_path = "feature_table_cache",
             ncbi_api_key = ""
         threads:
@@ -239,6 +271,7 @@ with Stage("blastbin_vp") as S:
             " --ncbi-taxonomy {input.taxonomy}"
             " --in-blast7 {input.blast7}"
             " --in-coverage {params.coverage}"
+            " --in-fastaqc {params.fastaqc}"
             " --cache-path {params.cache_path}"
             " --ncbi-api-key '{params.ncbi_api_key}'"
 
@@ -422,12 +455,14 @@ with Stage("summarize_vp") as S:
             coverages="{:prev:}/{:target:}.coverage",
             basecov="{:prev:}/{:target:}.basecov.bg",
             scaffolds="{:prev:}/{:target:}.scaffolds.csv",
+            fastaqc="{:prev:}/{:target:}.fasta.qc.csv",
             rnaseq_stats="{:prev:}/{:target:}.stats.rds",
         output:
             call_files=temp("{:this:}/{target}.call_flist"),
             coverage_files=temp("{:this:}/{target}.coverage_flist"),
             basecov_files=temp("{:this:}/{target}.basecov_flist"),
             scaffold_files=temp("{:this:}/{target}.scaffold_flist"),
+            fastaqc_files=temp("{:this:}/{target}.fastaqc_flist"),
             excel="{:this:}/{target}.pathogens.xlsx",
             rds="{:this:}/{target}.pathogens.rds",
         benchmark:
@@ -439,6 +474,7 @@ with Stage("summarize_vp") as S:
             coverages   = lambda wc, input: "\n".join(input.coverages),
             basecov     = lambda wc, input: "\n".join(input.basecov),
             scaffolds   = lambda wc, input: "\n".join(input.scaffolds),
+            fastaqc     = lambda wc, input: "\n".join(input.fastaqc),
             csv_out     = "{:this:}/{target}.summary_%s.csv",
             filter_host = "Homo sapiens",
             min_bp      = 200,
@@ -456,10 +492,11 @@ with Stage("summarize_vp") as S:
         shell:
             "exec >{log} 2>&1;\n"
             "\n"
-            "echo '{params.calls}' > {output.call_files};\n"
-            "echo '{params.coverages}' > {output.coverage_files};\n"
-            "echo '{params.basecov}' > {output.basecov_files};\n"
-            "echo '{params.scaffolds}' > {output.scaffold_files};\n"
+            "echo '{params.calls}' > {output.call_files};\n\n"
+            "echo '{params.coverages}' > {output.coverage_files};\n\n"
+            "echo '{params.basecov}' > {output.basecov_files};\n\n"
+            "echo '{params.scaffolds}' > {output.scaffold_files};\n\n"
+            "echo '{params.fastaqc}' > {output.fastaqc_files};\n\n"
             "\n"
             "{BIN}/aggregate_classifications.R"
             "  --set-project {params.project}"
@@ -477,9 +514,9 @@ with Stage("summarize_vp") as S:
             "  --in-list {output.call_files}"
             "  --in-coverage-list {output.coverage_files}"
             "  --in-scaffold-list {output.scaffold_files}"
+            "  --in-fastaqc-list {output.fastaqc_files}"
             "  --in-basecov-list {output.basecov_files};\n"
             "\n"
-
 
     localrules: vp_aggregate_genomes
     rule vp_aggregate_genomes:
