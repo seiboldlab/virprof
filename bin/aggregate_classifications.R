@@ -101,7 +101,8 @@ field_name_map <- list(
     "Sequencing Units" = "unit_names",
     "Unit Count" = "num_units",
     "Trimmed Reads" = "trimmed_read_count",
-    "Mapped Reads" = "mapped_read_count"
+    "Mapped Reads" = "mapped_read_count",
+    "% Homopolymer" = "pcthp"
 )
 
 #' Convert code to natural names
@@ -225,6 +226,10 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "FILE",
                     help = "File with list of base coverage input files"
                     ),
+        make_option(c("--in-fastaqc-list"),
+                    metavar = "FILE",
+                    help = "File with list of Fasta QC CSV input files"
+                    ),
         make_option(c("--in-rnaseq-stats"),
                     metavar = "FILE",
                     help = "Stats summary file (.stats.rds) from rnaseq pipeline"
@@ -341,6 +346,13 @@ load_calls <- function(samples, opt) {
         staxids = col_character(),
         pident = col_double(),
         numreads = col_integer(),
+        pcthp = col_number(),
+        entropy1 = col_number(),
+        entropy2 = col_number(),
+        entropy3 = col_number(),
+        entropy4 = col_number(),
+        entropy6 = col_number(),
+        entropy10 = col_number(),
         taxid = col_integer(),
         genome_size = col_number(),
         taxname = col_character(),
@@ -458,6 +470,36 @@ load_scaffolds <- function(calls, scaffold_filelist_file) {
     left_join(calls, scaffolds, by=c("sample", "sacc")) %>%
         relocate(bp, .after = pident)
 }
+
+
+load_fastaqc <- function(calls, fastaqc_filelist_file) {
+    message("Loading Fasta QC data...")
+    fastaqc_cols <- cols(
+        "acc" = col_character(),
+        entropy1 = col_number(),
+        entropy2 = col_number(),
+        entropy3 = col_number(),
+        entropy4 = col_number(),
+        entropy6 = col_number(),
+        entropy10 = col_number(),
+        frac_hp = col_number()
+    )
+    fastaqc <- fastaqc_filelist_file %>%
+        read_table(col_names = "path", col_types = cols(col_character())) %>%
+        mutate(data = map(path, read_csv, col_types = fastaqc_cols)) %>%
+        unnest(cols = c(data)) %>%
+        select(-path) %>%
+        mutate(acc = str_replace(acc, "_pilon$", "")) %>%
+        separate(acc, c("sample", "sacc"), sep="\\.") %>%
+        mutate(sacc = sub("(\\d)_(\\d{1,3})", "\\1:\\2", sacc)) %>%
+        separate(sacc, c("sacc", "fragment"), sep=":", fill = "right") %>%
+        select(-fragment) %>%
+        group_by(sample, sacc) %>%
+        summarize(across(everything(), ~paste(., collapse="; ")))
+
+    left_join(calls, fastaqc, by = c("sample", "sacc"))
+}
+
 
 #' Basic hit filtering
 filter_hits <- function(samples, opt) {
@@ -593,6 +635,10 @@ if (!interactive()) {
     if (!is.null(opt$options$in_scaffold_list)) {
         calls <- load_scaffolds(calls, opt$options$in_scaffold_list)
     }
+    if (!is.null(opt$options$in_fastaqc_list)) {
+        calls <- load_fastaqc(calls, opt$options$in_fastaqc_list)
+    }
+    message("Finished loading files")
 
     ## Compute Genome Coverage
     calls <- calls %>%
