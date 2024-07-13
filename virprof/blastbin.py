@@ -14,9 +14,14 @@ from typing import (
     Dict,
     Any,
     Mapping,
+    Tuple,
 )
+import os
+import csv
+from statistics import mean
 
 import tqdm  # type: ignore
+import click
 
 from .regionlist import RegionList
 from .blast import BlastHit
@@ -515,13 +520,30 @@ class CoverageHitChain(HitChain):
     def set_coverage(
         self, coverages: Mapping[str, Mapping[str, Mapping[str, str]]]
     ) -> None:
-        """Set coverage data"""
+        """Set coverage data (sums values from multiple units)"""
         self._coverages = coverages
         self._units = list(coverages.keys())
         self._numreads = {
             qacc: [int(coverages[unit][qacc]["numreads"]) for unit in self._units]
             for qacc in coverages[self._units[0]]
         }
+
+    def load_coverage(self, in_coverage: Tuple[click.utils.LazyFile, ...]):
+        """Loads coverages from file list"""
+        cov = {}
+        for cov_fd in in_coverage:
+            fname = os.path.basename(cov_fd.name)
+            cov_sample, _, ext = fname.rpartition(".")
+            if ext != "coverage":
+                LOG.warning(
+                    "Parsing of filename '%s' failed." "Should end in .coverage", fname
+                )
+            LOG.info("Loading coverage file %s", cov_sample)
+            cov_reader = csv.DictReader(cov_fd, delimiter="\t")
+            cov_data = {row["#rname"]: row for row in cov_reader}
+            cov[cov_sample] = cov_data
+            cov_fd.close()
+        self.set_coverage(cov)
 
     def _copy_from_other(self, other):
         super()._copy_from_other(other)
@@ -572,6 +594,116 @@ class CoverageHitChain(HitChain):
     @property
     def hit_fields(self):
         return super().hit_fields + ["numreads"]
+
+
+class FastAQcHitChain(HitChain):
+    """HitChain considering FastA QC data"""
+
+    def __init__(
+        self, hits: Optional[List[BlastHit]] = None, chain_penalty: int = 20
+    ) -> None:
+        super().__init__(hits, chain_penalty)
+
+    def set_fastaqc(
+        self, fastaqc: Mapping[str, Mapping[str, Mapping[str, str]]]
+    ) -> None:
+        """Set FastaQC data"""
+        self._fastaqc = fastaqc  # acc -> key -> value
+        self._entropy_klens = set(
+            int(key.removeprefix("entropy"))
+            for acc in self._fastaqc
+            for key in self._fastaqc[acc]
+            if key.startswith("entropy")
+        )
+
+    def _copy_from_other(self, other):
+        super()._copy_from_other(other)
+        # pylint: disable=protected-access
+        self._fastaqc = other._fastaqc
+        self._entropy_klens = other._entropy_klens
+
+    def load_fastaqc(self, in_fastaqc: Tuple[click.utils.LazyFile, ...]) -> None:
+        """Loads FastAQC data from file list"""
+        LOG.info("Loading %s", in_fastaqc.name)
+        reader = csv.DictReader(in_fastaqc)
+        self.set_fastaqc(
+            {
+                row["acc"]: {
+                    key: float(val) for key, val in row.items() if key != "acc"
+                }
+                for row in reader
+            }
+        )
+        in_fastaqc.close()
+
+    def get_entropy(self, klens: Optional[List] = None) -> List[float]:
+        if klens is None:
+            klens = self._entropy_klens
+        if self._fastaqc is None or not self._subject_regions:
+            return {klen:-1 for klen in klens}
+
+        res = {}
+        for klen in klens:
+            if not klen in self._entropy_klens:
+                res[klen] = -1
+            else:
+                var = f"entropy{klen}"
+                entropy = (
+                    sum(
+                        mean(self._fastaqc[hit.qacc][var] for hit in data)
+                        * (stop - start + 1)
+                        for start, stop, data in self._subject_regions
+                        if data
+                    )
+                    / self.slen
+                )
+                res[klen] = entropy
+        return res
+
+    def get_hp_frac(self) -> float:
+        """Estimates overall hp fraction
+
+        This just weights the contigs, it will be inaccurate as we are
+        not looking at the indiviual section of each contig. Good enough
+        for nowm, aggregate will calculate a more precise value later.
+        """
+        if self._fastaqc is None or not self._subject_regions:
+            return -1
+
+        return (
+            sum(
+                mean(self._fastaqc[hit.qacc]["frac_hp"] for hit in data)
+                * (stop - start + 1)
+                for start, stop, data in self._subject_regions
+                if data
+            )
+            / self.slen
+        )
+
+    def filter_hitgroups_qc(self, hitgroups: Iterable[List[BlastHit]]):
+        filtered = 0
+        hitgroups = super().filter_hitgroups(hitgroups)
+        for hitgroup in hitgroups:
+            if True:
+                yield hitgroup
+            else:
+                filtered += 1
+        LOG.info("Removed %i contigs with low QC", filtered)
+
+    def to_dict(self) -> Dict[str, Any]:
+        res = super().to_dict()
+        res.update({"pcthp": round(self.get_hp_frac() * 100, 2)})
+        res.update(
+            {
+                f"entropy{klen}": round(entropy, 2)
+                for klen, entropy in self.get_entropy().items()
+            }
+        )
+        return res
+
+
+class CoverageFastAQcHitChain(FastAQcHitChain, CoverageHitChain):
+    pass
 
 
 def greedy_select_chains(
