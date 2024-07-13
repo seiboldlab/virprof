@@ -7,7 +7,7 @@ import re
 def sequence_entropy(sequence: bytes, klen: int = 5):
     """Calculates sequence entropy
 
-    The entropy formula is H(X) = sum(p(x) * log(p(x)) for x in X).
+    The base entropy formula is H(X) = sum(p(x) * log(p(x)) for x in X).
 
     For the purpose of this simple estimation, we assume that the
     states of X, the words of the sequence, are independent. That's
@@ -15,16 +15,16 @@ def sequence_entropy(sequence: bytes, klen: int = 5):
     commonly. Instead of using just a single basepair for each word,
     which would only look at how even the base distribution is, we
     consider k-mers.
+
+    To make values with different k, and thus different number of
+    categories more comparable, we divide by log(|categories|), which,
+    since we actually use log_2 and assume 4 different bases, ends
+    up being 2k (log_2 4^k == 2k).
     """
 
     # bail out if too short
     if len(sequence) < klen:
         return 0
-
-    # remove 'n'*
-    sequence = re.sub(b"n+", b"", sequence)
-    # ignore case
-    sequence = sequence.upper()
 
     # do counting
     counts = Counter(
@@ -39,7 +39,8 @@ def sequence_entropy(sequence: bytes, klen: int = 5):
         counts["N" * klen] = n_count
     words = sum(counts.values())
     logp = lambda x: x * log2(x)
-    return -sum(logp(c/words) for c in counts.values())
+    entropy = -sum(logp(c/words) for c in counts.values())
+    return entropy / (2*klen)
 
 
 def homopolymer_ratio(sequence: bytes, kmin: int = 5):
@@ -48,15 +49,27 @@ def homopolymer_ratio(sequence: bytes, kmin: int = 5):
     A consecutive strech of identical bases of at least kmin length is
     considered a homopolymer.
     """
-    # remove 'n'*
-    sequence = re.sub(b"n+", b"", sequence)
-
-    # ignore case
-    sequence = sequence.upper()
 
     # remove homopolymers
     # (regex will be faster than manual code in python)
-    #print(f"([A-Z])\\1{{{kmin},}}")
     no_hp = re.sub(f"([A-Z])\\1{{{kmin},}}".encode(), b"", sequence)
 
     return 1-len(no_hp)/len(sequence)
+
+
+def normalize_sequence(sequence: bytes):
+    """Normalizes sequence for calculating entropy and hp count
+
+    - remove n* sequences
+    - uppercase
+    - map wobbles to N
+    """
+
+    # remove scaffold padding 'n'* (assembled is N)
+    sequence = re.sub(b"n+", b"", sequence)
+    # make sure we have no lowercase left
+    sequence = sequence.upper()
+    # map unresolved IUPAC to N
+    sequence = re.sub(b"[^AGCT]", b"n", sequence)
+
+    return sequence

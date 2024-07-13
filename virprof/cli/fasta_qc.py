@@ -6,7 +6,7 @@ import logging
 from statistics import mean, quantiles
 import time
 
-from ..entropy import sequence_entropy, homopolymer_ratio
+from ..entropy import sequence_entropy, homopolymer_ratio, normalize_sequence
 from ..fasta import FastaFile
 
 LOG = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def cli(in_fasta, out_csv, entropy_k_sizes, homopolymer_min_size):
         klens = []
     else:
         klens = [int(klen) for klen in entropy_k_sizes.split(",")]
-    field_names = ["acc"] + [f"entropy{i}" for i in klens]
+    field_names = ["acc", "len_all", "len_used"] + [f"entropy{i}" for i in klens]
     if homopolymer_min_size > 0:
         field_names.append("frac_hp")
 
@@ -68,7 +68,11 @@ def cli(in_fasta, out_csv, entropy_k_sizes, homopolymer_min_size):
             LOG.info("Processing %i/%i: %s", index, len(contigs), acc)
             last_print = time.time()
         sequence = contigs.get(acc)
-        row = {"acc": acc}
+        orig_len = len(sequence)
+        sequence = normalize_sequence(sequence)
+        consider_len = len(sequence)
+
+        row = {"acc": acc, "len_all": orig_len, "len_used": consider_len}
         for i in klens:
             entropy = round(sequence_entropy(sequence, klen=i), 2)
             row[f"entropy{i}"] = entropy
