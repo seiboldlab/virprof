@@ -10,7 +10,7 @@ on:
 
 jobs:
   lint:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - uses: psf/black@stable
@@ -28,7 +28,15 @@ jobs:
           --max-line-length=88 --statistics
 
   unit_test:
-    runs-on: self-hosted
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ ubuntu-latest ]
+        python-version: ['3.10']
+    defaults:
+      run:
+        shell: bash -l {0}
+    runs-on: ${{ matrix.os }}
     needs: lint
     steps:
     - uses: actions/checkout@v3
@@ -38,9 +46,9 @@ jobs:
         channel-priority: strict
         activate-environment: virprof
         environment-file: environment_pytest.yaml
-        python-version: "3.10"
+        python-version: ${{ matrix.python-version }}
+        mamba-version: "*"
     - name: Pytest Run
-      shell: bash -l {0}
       run: |
         pytest
 
@@ -50,8 +58,8 @@ jobs:
       max-parallel: 5
       matrix:
         os:
-          - linux
-          - macOS
+          - ubuntu-latest
+          - macos-latest
         target:
           - test.ref_hg38gtest.rnaseq_salmon
           - test.ref_hg38gtest.rnaseq_star_salmon
@@ -65,7 +73,7 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         path: virprof
     - uses: conda-incubator/setup-miniconda@v2
