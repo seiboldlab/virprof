@@ -1,6 +1,7 @@
 """
 Unit tests for RegionList class
 """
+
 # pylint: disable=invalid-name
 # pylint: disable=missing-function-docstring
 # pylint: disable=protected-access

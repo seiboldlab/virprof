@@ -67,7 +67,6 @@ jobs:
           - test.ref_hg38gtest.rnaseq_salmon.pathogen
       fail-fast: false
     runs-on:
-      - self-hosted
       - ${{ matrix.os }}
     defaults:
       run:
