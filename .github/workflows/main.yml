@@ -59,7 +59,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+#         - macos-latest
         target:
           - test.ref_hg38gtest.rnaseq_salmon
           - test.ref_hg38gtest.rnaseq_star_salmon
