@@ -1,0 +1,35 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: linux-64
+@EXPLICIT
+https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2#d7c89558ba9fa0495403155b64376d81
+https://repo.anaconda.com/pkgs/main/linux-64/ca-certificates-2021.10.26-h06a4308_2.conda#55d8c51214ce7b3ddf594da13848a122
+https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-ng-11.2.0-he4da1e4_11.tar.bz2#0bf83958e788f1e75ba26154cb702afe
+https://conda.anaconda.org/conda-forge/linux-64/libgomp-11.2.0-h1d223b6_11.tar.bz2#1d16527c76842bf9c41e9399d39d8097
+https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-1_gnu.tar.bz2#561e277319a41d4f24f5c05a9ef63c04
+https://conda.anaconda.org/conda-forge/linux-64/libgcc-ng-11.2.0-h1d223b6_11.tar.bz2#e3495f4f93cfd6b68021cbe2b5844cd5
+https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-h7f98852_4.tar.bz2#a1fd65c7ccbf10880423d82bca54eb54
+https://conda.anaconda.org/conda-forge/linux-64/c-ares-1.18.1-h7f98852_0.tar.bz2#f26ef8098fab1f719c91eb760d63381a
+https://conda.anaconda.org/conda-forge/linux-64/icu-68.2-h9c3ff4c_0.tar.bz2#6618c9b191638993f2a818c6529e1b49
+https://conda.anaconda.org/conda-forge/linux-64/libdeflate-1.7-h7f98852_5.tar.bz2#10e242842cd30c59c12d79371dc0f583
+https://conda.anaconda.org/conda-forge/linux-64/libev-4.33-h516909a_1.tar.bz2#6f8720dff19e17ce5d48cfe7f3d2f0a3
+https://conda.anaconda.org/conda-forge/linux-64/libjemalloc-5.2.1-h9c3ff4c_6.tar.bz2#ea7e614f3a641bd6cec18de031228d9a
+https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.2.11-h36c2ea0_1013.tar.bz2#dcddf696ff5dfcab567100d691678e18
+https://conda.anaconda.org/conda-forge/linux-64/lz4-c-1.9.3-h9c3ff4c_1.tar.bz2#fbe97e8fa6f275d7c76a09e795adc3e6
+https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.2-h58526e2_4.tar.bz2#509f2a21c4a09214cd737a480dfd80c9
+https://conda.anaconda.org/conda-forge/linux-64/openssl-1.1.1l-h7f98852_0.tar.bz2#de7b38a1542dbe6f41653a8ae71adc53
+https://repo.anaconda.com/pkgs/main/linux-64/tbb-2020.3-hfd86e86_0.conda#7d06fdc8b4f3e389f26f67311c7ccf5f
+https://conda.anaconda.org/conda-forge/linux-64/xz-5.2.5-h516909a_1.tar.bz2#33f601066901f3e1a85af3522a8113f9
+https://conda.anaconda.org/conda-forge/linux-64/jemalloc-5.2.1-h9c3ff4c_6.tar.bz2#12925814bcbd28b3176c557d3c519d08
+https://repo.anaconda.com/pkgs/main/linux-64/libedit-3.1.20210714-h7f8727e_0.conda#a44c016447ec4fc366dc35ce5282a5a8
+https://conda.anaconda.org/conda-forge/linux-64/zlib-1.2.11-h36c2ea0_1013.tar.bz2#cf7190238072a41e9579e4476a6a60b8
+https://conda.anaconda.org/conda-forge/linux-64/libnghttp2-1.43.0-h812cca2_1.tar.bz2#d0a7846b7b3b8fb0d8b36904a53b8155
+https://conda.anaconda.org/conda-forge/linux-64/libssh2-1.10.0-ha56f1ee_2.tar.bz2#6ab4eaa11ff01801cffca0a27489dc04
+https://conda.anaconda.org/conda-forge/linux-64/tk-8.6.11-h27826a3_1.tar.bz2#84e76fb280e735fec1efd2d21fd9cb27
+https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.0-ha95c52a_0.tar.bz2#b56f94865e2de36abf054e7bfa499034
+https://conda.anaconda.org/conda-forge/linux-64/boost-cpp-1.74.0-h312852a_4.tar.bz2#22ee6de84c28eb7bd76802cf071c5d25
+https://conda.anaconda.org/conda-forge/linux-64/krb5-1.19.2-hcc1bbae_3.tar.bz2#e29650992ae593bc05fc93722483e5c3
+https://conda.anaconda.org/conda-forge/linux-64/libcurl-7.80.0-h2574ce0_0.tar.bz2#5d0784b790350f7939bb5d3f2c32e700
+https://conda.anaconda.org/bioconda/linux-64/salmon-1.5.2-h84f40af_0.tar.bz2#9c04006208338ddf9a47b23512232448
+https://conda.anaconda.org/bioconda/linux-64/htslib-1.14-h9093b5e_0.tar.bz2#cde5ed4727512e7c3a6f35cca442b0dd
+https://conda.anaconda.org/bioconda/linux-64/samtools-1.14-hb421002_0.tar.bz2#86e6c83f90a32168a7dbe247dbc19d48
