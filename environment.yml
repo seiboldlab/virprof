@@ -3,9 +3,12 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python >=3.7
-  - snakemake-minimal >=7.15
-  - click
+  - python >=3.10
+  - snakemake-minimal =7.32.*
+  - mamba
+  - conda != 4.6.11
+  - click >8
+  - click-completion
   - ruamel.yaml >0.15
   - pandas >=0.20
   - openpyxl
@@ -17,10 +20,12 @@ dependencies:
   - tqdm >=4.21
   - aiohttp
   - pip
+  - networkx >=2.0
   - pip:
     - git+https://github.com/epruesse/ymp@development
   - graph-tool >=2.34
   - biopython
   - click
   - tqdm
+  - networkx >=2.0
   - requests
