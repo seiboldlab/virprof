@@ -89,15 +89,23 @@ jobs:
         mamba env update --file virprof/environment.yml --name base
     - name: Install Test Data
       run: |
+        echo "Current directory: $PWD"
         ./virprof/test_data/install_testdata.sh
     - name: Dry-Run
       run: |
+        echo "Current directory: $PWD"
+        echo "test_data/:"
+        ls test_data -l
+        echo "test.csv:"
+        cat test_data/test.csv
         ymp make -n ${{matrix.target}}
     - name: Install deps
       run: |
+        echo "Current directory: $PWD"
         ymp env prepare ${{matrix.target}}
     - name: Run Pipeline
       run: |
+        echo "Current directory: $PWD"
         ymp make ${{matrix.target}} -j2 -p
 
     ## LOG ##
