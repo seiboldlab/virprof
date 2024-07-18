@@ -17,4 +17,4 @@ conda:
 
 projects:
   test:
-    data: test_data/test.csv
+    data: !workdir test_data/test.csv
