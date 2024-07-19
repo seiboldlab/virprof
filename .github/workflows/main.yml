@@ -87,6 +87,7 @@ jobs:
       run: |
         mamba update conda
         mamba env update --file virprof/environment.yml --name base
+        mamba clean --all
     - name: Install Test Data
       run: |
         echo "Current directory: $PWD"
@@ -102,7 +103,15 @@ jobs:
     - name: Install deps
       run: |
         echo "Current directory: $PWD"
+        echo "Disk usage:"
+        df -h
         ymp env prepare ${{matrix.target}}
+        echo "Disk usage:"
+        df -h
+        mamba clean --all
+        mamba info
+        echo "Disk usage:"
+        df -h
     - name: Run Pipeline
       run: |
         echo "Current directory: $PWD"
