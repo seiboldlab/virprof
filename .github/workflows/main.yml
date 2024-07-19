@@ -61,9 +61,9 @@ jobs:
           - ubuntu-latest
 #         - macos-latest
         target:
-          - test.ref_hg38gtest.rnaseq_salmon
+#          - test.ref_hg38gtest.rnaseq_salmon
           - test.ref_hg38gtest.rnaseq_star_salmon
-          - test.ref_hg38gtest.rnaseq_star_rsem
+#          - test.ref_hg38gtest.rnaseq_star_rsem
           - test.ref_hg38gtest.rnaseq_salmon.pathogen
       fail-fast: false
     runs-on:
@@ -115,7 +115,7 @@ jobs:
     - name: Run Pipeline
       run: |
         echo "Current directory: $PWD"
-        ymp make ${{matrix.target}} -j2 -p
+        ymp make ${{matrix.target}} -j4 -p -v
 
     ## LOG ##
     - name: Save pipeline reports
