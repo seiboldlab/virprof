@@ -115,9 +115,7 @@ jobs:
     - name: Run Pipeline
       run: |
         echo "Current directory: $PWD"
-        # running greedy scheduler because ILP doesn't seem to work
-        # right in the action container
-        ymp make ${{matrix.target}} -j4 -p -v --scheduler greedy
+        ymp make ${{matrix.target}} -j4 -p -vvv 
 
     ## LOG ##
     - name: Save pipeline reports
