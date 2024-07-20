@@ -5,7 +5,7 @@ channels:
 dependencies:
   - ymp =0.3.*
   - python >=3.10
-  - graph-tool >=2.34
+  - graph-tool-base >=2.34
   - biopython
   - click
   - tqdm
