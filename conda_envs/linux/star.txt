@@ -2,4 +2,4 @@
 # $ conda create --name <env> --file <this file>
 # platform: linux-64
 @EXPLICIT
-file:///shared/seiboldlab/proj/VirProf/virprof_config/conda/archive/2ab58e9b2f750f95976b102075dd1481/star-2.7.9a-h9ee0642_0.tar.bz2#0ac1051c6a32846b84cd982f238c2743
+https://conda.anaconda.org/bioconda/linux-64/star-2.7.9a-h9ee0642_0.tar.bz2#0ac1051c6a32846b84cd982f238c2743
