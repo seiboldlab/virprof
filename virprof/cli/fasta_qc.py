@@ -3,7 +3,7 @@
 import click
 import csv
 import logging
-from statistics import mean, quantiles
+from statistics import mean, quantiles, StatisticsError
 import time
 
 from ..entropy import sequence_entropy, homopolymer_ratio, normalize_sequence
@@ -88,9 +88,12 @@ def cli(in_fasta, out_csv, entropy_k_sizes, homopolymer_min_size):
     for stat in stats:
         click.echo(f"Stat '{stat}':")
         click.echo(f" mean = {mean(stats[stat])}")
-        quant = quantiles(stats[stat], n=100, method="inclusive")
-        quants = [round(quant[i], 2) for i in (0, 4, 24, 49, 74, 94, 98)]
-        click.echo(f" 1/5/25/50/75/95/99%ile = {quants}")
-        click.echo(f" min/max = {min(quants)} {max(quants)}")
+        try:
+            quant = quantiles(stats[stat], n=100, method="inclusive")
+            quants = [round(quant[i], 2) for i in (0, 4, 24, 49, 74, 94, 98)]
+            click.echo(f" 1/5/25/50/75/95/99%ile = {quants}")
+            click.echo(f" min/max = {min(quants)} {max(quants)}")
+        except StatisticsError:
+            click.echo(f" (percentiles failed, probably not enough data)")
 
     return True
