@@ -112,7 +112,8 @@ references:
 
   # VirusHostDB from genome.jp
   VHDB:
-    - url: ftp://ftp.genome.jp/pub/db/virushostdb/
-      type: dirx
+    - url: https://www.genome.jp/ftp/db/virushostdb/
+      # or use ftp: - url: ftp://www.genome.jp/db/virushostdb/
+      type: localdir
       files:
         virushostdb.tsv: virushostdb.tsv
