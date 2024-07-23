@@ -476,6 +476,8 @@ load_fastaqc <- function(calls, fastaqc_filelist_file) {
     message("Loading Fasta QC data...")
     fastaqc_cols <- cols(
         "acc" = col_character(),
+        len_all = col_integer(),
+        len_used = col_integer(),
         entropy1 = col_number(),
         entropy2 = col_number(),
         entropy3 = col_number(),
