@@ -4,6 +4,7 @@ from collections import Counter
 from math import log2
 import re
 
+
 def sequence_entropy(sequence: bytes, klen: int = 5):
     """Calculates sequence entropy
 
@@ -27,20 +28,17 @@ def sequence_entropy(sequence: bytes, klen: int = 5):
         return 0
 
     # do counting
-    counts = Counter(
-        sequence[i:i+klen]
-        for i in range(len(sequence) - klen + 1)
-    )
+    counts = Counter(sequence[i : i + klen] for i in range(len(sequence) - klen + 1))
 
     # aggregate kmers containing N if any
     n_count = sum(n for kmer, n in counts.items() if b"N" in kmer)
     if n_count > 0:
-        counts = {kmer:n for kmer,n in counts.items() if not b"N" in kmer}
+        counts = {kmer: n for kmer, n in counts.items() if not b"N" in kmer}
         counts["N" * klen] = n_count
     words = sum(counts.values())
     logp = lambda x: x * log2(x)
-    entropy = -sum(logp(c/words) for c in counts.values())
-    return entropy / (2*klen)
+    entropy = -sum(logp(c / words) for c in counts.values())
+    return entropy / (2 * klen)
 
 
 def homopolymer_ratio(sequence: bytes, kmin: int = 5):
@@ -54,7 +52,7 @@ def homopolymer_ratio(sequence: bytes, kmin: int = 5):
     # (regex will be faster than manual code in python)
     no_hp = re.sub(f"([A-Z])\\1{{{kmin},}}".encode(), b"", sequence)
 
-    return 1-len(no_hp)/len(sequence)
+    return 1 - len(no_hp) / len(sequence)
 
 
 def normalize_sequence(sequence: bytes):

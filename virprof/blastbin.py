@@ -640,7 +640,7 @@ class FastAQcHitChain(HitChain):
         if klens is None:
             klens = self._entropy_klens
         if self._fastaqc is None or not self._subject_regions:
-            return {klen:-1 for klen in klens}
+            return {klen: -1 for klen in klens}
 
         res = {}
         for klen in klens:

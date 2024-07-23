@@ -18,7 +18,14 @@ from typing import Iterable, List, Tuple, Optional, Callable, Dict, Any
 
 import click
 
-from ..blastbin import BlastHit, HitChain, CoverageHitChain, CoverageFastAQcHitChain, FastAQcHitChain, greedy_select_chains
+from ..blastbin import (
+    BlastHit,
+    HitChain,
+    CoverageHitChain,
+    CoverageFastAQcHitChain,
+    FastAQcHitChain,
+    greedy_select_chains,
+)
 from ..entrez import FeatureTables, GenomeSizes
 from .. import blast  # type: ignore
 from ..wordscore import WordScorer
@@ -165,7 +172,7 @@ def make_taxonomy_annotate_function(
 def make_hitchain_template(
     in_coverage: Tuple[click.utils.LazyFile, ...],
     in_fastaqc: click.utils.LazyFile,
-    chain_penalty: int
+    chain_penalty: int,
 ) -> HitChain:
     """Creates hitchain template object
 
@@ -249,7 +256,7 @@ def create_blast_reader(
 @click.option(
     "--in-fastaqc",
     type=click.File("r"),
-    help="VirProf FastA QC reports (entropies, homopolymers)"
+    help="VirProf FastA QC reports (entropies, homopolymers)",
 )
 @click.option(
     "--out",
