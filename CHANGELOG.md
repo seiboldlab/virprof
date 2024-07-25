@@ -1,5 +1,10 @@
 # CHANGELOG
 
+#### v0.9.0
+ - feature: add FastA QC metrics entropy, homopolymer fraction
+ - feature: extended QC filtering (fixes #60)
+ - feature: make whitelist and filtering parameters configurable (fixes #55)
+
 #### v0.8.2
  - use https to fetch VHDB instead of ftp
  - fix fastqc (update, hopefuly no more crashes)
