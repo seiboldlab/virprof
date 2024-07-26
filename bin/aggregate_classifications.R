@@ -255,6 +255,10 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "FILE",
                     help = "Stats summary file (.stats.rds) from rnaseq pipeline"
                     ),
+        make_option(c("--in-white-list"),
+                    metavar = "FILE",
+                    help = "White list for selecting respiratory viruses"
+                    ),
         make_option(c("--set-project"),
                     metavar = "STRING",
                     help = "Set project variable for export"
@@ -557,6 +561,10 @@ filter_hits <- function(samples, opt) {
 
 annotate_viruses <- function(samples, opt) {
     message("Annotating Viruses")
+    if (!is.null(opt$options$in_white_list)) {
+        message("Loading whitelist from ", opt$options$in_white_list)
+        respiratory_viruses <- readLines(opt$options$in_white_list)
+    }
     re <- paste0("(", paste(collapse="|", respiratory_viruses), ")")
 
     samples <- samples %>%

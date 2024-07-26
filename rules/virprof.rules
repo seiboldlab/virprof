@@ -534,6 +534,7 @@ with Stage("summarize_vp") as S:
             "  --in-coverage-list {output.coverage_files}"
             "  --in-scaffold-list {output.scaffold_files}"
             "  --in-fastaqc-list {output.fastaqc_files}"
+            "  --in-white-list {input.whitelist}"
             "  --in-basecov-list {output.basecov_files};\n"
             "\n"
 
