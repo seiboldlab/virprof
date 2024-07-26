@@ -605,16 +605,13 @@ class FastAQcHitChain(HitChain):
         super().__init__(hits, chain_penalty)
 
     def set_fastaqc(
-        self, fastaqc: Mapping[str, Mapping[str, Mapping[str, str]]]
+        self,
+        fastaqc: Mapping[str, Mapping[str, Mapping[str, str]]],
+        entropy_klens: List[int],
     ) -> None:
         """Set FastaQC data"""
         self._fastaqc = fastaqc  # acc -> key -> value
-        self._entropy_klens = set(
-            int(key.removeprefix("entropy"))
-            for acc in self._fastaqc
-            for key in self._fastaqc[acc]
-            if key.startswith("entropy")
-        )
+        self._entropy_klens = entropy_klens
 
     def _copy_from_other(self, other):
         super()._copy_from_other(other)
@@ -632,7 +629,12 @@ class FastAQcHitChain(HitChain):
                     key: float(val) for key, val in row.items() if key != "acc"
                 }
                 for row in reader
-            }
+            },
+            [
+                int(col.removeprefix("entropy"))
+                for col in reader.fieldnames
+                if col.startswith("entropy")
+            ],
         )
         in_fastaqc.close()
 
