@@ -1,10 +1,13 @@
 userdata:
   virprof:
-    version: 0.8.1
+    # Version number for reports.
+    # Adjust if you make modifications to the pipeline.
+    version: 0.9.0-dev
 
 include:
   - pipelines.yml
   - references.yml
+  - config.yml
 
 directories:
   rules:
