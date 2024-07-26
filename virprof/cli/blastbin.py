@@ -335,6 +335,13 @@ def create_blast_reader(
     " Requires --in-coverage to be set to take effect.",
 )
 @click.option(
+    "--max-pcthp",
+    type=int,
+    default=15,
+    help="Exclude contigs with higher homopolymer percentage."
+    " Requires --in-fastaqc to be set to take effect.",
+)
+@click.option(
     "--chain-penalty",
     type=int,
     default=20,
@@ -369,6 +376,7 @@ def cli(
     ncbi_taxonomy: Optional[str] = None,
     no_standard_excludes: bool = False,
     min_read_count=2,
+    max_pcthp=15,
     chain_penalty: int = 20,
     num_words: int = 4,
     cache_path: str = "entrez_cache",
@@ -416,6 +424,10 @@ def cli(
     # Filter by minimum read coverage
     if isinstance(chain_tpl, CoverageHitChain):
         hitgroups = list(chain_tpl.filter_hitgroups(hitgroups, min_read_count))
+
+    # Filter by maximum homopolymer percentage
+    if isinstance(chain_tpl, FastAQcHitChain):
+        hitgroups = list(chain_tpl.filter_hitgroups_qc(hitgroups, max_pcthp))
 
     # Classify each contig
     LOG.info("Classifying each contig...")

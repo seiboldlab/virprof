@@ -680,15 +680,16 @@ class FastAQcHitChain(HitChain):
             / self.slen
         )
 
-    def filter_hitgroups_qc(self, hitgroups: Iterable[List[BlastHit]]):
+    def filter_hitgroups_qc(self, hitgroups: Iterable[List[BlastHit]], max_pcthp: int):
         filtered = 0
-        hitgroups = super().filter_hitgroups(hitgroups)
         for hitgroup in hitgroups:
-            if True:
+            qacc = hitgroup[0].qacc
+            pcthp = self._fastaqc[qacc]["frac_hp"] * 100
+            if pcthp <= max_pcthp:
                 yield hitgroup
             else:
                 filtered += 1
-        LOG.info("Removed %i contigs with low QC", filtered)
+        LOG.info("Removed %i contigs with pcthp > %i", filtered, max_pcthp)
 
     def to_dict(self) -> Dict[str, Any]:
         res = super().to_dict()
