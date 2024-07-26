@@ -33,6 +33,7 @@ Env(name="virprof_py", base="bioconda",
 
 BIN = srcdir("../bin/")
 
+VPCFG = ymp.get_config()._config.userdata.virprof
 
 with Stage("get_unmapped_vp") as S:
     S.require(
@@ -255,7 +256,13 @@ with Stage("blastbin_vp") as S:
             coverage = lambda wc, input: " --in-coverage ".join(ensure_list(input.coverage)),
             fastaqc = lambda wc, input: " --in-fastaqc ".join(ensure_list(input.fastaqc)),
             cache_path = "feature_table_cache",
-            ncbi_api_key = ""
+            ncbi_api_key = VPCFG.ncbi_api_key,
+            chain_penalty = VPCFG.bin_chain_penalty,
+            min_reads = VPCFG.bin_min_reads,
+            max_pcthp = VPCFG.bin_max_pcthp,
+            prefilter_contigs = "' --prefilter-contigs '".join(VPCFG.bin_prefilter_contigs),
+            prefilter_hits = "' --prefilter-hits '".join(VPCFG.bin_prefilter_hits),
+            exclude = "' --exclude '".join(VPCFG.bin_exclude_taxa),
         threads:
             1
         resources:
@@ -274,6 +281,13 @@ with Stage("blastbin_vp") as S:
             " --in-fastaqc {params.fastaqc}"
             " --cache-path {params.cache_path}"
             " --ncbi-api-key '{params.ncbi_api_key}'"
+            " --prefilter-contigs '{params.prefilter_contigs}'"
+            " --prefilter-hits '{params.prefilter_hits}'"
+            " --no-standard-excludes"
+            " --exclude '{params.exclude}'"
+            " --chain-penalty {params.chain_penalty}"
+            " --min-read-count {params.min_reads}"
+            " --max-pcthp {params.max_pcthp}"
 
     rule vp_bins_to_rds:
         message:
@@ -424,7 +438,7 @@ with Stage("bin_vp") as S:
             "virprof_py"
         params:
             out_bins = "{:this:}/%s.fasta.gz",
-            filter_lineage = "^Virus",
+            filter_lineage = VPCFG.export_filter,
         shell:
             "exec >{log} 2>&1;"
             "ulimit -Sn 50000;"  # may need a lot of files
@@ -457,6 +471,7 @@ with Stage("summarize_vp") as S:
             scaffolds="{:prev:}/{:target:}.scaffolds.csv",
             fastaqc="{:prev:}/{:target:}.fasta.qc.csv",
             rnaseq_stats="{:prev:}/{:target:}.stats.rds",
+            whitelist=VPCFG.get_path("whitelist"),
         output:
             call_files=temp("{:this:}/{target}.call_flist"),
             coverage_files=temp("{:this:}/{target}.coverage_flist"),
@@ -476,12 +491,14 @@ with Stage("summarize_vp") as S:
             scaffolds   = lambda wc, input: "\n".join(input.scaffolds),
             fastaqc     = lambda wc, input: "\n".join(input.fastaqc),
             csv_out     = "{:this:}/{target}.summary_%s.csv",
-            filter_host = "Homo sapiens",
-            min_bp      = 200,
-            min_reads   = 3,
+            filter_host = VPCFG.host_species,
+            min_bp      = VPCFG.min_bp,
+            min_aligned_bp = VPCFG.min_aligned_bp,
+            min_reads   = VPCFG.min_reads,
+            max_pcthp   = VPCFG.max_pcthp,
             project = "{:project:}",
             label = make_label,
-            version = ymp.get_config()._config.userdata.virprof.version,
+            version = VPCFG.version,
             pipeline = "{:this:}"
         threads:
             1
@@ -506,7 +523,9 @@ with Stage("summarize_vp") as S:
             "  --virushostdb '{input.virushostdb}'"
             "  --filter-host '{params.filter_host}'"
             "  --min-bp '{params.min_bp}'"
+            "  --min-aligned-bp '{params.min_aligned_bp}'"
             "  --min-reads '{params.min_reads}'"
+            "  --max-pcthp '{params.max_pcthp}'"
             "  --out-excel '{output.excel}'"
             "  --out-csv '{params.csv_out}'"
             "  --out-rds '{output.rds}'"
@@ -586,11 +605,11 @@ with Stage("report_pathogen_vp") as S:
         resources:
             mem = "50m"
         params:
-            slack_hook  = "",  # should be trailing part of form xxx/xxx/xxx
+            slack_hook  = VPCFG.slack_hook,
             reporttpl   = "{:ensuredir.reports:}/{:project:}.$LABEL.$TYPE.%Y-%m-%d_%H-%M$EXT",
             project = "{:project:}",
             label = make_label,
-            version = ymp.get_config()._config.userdata.virprof.version,
+            version = VPCFG.version,
         shell:
             "exec >{log} 2>&1;"
             "SRCS=({input});"

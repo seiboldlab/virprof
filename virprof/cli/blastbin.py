@@ -323,7 +323,7 @@ def create_blast_reader(
 @click.option(
     "--no-standard-excludes",
     "-E",
-    type=bool,
+    is_flag=True,
     help="Do not exclude Human, artificial and unclassified" " sequences by default",
     default=False,
 )

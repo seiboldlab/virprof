@@ -24,6 +24,7 @@ Env(name="vp_rnaseq_r", base="bioconda", packages=[
     "pigz"
 ])
 
+VPCFG=ymp.get_config()._config.userdata.virprof
 
 with Stage("tximport_vp") as S:
     S.doc("""
@@ -147,11 +148,11 @@ with Stage("report_vp") as S:
         resources:
             mem = "50m"
         params:
-            slack_hook = "",  # should be trailing part of form xxx/xxx/xxx
+            slack_hook = VPCFG.slack_hook,
             reporttpl  = "{:ensuredir.reports:}/{:project:}.$LABEL.$TYPE.%Y-%m-%d_%H-%M$EXT",
             project = "{:project:}",
             label = make_label,
-            version = ymp.get_config()._config.userdata.virprof.version,
+            version = VPCFG.version,
         shell:
             "exec >{log} 2>&1;"
             "SRCS=({input});"
