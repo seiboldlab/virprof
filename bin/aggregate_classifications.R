@@ -1,18 +1,24 @@
 #!/usr/bin/env Rscript
-library(optparse)
-library(magrittr)
-suppressPackageStartupMessages(library(dplyr))
-library(readr)
-suppressPackageStartupMessages(library(purrr))
-suppressPackageStartupMessages(library(tidyr))
-library(stringr)
-library(openxlsx)
-library(fuzzyjoin)
-library(tibble)
-suppressPackageStartupMessages(library(BiocGenerics))
-suppressPackageStartupMessages(library(S4Vectors))
-suppressPackageStartupMessages(library(stats4))
-library(lubridate)
+
+suppressPackageStartupMessages({
+    library(optparse)
+
+    library(magrittr)
+    library(dplyr)
+    library(purrr)
+    library(tidyr)
+    library(readr)
+    library(stringr)
+    library(tibble)
+    library(lubridate)
+    library(fuzzyjoin)
+
+    library(openxlsx)
+
+    library(BiocGenerics)
+    library(S4Vectors)
+    library(stats4)
+})
 
 libdir <- file.path(
     dirname(dirname(
@@ -25,7 +31,7 @@ libdir <- file.path(
 )
 source(file.path(libdir, "virushostdb.R"))
 
-#' List of terms marking known respiratory viruses
+#' Default list of terms marking known respiratory viruses
 respiratory_viruses <- c(
     "Rhinovirus",
     "Coronavirus",
@@ -202,10 +208,25 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     default = 200,
                     help = "Minimum sequence length (default: %default)"
                     ),
+        make_option(c("--min-aligned-bp"),
+                    metavar = "N",
+                    default = 150,
+                    help = "Minimum aligned sequence length (default: %default)"
+                    ),
         make_option(c("--min-reads"),
                     metavar = "N",
                     default = 3,
                     help = "Minimum read count (default: %default)"
+                    ),
+        make_option(c("--min-pident"),
+                    metavar = "PERCENT",
+                    default = 70,
+                    help = "Minimum percent identity (default: %default)"
+                    ),
+        make_option(c("--max-pcthp"),
+                    metavar = "PERCENT",
+                    default = 12,
+                    help = "Maximum percent homopolymer (default: %default)"
                     ),
         make_option(c("--merge-samples"),
                     metavar = "REGEX",
@@ -507,12 +528,30 @@ load_fastaqc <- function(calls, fastaqc_filelist_file) {
 filter_hits <- function(samples, opt) {
     message("Filtering accession level bins...")
     message("... input detection count: ", nrow(samples))
-    message("... minimum `bp`: ", opt$option$min_bp)
-    samples <- filter(samples, bp >= opt$option$min_bp)
+    message("... minimum `bp`: ", opt$options$min_bp)
+    samples <- filter(samples, bp >= opt$options$min_bp)
+
+    message("... remaining detections: ", nrow(samples))
+    message("... minimum aligned bp: ", opt$options$min_aligned_bp)
+    samples <- filter(samples,
+                      bp * contig_coverage / 100 >= opt$options$min_aligned_bp)
+    message("... remaining detections: ", nrow(samples))
+
     message("... remaining detections: ", nrow(samples))
     message("... minimum read count: ", opt$option$min_reads)
-    samples <- filter(samples, numreads >= opt$option$min_reads)
+    samples <- filter(samples, numreads2 >= opt$option$min_reads)
     message("... remaining detections: ", nrow(samples))
+
+    message("... remaining detections: ", nrow(samples))
+    message("... minimum % blast identity: ", opt$options$min_pident)
+    samples <- filter(samples, pident >= opt$options$min_pident)
+    message("... remaining detections: ", nrow(samples))
+
+    message("... remaining detections: ", nrow(samples))
+    message("... maximum % homopolymers: ", opt$option$max_pcthp)
+    samples <- filter(samples, pcthp >= opt$option$max_pcthp)
+    message("... remaining detections: ", nrow(samples))
+
     samples
 }
 
@@ -604,7 +643,10 @@ if (!interactive()) {
         respiratory_viruses = respiratory_viruses,
         filter_host = opt$options$filter_host,
         min_bp = opt$options$min_bp,
-        min_reads = opt$options$min_reads
+        min_aligned_bp = opt$options$min_aligned_bp,
+        min_reads = opt$options$min_reads,
+        min_pident = opt$options$min_pident,
+        max_pcthp = opt$options$max_pcthp
     )
 
     summary <- tibble(
