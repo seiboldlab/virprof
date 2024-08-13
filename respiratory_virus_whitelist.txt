@@ -1,0 +1,12 @@
+Rhinovirus
+Coronavirus
+Influenza
+Metapneumovirus
+Enterovirus
+Orthopneumovirus
+Parainfluenza
+Respirovirus
+Rubulavirus
+Respiratory
+Bocavirus
+Adenovirus

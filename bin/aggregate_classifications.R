@@ -1,19 +1,26 @@
 #!/usr/bin/env Rscript
-library(optparse)
-library(magrittr)
-suppressPackageStartupMessages(library(dplyr))
-library(readr)
-suppressPackageStartupMessages(library(purrr))
-suppressPackageStartupMessages(library(tidyr))
-library(stringr)
-library(openxlsx)
-library(fuzzyjoin)
-library(tibble)
-suppressPackageStartupMessages(library(BiocGenerics))
-suppressPackageStartupMessages(library(S4Vectors))
-suppressPackageStartupMessages(library(stats4))
-library(lubridate)
 
+suppressPackageStartupMessages({
+    library(optparse)
+
+    library(magrittr)
+    library(dplyr)
+    library(purrr)
+    library(tidyr)
+    library(readr)
+    library(stringr)
+    library(tibble)
+    library(lubridate)
+    library(fuzzyjoin)
+
+    library(openxlsx)
+
+    library(BiocGenerics)
+    library(S4Vectors)
+    library(stats4)
+})
+
+## Find out where we are. Sadly difficult to do.
 libdir <- file.path(
     dirname(dirname(
         sub("--file=", "", grep("--file",
@@ -25,7 +32,9 @@ libdir <- file.path(
 )
 source(file.path(libdir, "virushostdb.R"))
 
-#' List of terms marking known respiratory viruses
+#' Default list of terms marking known respiratory viruses
+#' Normally, this will be overridden by a file supplied
+#' from the pipeline configuration.
 respiratory_viruses <- c(
     "Rhinovirus",
     "Coronavirus",
@@ -58,7 +67,7 @@ write_xlsx <- function(sheets, file,
     message("... done")
 }
 
-
+#' Translation table for R "code" names to "English"
 field_name_map <- list(
     "Unit" = "unit",
     "Sample" = "sample",
@@ -77,21 +86,22 @@ field_name_map <- list(
     "Reference Genome Size" = "genome_size",
     "Reference Size Source" = "genome_size_source",
     "% Identity" = "pident",
-    "% Identities" = "pidents",
-    "(old) Read Count" = "numreads",
-    "(old) Read Count(s)" = "numreadss",
-    "Read Count" = "numreads2",
-    "Read Count(s)" = "numreadss2",
+    "% Identity(s)" = "pidents",
+    "Read Count" = "numreads",
+    "Read Count(s)" = "numreadss",
     "Taxonomy ID" = "taxid",
     "Taxonomy IDs" = "taxids",
     "Taxonomic Name" = "taxname",
     "Taxonomic Name(s)" = "taxnames",
     "Species Name" = "species",
     "Lineage" = "lineage",
-    "Lineage(s)" = "lineage",
+    "Lineage(s)" = "lineages",
     "Lineage Ranks" = "lineage_ranks",
     "Scaffold BP" = "bp",
     "Scaffold BP(s)" = "bps",
+    "Max. Scaffold BP" = "max_bp",
+    "Max. Scaffold BP(s)" = "max_bps",
+    "Subject Length" = "slen",
     "% Genome" = "genome_coverage",
     "% Genome(s)" = "genome_coverages",
     "% Aligned" = "contig_coverage",
@@ -101,7 +111,11 @@ field_name_map <- list(
     "Sequencing Units" = "unit_names",
     "Unit Count" = "num_units",
     "Trimmed Reads" = "trimmed_read_count",
-    "Mapped Reads" = "mapped_read_count"
+    "Mapped Reads" = "mapped_read_count",
+    "% Homopolymer" = "pcthp",
+    "% Homopolymer(s)" = "pcthps",
+    "Entropy" = "entropy",
+    "Entropy(s)" = "entropies"
 )
 
 #' Convert code to natural names
@@ -201,10 +215,25 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     default = 200,
                     help = "Minimum sequence length (default: %default)"
                     ),
+        make_option(c("--min-aligned-bp"),
+                    metavar = "N",
+                    default = 150,
+                    help = "Minimum aligned sequence length (default: %default)"
+                    ),
         make_option(c("--min-reads"),
                     metavar = "N",
                     default = 3,
                     help = "Minimum read count (default: %default)"
+                    ),
+        make_option(c("--min-pident"),
+                    metavar = "PERCENT",
+                    default = 70,
+                    help = "Minimum percent identity (default: %default)"
+                    ),
+        make_option(c("--max-pcthp"),
+                    metavar = "PERCENT",
+                    default = 12,
+                    help = "Maximum percent homopolymer (default: %default)"
                     ),
         make_option(c("--merge-samples"),
                     metavar = "REGEX",
@@ -225,9 +254,17 @@ parse_options <- function(args = commandArgs(trailingOnly = TRUE)) {
                     metavar = "FILE",
                     help = "File with list of base coverage input files"
                     ),
+        make_option(c("--in-fastaqc-list"),
+                    metavar = "FILE",
+                    help = "File with list of Fasta QC CSV input files"
+                    ),
         make_option(c("--in-rnaseq-stats"),
                     metavar = "FILE",
                     help = "Stats summary file (.stats.rds) from rnaseq pipeline"
+                    ),
+        make_option(c("--in-white-list"),
+                    metavar = "FILE",
+                    help = "White list for selecting respiratory viruses"
                     ),
         make_option(c("--set-project"),
                     metavar = "STRING",
@@ -324,7 +361,7 @@ locate_files <- function(opt) {
         )
 }
 
-#' Load CSVs
+#' Load Calls (bins, detections)
 #'
 #'
 load_calls <- function(samples, opt) {
@@ -341,6 +378,13 @@ load_calls <- function(samples, opt) {
         staxids = col_character(),
         pident = col_double(),
         numreads = col_integer(),
+        pcthp = col_number(),
+        entropy1 = col_number(),
+        entropy2 = col_number(),
+        entropy3 = col_number(),
+        entropy4 = col_number(),
+        entropy6 = col_number(),
+        entropy10 = col_number(),
         taxid = col_integer(),
         genome_size = col_number(),
         taxname = col_character(),
@@ -370,12 +414,27 @@ load_calls <- function(samples, opt) {
     samples <- samples %>%
         select(
             unit, sample,
+            species,
+            taxname,
             words,
             numreads,
-            log_evalue, pident, n_frag, contig_coverage,
-            species, taxname, stitle,
+            pident,
+            n_frag,
+            contig_coverage,
+            log_evalue,
+            stitle,
             everything()
-        )
+        ) %>%
+        mutate(
+            log_evalue = round(log_evalue)
+        ) %>%
+        ## skip the contig level values for the report
+        ## we are using the scaffold ones instead
+        select(-c(
+            numreads,
+            pcthp, entropy1, entropy2, entropy3, entropy4,
+            entropy6, entropy10,
+        ))
 
     if (all(samples$unit == samples$sample)) {
         samples <- select(samples, -unit)
@@ -384,6 +443,11 @@ load_calls <- function(samples, opt) {
     samples
 }
 
+
+#' Load coverage data and add read counts to calls
+#'
+#' This only grabs "numreads" from the samtools
+#' coverage output.
 load_coverages <- function(calls, coverage_filelist_file) {
     message("Loading coverage files...")
     call_cols <- cols(
@@ -413,15 +477,16 @@ load_coverages <- function(calls, coverage_filelist_file) {
         mutate(sacc = sub("(\\d)_(\\d{1,3})", "\\1:\\2", sacc)) %>%
         separate(sacc, c("sacc", "fragment"), sep=":", fill = "right") %>%
         group_by(sample, sacc) %>%
-        summarize(numreads2 = sum(numreads), .groups="drop")
+        summarize(numreads = sum(numreads), .groups="drop")
 
     left_join(calls, coverages, by=c("sample", "sacc")) %>%
-        relocate(
-            numreads2,
-            .after = words
-        )
+        relocate(numreads, .after = words)
 }
 
+
+#' Load the scaffold data and add to calls
+#'
+#' This only grabs the "bp" number
 load_scaffolds <- function(calls, scaffold_filelist_file) {
     message("Loading scaffold files...")
     scaffold_cols <- cols(
@@ -459,21 +524,96 @@ load_scaffolds <- function(calls, scaffold_filelist_file) {
         relocate(bp, .after = pident)
 }
 
-#' Basic hit filtering
+#' Load the FastaQC data and add to calls
+#'
+#' This only loads the percent homopolymer and average entropy. Values
+#' are weighted by fragment length.
+load_fastaqc <- function(calls, fastaqc_filelist_file) {
+    message("Loading Fasta QC data...")
+    fastaqc_cols <- cols(
+        "acc" = col_character(),
+        len_all = col_integer(),
+        len_used = col_integer(),
+        entropy1 = col_number(),
+        entropy2 = col_number(),
+        entropy3 = col_number(),
+        entropy4 = col_number(),
+        entropy6 = col_number(),
+        entropy10 = col_number(),
+        frac_hp = col_number()
+    )
+    fastaqc <- fastaqc_filelist_file %>%
+        read_table(col_names = "path", col_types = cols(col_character())) %>%
+        mutate(data = map(path, read_csv, col_types = fastaqc_cols)) %>%
+        unnest(cols = c(data)) %>%
+        select(-path) %>%
+        mutate(acc = str_replace(acc, "_pilon$", "")) %>%
+        separate(acc, c("sample", "sacc"), sep="\\.") %>%
+        mutate(sacc = sub("(\\d)_(\\d{1,3})", "\\1:\\2", sacc)) %>%
+        separate(sacc, c("sacc", "fragment"), sep=":", fill = "right") %>%
+        select(-fragment) %>%
+        group_by(sample, sacc) %>%
+        summarize(
+            pcthp = round(sum(frac_hp * len_used) / sum(len_used) * 100, 1),
+            entropy = round(sum(
+                (entropy1 + entropy2 + entropy3 + entropy4
+                    + entropy6 + entropy10) * len_used) /
+                sum(len_used) / 6, 2)
+        )
+
+    left_join(calls, fastaqc, by = c("sample", "sacc")) %>%
+        relocate(pcthp, entropy, .after = bp)
+}
+
+
+#' Apply thresholds to collected hits
 filter_hits <- function(samples, opt) {
+    total <- nrow(samples)
+    stats <- list()
     message("Filtering accession level bins...")
-    message("... input detection count: ", nrow(samples))
-    message("... minimum `bp`: ", opt$option$min_bp)
-    samples <- filter(samples, bp >= opt$option$min_bp)
-    message("... remaining detections: ", nrow(samples))
+    message("... input detection count: ", total)
+
+    message("... minimum `bp`: ", opt$options$min_bp)
+    samples <- filter(samples, bp >= opt$options$min_bp)
+    stats$min_bp <- total - nrow(samples)
+    total <- nrow(samples)
+    message("... remaining detections: ", total)
+
+    message("... minimum aligned bp: ", opt$options$min_aligned_bp)
+    samples <- filter(samples,
+                      bp * contig_coverage / 100 >= opt$options$min_aligned_bp)
+    stats$min_aligned_bp <- total - nrow(samples)
+    total <- nrow(samples)
+    message("... remaining detections: ", total)
+
     message("... minimum read count: ", opt$option$min_reads)
     samples <- filter(samples, numreads >= opt$option$min_reads)
-    message("... remaining detections: ", nrow(samples))
+    stats$min_reads <- total - nrow(samples)
+    total <- nrow(samples)
+    message("... remaining detections: ", total)
+
+    message("... minimum % blast identity: ", opt$options$min_pident)
+    samples <- filter(samples, pident >= opt$options$min_pident)
+    stats$min_pident <- total - nrow(samples)
+    total <- nrow(samples)
+    message("... remaining detections: ", total)
+
+    message("... maximum % homopolymers: ", opt$option$max_pcthp)
+    samples <- filter(samples, pcthp <= opt$option$max_pcthp)
+    stats$max_pcthp <- total - nrow(samples)
+    total <- nrow(samples)
+    message("... remaining detections: ", total)
+
+    attr(samples, "stats") <- stats
     samples
 }
 
 annotate_viruses <- function(samples, opt) {
     message("Annotating Viruses")
+    if (!is.null(opt$options$in_white_list)) {
+        message("Loading whitelist from ", opt$options$in_white_list)
+        respiratory_viruses <- readLines(opt$options$in_white_list)
+    }
     re <- paste0("(", paste(collapse="|", respiratory_viruses), ")")
 
     samples <- samples %>%
@@ -483,15 +623,9 @@ annotate_viruses <- function(samples, opt) {
         mutate(
             host = vhdb_get_host(lineage, taxid, url=opt$options$virushostdb),
             respiratory = grepl(re, taxname, ignore.case = TRUE)
-        )
+        ) %>%
+        relocate(respiratory, .after = taxname)
     message("... found Viruses: ", nrow(samples))
-    samples
-}
-
-#' Filter known respiratory viruses
-filter_respiratory_viruses <- function(samples) {
-    message("Filtering with positive list...")
-    message("... remaining detections: ", nrow(samples))
     samples
 }
 
@@ -504,16 +638,21 @@ merge_species <- function(samples) {
             # minimize taxononomic names list
             taxnames  = concat(taxname, ", ", sort=TRUE, unique=TRUE),
             # sum up the read count
-            numreads2 = sum(numreads2),
             numreads = sum(numreads),
-            # pick the best evalue
-            min_log_evalue = min(log_evalue),
+            # get largest scaffold
+            max_bp    = max(bp),
             # calculate weighted % identity
             pident   = round(sum(pident * slen) / sum(slen), 1),
+            # calculate weighted % homopolymer
+            pcthp = round(sum(pcthp * bp) / sum(bp), 1),
+            # calculate weighted entropy
+            entropy = round(sum(entropy * bp) / sum(bp), 4),
             # collect each value for these:
             genome_coverages = concat(genome_coverage),
             bps       = concat(bp),
             n_frags   = concat(n_frag),
+            # pick the best evalue
+            min_log_evalue = min(log_evalue),
             saccs     = concat(sacc),
             # summarize these:
             staxids   = concat(staxids, ", ", split=";", sort=TRUE, unique=TRUE),
@@ -533,13 +672,14 @@ merge_samples <- function(samples) {
         arrange(desc(numreads)) %>%
         summarize(
             taxnames = concat(taxnames, " | "),
-            numreadss2 = concat(numreads2, " | "),
             numreadss = concat(numreads, " | "),
-            min_log_evalues = concat(min_log_evalue, " | "),
+            max_bps = concat(max_bp, " | "),
             pidents = concat(pident, " | "),
-            genome_coverages = concat(genome_coverages, " | "),
-            bps = concat(bps, " | "),
+            pcthps = concat(pcthp, " | "),
+            entropies = concat(entropy, " | "),
             n_frags = concat(n_frags, " | "),
+            genome_coverages = concat(genome_coverages, " | "),
+            min_log_evalues = concat(min_log_evalue, " | "),
             saccs = concat(saccs, " | "),
             .groups="drop"
         ) %>%
@@ -560,7 +700,10 @@ if (!interactive()) {
         respiratory_viruses = respiratory_viruses,
         filter_host = opt$options$filter_host,
         min_bp = opt$options$min_bp,
-        min_reads = opt$options$min_reads
+        min_aligned_bp = opt$options$min_aligned_bp,
+        min_reads = opt$options$min_reads,
+        min_pident = opt$options$min_pident,
+        max_pcthp = opt$options$max_pcthp
     )
 
     summary <- tibble(
@@ -593,6 +736,10 @@ if (!interactive()) {
     if (!is.null(opt$options$in_scaffold_list)) {
         calls <- load_scaffolds(calls, opt$options$in_scaffold_list)
     }
+    if (!is.null(opt$options$in_fastaqc_list)) {
+        calls <- load_fastaqc(calls, opt$options$in_fastaqc_list)
+    }
+    message("Finished loading files")
 
     ## Compute Genome Coverage
     calls <- calls %>%
@@ -610,24 +757,44 @@ if (!interactive()) {
 
     ## Filter calls and read count
     filtered_calls <- filter_hits(calls, opt)
+    filter_stats <- attr(filtered_calls, "stats")
+    attr(filtered_calls, "stats") <- NULL
     results$Detections <- filtered_calls
     summary %<>%
         add_row(
-            Count=nrow(filtered_calls),
             Description="Filtered Detections",
+            Count=nrow(filtered_calls),
             Tab="Detections"
         ) %>%
         add_row(
-            Description=paste("... Minimum scaffold bp:", opt$options$min_bp)
+            Description=paste("... Minimum scaffold bp:", opt$options$min_bp),
+            Count = filter_stats$min_bp
         ) %>%
         add_row(
-            Description=paste("... Minimum read count:", opt$options$min_reads)
+            Description=paste("... Minimum aligned bp:", opt$options$min_aligned_bp),
+            Count = filter_stats$min_aligned_bp
+        ) %>%
+        add_row(
+            Description=paste("... Minimum read count:", opt$options$min_reads),
+            Count = filter_stats$min_reads
+        ) %>%
+        add_row(
+            Description=paste("... Minimum % blast identity:", opt$options$min_pident),
+            Count = filter_stats$min_pident
+        ) %>%
+        add_row(
+            Description=paste("... Maximum % homopolymers:", opt$options$max_pcthp),
+            Count = filter_stats$max_pcthp
         )
 
     ## Summary taxonomic stats
     species_found <- filtered_calls %>%
         group_by(species) %>%
-        summarize(n_samples = length(unique(sample)), .groups="drop") %>%
+        summarize(
+            n_samples = length(unique(sample)),
+            numreads = sum(numreads),
+            .groups="drop"
+        ) %>%
         arrange(species)
     results$`Species Found` = species_found
     message("Found ", nrow(species_found), " distinct species across all samples")
@@ -680,7 +847,7 @@ if (!interactive()) {
         results$`Run Info`$rnaseq_run_info <- list(
             virprof_version = stats$virprof_version,
             pipeline = stats$pipeline,
-            date = stats$date
+            date = as.character(stats$date)
         )
 
         sample_sheet <- stats$sample_sheet %>%
@@ -695,7 +862,8 @@ if (!interactive()) {
             ) %>%
             left_join(
                 positive_samples %>%
-                    select(sample, taxnames, numreadss2, pidents, genome_coverages),
+                select(sample, taxnames, numreadss, max_bps,
+                       pidents, genome_coverages, pcthps),
                 by = "sample"
             )
         results$`Samples` <- sample_sheet

@@ -18,7 +18,14 @@ from typing import Iterable, List, Tuple, Optional, Callable, Dict, Any
 
 import click
 
-from ..blastbin import BlastHit, HitChain, CoverageHitChain, greedy_select_chains
+from ..blastbin import (
+    BlastHit,
+    HitChain,
+    CoverageHitChain,
+    CoverageFastAQcHitChain,
+    FastAQcHitChain,
+    greedy_select_chains,
+)
 from ..entrez import FeatureTables, GenomeSizes
 from .. import blast  # type: ignore
 from ..wordscore import WordScorer
@@ -163,31 +170,34 @@ def make_taxonomy_annotate_function(
 
 
 def make_hitchain_template(
-    in_coverage: Tuple[click.utils.LazyFile, ...], chain_penalty: int
+    in_coverage: Tuple[click.utils.LazyFile, ...],
+    in_fastaqc: click.utils.LazyFile,
+    chain_penalty: int,
 ) -> HitChain:
     """Creates hitchain template object
 
     Return can be a CoverageHitChain if we have coverages, otherwise
     it's a regular HitChain.
     """
-    if not in_coverage:
-        return HitChain(chain_penalty=chain_penalty)
+    if in_coverage:
+        if in_fastaqc:
+            klass = CoverageFastAQcHitChain
+        else:
+            klass = CoverageHitChain
+    else:
+        if in_fastaqc:
+            klass = FastAQcHitChain
+        else:
+            klass = HitChain
 
-    chain_tpl = CoverageHitChain(chain_penalty=chain_penalty)
-    cov = {}
-    for cov_fd in in_coverage:
-        fname = os.path.basename(cov_fd.name)
-        cov_sample, _, ext = fname.rpartition(".")
-        if ext != "coverage":
-            LOG.warning(
-                "Parsing of filename '%s' failed. Should end in .coverage", fname
-            )
-        LOG.info("Loading coverage file %s", cov_sample)
-        cov_reader = csv.DictReader(cov_fd, delimiter="\t")
-        cov_data = {row["#rname"]: row for row in cov_reader}
-        cov[cov_sample] = cov_data
-        cov_fd.close()
-    chain_tpl.set_coverage(cov)
+    chain_tpl = klass(chain_penalty=chain_penalty)
+
+    if isinstance(chain_tpl, CoverageHitChain):
+        chain_tpl.load_coverage(in_coverage)
+
+    if isinstance(chain_tpl, FastAQcHitChain):
+        chain_tpl.load_fastaqc(in_fastaqc)
+
     return chain_tpl
 
 
@@ -241,7 +251,12 @@ def create_blast_reader(
     "-c",
     type=click.File("r"),
     multiple=True,
-    help="Samtools coverage result file",
+    help="Samtools coverage result files",
+)
+@click.option(
+    "--in-fastaqc",
+    type=click.File("r"),
+    help="VirProf FastA QC reports (entropies, homopolymers)",
 )
 @click.option(
     "--out",
@@ -308,7 +323,7 @@ def create_blast_reader(
 @click.option(
     "--no-standard-excludes",
     "-E",
-    type=bool,
+    is_flag=True,
     help="Do not exclude Human, artificial and unclassified" " sequences by default",
     default=False,
 )
@@ -318,6 +333,13 @@ def create_blast_reader(
     default=2,
     help="Exclude contigs with less than this number of reads."
     " Requires --in-coverage to be set to take effect.",
+)
+@click.option(
+    "--max-pcthp",
+    type=int,
+    default=15,
+    help="Exclude contigs with higher homopolymer percentage."
+    " Requires --in-fastaqc to be set to take effect.",
 )
 @click.option(
     "--chain-penalty",
@@ -343,6 +365,7 @@ def create_blast_reader(
 def cli(
     in_blast7: click.utils.LazyFile,
     in_coverage: Tuple[click.utils.LazyFile, ...],
+    in_fastaqc: click.utils.LazyFile,
     out: click.utils.LazyFile,
     out_hits: click.utils.LazyFile,
     include: Tuple[str, ...],
@@ -353,6 +376,7 @@ def cli(
     ncbi_taxonomy: Optional[str] = None,
     no_standard_excludes: bool = False,
     min_read_count=2,
+    max_pcthp=15,
     chain_penalty: int = 20,
     num_words: int = 4,
     cache_path: str = "entrez_cache",
@@ -366,7 +390,7 @@ def cli(
     sample, reader = create_blast_reader(in_blast7)
     taxonomy = load_taxonomy(ncbi_taxonomy)
     wordscorer = WordScorer(keepwords=num_words)
-    chain_tpl = make_hitchain_template(in_coverage, chain_penalty)
+    chain_tpl = make_hitchain_template(in_coverage, in_fastaqc, chain_penalty)
 
     fields = chain_tpl.fields
     add_genome_sizes = make_genome_size_fetch_function(
@@ -400,6 +424,10 @@ def cli(
     # Filter by minimum read coverage
     if isinstance(chain_tpl, CoverageHitChain):
         hitgroups = list(chain_tpl.filter_hitgroups(hitgroups, min_read_count))
+
+    # Filter by maximum homopolymer percentage
+    if isinstance(chain_tpl, FastAQcHitChain):
+        hitgroups = list(chain_tpl.filter_hitgroups_qc(hitgroups, max_pcthp))
 
     # Classify each contig
     LOG.info("Classifying each contig...")

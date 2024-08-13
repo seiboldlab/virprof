@@ -1,0 +1,70 @@
+userdata:
+  virprof:
+    # API Keys:
+    # ---------
+    # NCBI API key used for querying Entrez.
+    # Supplying your key increases rate limits.
+    ncbi_api_key: ""
+
+    # Slack web hook for posting completion notices to a channel.
+    # This should be only the trailing part of form xxx/xxx/xxx
+    slack_hook: ""
+
+    # Target configuration:
+    # ---------------------
+    # Regular expression selecting bins for scaffold exporting.
+    # By default, only Viruses are exported.
+    export_filter: "^Virus"
+
+    # Host species for virus selection using VHDB
+    # Only viruses marked as infecting this species will be
+    # shown in in Respiratory Virus tab
+    host_species: "Homo sapiens"
+
+    # Whitelist for determining respiratory viruses.
+    # Both host species and this white list must match.
+    # This file contains one regular expression per line.
+    whitelist: respiratory_virus_whitelist.txt
+
+    # Exclude contigs classified into these taxa prior to binning
+    # (Host depletion)
+    bin_prefilter_contigs:
+      - Euteleostomi
+    # Exclude bins classified into these taxa post binning
+    # (Final host removal)
+    bin_exclude_taxa:
+      - Hominidae
+
+    # Export thresholds:
+    # ------------------
+    # Minimum scaffold length in bp:
+    min_bp: 200
+    # Minmum read count
+    min_reads: 3
+    # Maximum homopolymer percentage
+    max_pcthp: 12
+    # Minimum fractional identity with reference (BLAST pident)
+    min_pident: 70
+    # Minimum aligned length in bp
+    min_aligned_bp: 150
+
+    # Binning parameters
+    # ------------------
+    # Exclude BLAST HSPs matching these taxa prior to binning
+    # (Removes uninformative database hits)
+    bin_prefilter_hits:
+      - artificial sequences
+      - unclassified sequences
+      - uncultured bacterium
+      - uncultured eukaryote
+      - uncultured fungus
+      - uncultured phage
+      - uncultured virus
+    # Penalty for having multiple disjunct BLAST HSP rather than
+    # a single, contiguous one:
+    bin_chain_penalty: 20
+    # Minimum per contig read coverage
+    bin_min_reads: 2
+    # Maximum per contig homopolymer percentage
+    bin_max_pcthp: 20
+
