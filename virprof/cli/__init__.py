@@ -141,6 +141,7 @@ class AutoLoadCommand(click.MultiCommand):
 
 
 @click.command(cls=AutoLoadCommand)
+@click.version_option()
 @click.option(
     "--profile",
     is_flag=True,

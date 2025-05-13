@@ -15,6 +15,7 @@ extra_package_data = {
         "rules/*",
         "test_data/*",
         "*.yml",
+        "respiratory_virus_whitelist.txt",
         "README.md",
     ]
 }
@@ -37,7 +38,7 @@ try:
             shutil.copy(src, dst)
         with open(os.path.join(submodule, "__init__.py"), "w"):
             pass
-    setup(package_data=package_data)
+    setup(package_data=package_data, zip_safe=False)
 finally:
     for submodule in extra_package_data:
         shutil.rmtree(submodule)
