@@ -1,5 +1,6 @@
 Env(name="vp_umi_tools", base="bioconda", packages=[
-    "umi_tools"
+    "umi_tools",
+    "samtools"
 ])
 
 with Stage("extract_umi_vp"):
