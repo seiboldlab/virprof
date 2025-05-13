@@ -7,6 +7,9 @@ references:
       type: fasta
     - url: http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.transcripts.fa.gz
       type: tx.fasta
+    - url: https://sourceforge.net/projects/rseqc/files/BED/Human_Homo_sapiens/hg38_GENCODE.v38.bed.gz
+      type: bed
+
     - type: pipeline
       stages:
         - index_star

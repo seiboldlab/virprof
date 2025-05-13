@@ -21,6 +21,7 @@ Env(name="vp_rnaseq_r", base="bioconda", packages=[
     "r-future",
     "r-future.apply",
     "r-furrr",
+    "r-jsonlite",
     "pigz"
 ])
 

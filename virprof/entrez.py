@@ -160,6 +160,8 @@ class EntrezAPI(BaseAPI):
             502,  # Bad Gateway Error
             504,  # Gateway Timeout
             429,  # Too Many Requests
+            500,  # this can be caused by error by us, but also seems to randomly
+                  # happen. So we just retry for this as well.
             # 500 may be caused by single entry in batch request, so
             # simple retry does not help.
         )

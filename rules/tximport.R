@@ -1,16 +1,119 @@
 #!/usr/bin/env Rscript
 
-#' We expect to be called from snakemake script directive, so having
-#' `snakemake` object with `snakemake@input` etc containing paths.
+library(cli)
 
-#' We also need to redirect our output to log ourselves...
-logfile <- file(snakemake@log[[1]], open = "wt")
-sink(logfile)
-sink(logfile, type = "message")
+# This creates a snakemake object such as is passed to us from
+# snakemake. Useful for debugging interactively.
+if (!exists("snakemake")) {
+    cli_h1("0. Parsing commandline options (no snakemake object found)")
+    library(optparse)
+    selfarg <- grep("--file", commandArgs(trailingOnly = FALSE), value = TRUE)
+    self <- sub("--file=", "", selfarg)
+    sourcedir <- dirname(self)
 
-message("Importing ", snakemake@params$input_type, " data into R")
+    parser <- OptionParser(
+        option_list = list(
+            make_option("--in-samplesheet", help = "PRJ/qiime_mapping.tsv"),
+            make_option("--in-multiqc", help = "PRJ.ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data"),
+            make_option("--in-gtf", help = "references/hg38g/ALL.gtf"),
+            make_option("--out-counts", default = "out.counts.rds"),
+            make_option("--out-transcripts", default ="out.txcounts.rds"),
+            make_option("--out-stats", default = "out.stats.rds"),
+            make_option("--out-log"),
+            make_option("--input-type", default = "Salmon"),
+            make_option("--set-version", default = "0.0"),
+            make_option("--set-label", default = "unknown"),
+            make_option("--threads", default = 4)
+        ),
+        usage = "usage: %prog [options] count_file ...",
+        description = paste(
+            sep="\n",
+            "Creates unified SummarizedExperiment RDS",
+            "",
+            "Example:",
+            "%prog \\",
+            "  --in-sample-sheet PROJ/qiime_mapping.tsv \\",
+            "  --in-multiqc PROJ.ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data \\",
+            "  --in-gtf references/hg38g/ALL.gtf",
+            "  PROJ.ref_hg38g.qc.quant_salmon_sa/*/quant.sf"
+        )
+    )
+    opt <- parse_args2(parser, args = commandArgs(trailingOnly = TRUE))
 
-message("1. ----------- Loading packages ----------")
+    Snakemake <- methods::setClass(
+        "Snakemake",
+        slots = c(
+            input = "list",
+            output = "list",
+            params = "list",
+            wildcards = "list",
+            threads = "numeric",
+            log = "list",
+            resources = "list",
+            config = "list",
+            rule = "character",
+            bench_iteration = "numeric",
+            scriptdir = "character",
+            source = "function"
+        )
+    )
+
+    snakemake <- Snakemake(
+        input = list(
+            counts = opt$args,
+            meta = opt$options$in_samplesheet,
+            multiqc = opt$options$in_multiqc,
+            gtf = opt$options$in_gtf
+        ),
+        output = list(
+            counts = opt$options$out_counts,
+            transcripts = opt$options$out_transcripts,
+            stats = opt$options$out_stats
+        ),
+        log = list(opt$options$out_log),
+        threads = opt$options$threads,
+        params = list(
+            version = opt$options$set_version,
+            label = opt$options$set_label,
+            input_type = opt$options$input_type
+        ),
+        scriptdir = sourcedir,
+        source = function(...) {
+            wd <- getwd()
+            setwd(snakemake@scriptdir)
+            source(...)
+            setwd(wd)
+        }
+    )
+
+    if (length(snakemake@input$counts) == 0) {
+        cli_abort("Missing input count files")
+    }
+    if (any(!fs::file_exists(snakemake@input$counts))) {
+        cli_abort("Some input count files are missing")
+    }
+    if (!fs::file_exists(snakemake@input$meta)) {
+        cli_abort("Sample sheet is missing")
+    }
+    if (!fs::file_exists(snakemake@input$multiqc)) {
+        cli_abort("MultiQC data folder is missing")
+    }
+    if (!fs::file_exists(snakemake@input$gtf)) {
+        cli_abort("GTF file is missing")
+    }
+}
+
+#' We need to redirect our output to log if running from snakemake...
+
+if (!is.null(snakemake@log[[1]])) {
+    logfile <- file(snakemake@log[[1]], open = "wt")
+    sink(logfile)
+    sink(logfile, type = "message")
+}
+
+cli_alert("Importing {snakemake@params$input_type} data into R")
+
+cli_h1("1. Loading packages")
 library(tximport)
 library(readr)
 library(GenomicFeatures)
@@ -63,113 +166,7 @@ get_idcols <- function(table, ids, allow_short = FALSE) {
     res
 }
 
-load_all_fastqc <- function(sample_sheet, path) {
-    fastqc <- NULL
-    for (n in c(1, 2)) {
-        suffix <- c("", "_1")[n]
-        trimmed <- n == 2
-        fastqc_fn <- fs::path(
-            path,
-            str_glue("multiqc_fastqc{suffix}.txt")
-        )
-        if (fs::file_exists(fastqc_fn)) {
-            fastqc_data <- load_fastqc(fastqc_fn, trimmed)
-            if (is.null(fastqc)) {
-                fastqc <- fastqc_data
-            } else {
-                fastqc <- bind_rows(fastqc, fastqc_data)
-            }
-       }
-    }
-    fastqc
-}
 
-load_fastqc <- function(fastqc_fn, trimmed) {
-    message("  Loading ", if (trimmed) "trimmed" else "raw",
-            " read fastqc data")
-    fastqc_data <- read_tsv(fastqc_fn, show_col_types = FALSE) %>%
-        # Sequence length can be `95` or `95-151`, split here
-        tidyr::separate(
-            col = `Sequence length`,
-            into = c("read_len_min", "read_len_max"),
-            convert = TRUE,
-            fill = "right"
-        ) %>%
-        transmute(
-            # filename is just sample.R[12].fq.gz, ignoring
-            fastqc_id = sub(".R[12]$", "", Sample),
-            mate = if_else(str_ends(Sample, "R2"), "R2", "R1"),
-            num_reads = `Total Sequences`,
-            read_len_min,
-            read_len_max = ifelse(
-                is.na(read_len_max), read_len_min, read_len_max
-            ),
-            read_len_avg = avg_sequence_length,
-            pct_gc = `%GC`,
-            # This is the percentage of unique reads (dedup/total)
-            pct_unique = total_deduplicated_percentage,
-            trimmed = trimmed
-        )
-
-    message("  Determining sample sheet column matching fastqc ids")
-    # Find columns identifying the fastqc files in sample sheet
-    fastqc_idcolumns <- get_idcols(sample_sheet, fastqc_data$fastqc_id,
-                                   allow_short = TRUE)
-    message("  FastQC files identified by: ",
-            paste(fastqc_idcolumns, collapse = ", "))
-
-    # Extract paths
-    #
-    # FIXME: This is a bad hack. We should get the detected fwd
-    #        and rev read from YMP somehow. Also, this won't work
-    #        for SRR sources.
-    fastq_id_to_path <- sample_sheet %>%
-        # One row per FQ file
-        pivot_longer(
-            cols = where(
-                ~any(str_detect(., "(fastq|fq).gz$"), na.rm = TRUE)
-            ),
-            values_to = "fastq_file_path",
-            names_to = "path_col"
-        ) %>%
-        mutate(
-            # Make sure ID columns are character
-            across(all_of(fastqc_idcolumns), as.character),
-            # Deduce mate from file name
-            mate = if_else(
-                str_detect(basename(fastq_file_path), "(_|\\.)R1"),
-                "R1", "R2"
-            ),
-            # Pick ID column
-            fastqc_id = as.character(.data[[fastqc_idcolumns[1]]])
-        ) %>%
-        # Remove anything we can't uniquely match
-        group_by(fastqc_id, mate) %>%
-        filter(n() == 1) %>%
-        ungroup()
-
-    # Merge this into the fastqc df
-    fastqc_data <- fastqc_data %>%
-        left_join(
-            fastq_id_to_path,
-            by = c("fastqc_id", "mate")
-        ) %>%
-        # move ids to front
-        relocate(any_of(fastqc_idcolumns)) %>%
-        # remove convenience fastqc_id
-        select(-fastqc_id)
-
-    if (any(is.na(fastqc_data$fastq_file_path))) {
-        message(
-            "WARNING: ",
-            "Failed to identify fastq file paths for all samples"
-        )
-        message("---- BEGIN fastqc data w/o file path ----")
-        print(filter(fastqc_data, is.na(fastq_file_path)))
-        message("---- END fastqc data w/o file path ----")
-    }
-    fastqc_data
-}
 
 is_header_only_csv <- function(files, col_types) {
     future_sapply(files, function(fn) {
@@ -295,11 +292,44 @@ metadata <- list(
 
 message("2.2. ----------- Loading MultiQC Report Data ----------")
 
-metadata$fastqc <- load_all_fastqc(sample_sheet, snakemake@input$multiqc)
-if (!is.null(metadata$fastqc)) {
-    # Show this (tibble, so will be short)
-    print(metadata$fastqc)
+multiqc_data_file <- fs::path(snakemake@input$multiqc, "multiqc_data.json")
+multiqc <- jsonlite::fromJSON(multiqc_data_file)
+
+extract_counts <- function(col, json) {
+    counts <- sapply(
+        names(json),
+        \(id) as.integer(json[[id]]["Total Sequences"])
+    )
+    res <- enframe(counts, name="ids", value = col) %>%
+        separate("ids", c("ids", "mate"), sep = "\\.", fill="right")
+    err <- group_by(res, ids) %>% filter(n_distinct(.data[[col]]) != 1)
+    if (nrow(err)) {
+        cli_alert("Found errors importing {col}:")
+        print(n=1000, err)
+        cli_abort("Failed to import read counts from multiqc fastqc report")
+    }
+    res <- res %>% group_by(ids) %>%
+        summarize("{col}":=unique(.data[[col]]), .groups="drop")
 }
+fastqc_trimmed <- extract_counts(
+    "trimmed_reads", multiqc$report_saved_raw_data$multiqc_fastqc
+)
+fastqc_raw <- extract_counts(
+    "raw_reads", multiqc$report_saved_raw_data$multiqc_fastqc_1
+)
+fastqc <- full_join(fastqc_raw, fastqc_trimmed, by = "ids")
+fastqc_idcols <- get_idcols(sample_sheet, fastqc$ids, allow_short = TRUE)
+cli_alert_info("FastQC data identified by '{fastqc_idcols}'")
+
+sample_sheet <- sample_sheet %>%
+    left_join(fastqc, by = set_names("ids", fastqc_idcols[1]))
+err <- filter(sample_sheet, is.na(trimmed_reads) | is.na(raw_reads))
+if (nrow(err) > 0) {
+    cli_alert("Read counts missing for some samples:")
+    print(n=1000, err)
+    cli_abort("Incomplete read count information from multiqc fastqc report")
+}
+
 
 message("2.3. ----------- Loading GTF ----------")
 message("Filename = ", snakemake@input$gtf)
@@ -446,10 +476,12 @@ if (snakemake@params$input_type == "ExonSE") {
         txi_genes <- tximport(gene_files, type = "rsem",
                               txIn = FALSE, txOut = FALSE)
 
-        ## Something inside of tximport seems to reset the log sink on the
-        ## second call. Resetting it here:
-        sink(logfile)
-        sink(logfile, type = "message")
+        if (!is.null(logfile)) {
+            ## Something inside of tximport seems to reset the log sink on the
+            ## second call. Resetting it here:
+            sink(logfile)
+            sink(logfile, type = "message")
+        }
     }
 
     message("7. ----------- Assembling SummarizedExperiment ----------")
@@ -586,53 +618,3 @@ if (snakemake@params$input_type == "ExonSE") {
     saveRDS(metadata(gse), snakemake@output$stats)
 }
 message("done")
-q()
-
-
-if (FALSE) {
-    # This creates a snakemake object such as is passed to us from
-    # snakemake. Useful for debugging interactively.
-    Snakemake <- methods::setClass(
-        "Snakemake",
-        slots = c(
-            input = "list",
-            output = "list",
-            params = "list",
-            wildcards = "list",
-            threads = "numeric",
-            log = "list",
-            resources = "list",
-            config = "list",
-            rule = "character",
-            bench_iteration = "numeric",
-            scriptdir = "character",
-            source = "function"
-        )
-    )
-    setwd("/Seibold/tmp/pipeline/work")
-    project <- "gala"
-    snakemake <- Snakemake(
-        scriptdir = "/Seibold/tmp/pipeline/work/virprof/rules",
-        source = function(...) {
-            wd <- getwd()
-            setwd(snakemake@scriptdir)
-            source(...)
-            setwd(wd)
-        }
-    )
-    snakemake@input$counts <- fs::dir_ls(
-        path = paste0(project, ".ref_hg38g.qc.quant_salmon_sa"),
-        glob = "*/quant.sf",
-        recurse = TRUE
-    )
-    snakemake@input$meta <- file.path(project, "qiime_mapping.tsv")
-    snakemake@input$multiqc <- paste0(
-        project,
-        ".ref_hg38g.qc.quant_salmon_sa.group_ALL.qc_multiqc/multiqc_report_data"
-    )
-    snakemake@input$gtf <- "references/hg38g/ALL.gtf"
-    snakemake@threads <- 16
-    snakemake@params$version <- "0.0.0"
-    snakemake@params$label <- "testing manually"
-    snakemake@params$input_type <- "Salmon"
-}
