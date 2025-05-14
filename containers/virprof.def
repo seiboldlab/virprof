@@ -1,0 +1,111 @@
+Bootstrap: docker
+From: mambaorg/micromamba:latest
+
+%arguments
+version=master
+ymp_version=master
+
+%labels
+Author Elmar Pruesse <pruessee@njhealth.org>
+Version {{ version }}
+
+%help
+Write some help here
+
+%post
+# Configure defaults for bioconda/conda-forge setup
+cat > ~/.condarc <<EOF
+channels:
+  - conda-forge
+  - bioconda
+channel_priority: strict
+always_yes: true
+EOF
+eval "$($MAMBA_EXE  shell activate --shell=dash)"
+cd /root
+
+# Get environment files
+micromamba install -q curl
+
+curl -L -o ymp_env.yml https://raw.githubusercontent.com/epruesse/ymp/{{ymp_version}}/environment.yaml
+curl -L -o vp_env.yml https://raw.githubusercontent.com/seiboldlab/virprof/{{version}}/environment.yml
+
+# Merge them
+(
+    grep -v ymp vp_env.yml
+    sed  '1,/dependencies:/d; /#### for tests: ####/,$d' ymp_env.yml
+    echo '  - pip'
+    echo '  - git'
+    echo '  - curl'
+    echo '  - mamba'
+    echo '  - pulp<2.8' # fix snakemake/pulp issue
+) > environment.yaml
+cat environment.yaml
+micromamba install -y -f environment.yaml -n base
+
+# Install YMP
+echo Installing YMP
+pip install git+https://github.com/epruesse/ymp.git@{{ymp_version}} --no-deps
+
+# Install VirProf
+echo Installing VirProf
+pip install git+https://github.com/seiboldlab/virprof.git@{{version}} --no-deps
+
+# Configure tools to be installed inside container in /opt/envs
+echo Adjusting config to place tools inside container
+sed -i 's%conda_prefix: .*%conda_prefix: /opt/envs%' \
+    /opt/conda/lib/python3.11/site-packages/ymp/etc/defaults.yml
+
+# We need to have the demo blast DB, otherwise the resource
+# definitions will break. BUG, really. 
+virprof init-test demo
+cd demo
+
+# DEBUG
+ymp show dir -vvv
+
+# Install environments
+ymp env install \
+  bbmap \
+  bedtools \
+  blast \
+  bowtie2 \
+  fastqc \
+  multiqc \
+  pilon \
+  salmon \
+  sambamba \
+  samtools \
+  spades \
+  star \
+  trf \
+  virprof_py \
+  virprof_r \
+  vp_rnaseq_r \
+  wget
+
+# Cleanup
+mamba clean --all
+rm -rf /root/.cache
+
+%environment
+export LC_ALL=C
+eval "$($MAMBA_EXE  shell activate --shell=dash)"
+
+%test
+snakemake --version
+ymp --version
+
+TMPDIR=$(mktemp -d)
+export HOME=$TMPDIR
+cd $TMPDIR
+ymp init demo
+ymp make toy -j4
+rm -rf *
+
+%runscript
+/opt/conda/bin/virprof "$@"
+
+
+
+
