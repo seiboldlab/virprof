@@ -5,19 +5,17 @@ userdata:
     version: 0.9.0
 
 include:
-  - pipelines.yml
-  - references.yml
-  - config.yml
+  - pipelines.yml   # pipeline definitions
+  - references.yml  # custom references
+  - config.yml      # default configuration parameters
+  - overrides.yml   # job size overrides
 
 directories:
   rules:
     virprof:
-      rules
+      rules # Add VirProf custom rules
 
 conda:
   env_specs:
-    - conda_envs
+    - conda_envs # use VirProf env-specs
 
-projects:
-  test:
-    data: !workdir test_data/test.csv

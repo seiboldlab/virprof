@@ -28,11 +28,11 @@ userdata:
 
     # Exclude contigs classified into these taxa prior to binning
     # (Host depletion)
-    bin_prefilter_contigs:
+    bin_prefilter_contigs: !clear
       - Euteleostomi
     # Exclude bins classified into these taxa post binning
     # (Final host removal)
-    bin_exclude_taxa:
+    bin_exclude_taxa: !clear
       - Hominidae
 
     # Export thresholds:
@@ -52,7 +52,7 @@ userdata:
     # ------------------
     # Exclude BLAST HSPs matching these taxa prior to binning
     # (Removes uninformative database hits)
-    bin_prefilter_hits:
+    bin_prefilter_hits: !clear
       - artificial sequences
       - unclassified sequences
       - uncultured bacterium

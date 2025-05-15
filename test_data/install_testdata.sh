@@ -23,8 +23,6 @@ unpack() {
     mkdir -p $dst
     echo "Unpacking $src to $dst" >&2
     tar xfv $src -C $dst
-    echo "DONE" >&2
-    echo >&2
 }
 
 unpack Homo_sapiens_UCSC_hg38_test.tar.bz2
@@ -37,18 +35,20 @@ tail -n +2 $TESTDATA/test.csv |
 	[ -z "$unit" ] && continue
 	for n in 1 2; do
 	    fq=fq$n
-	    echo making test_data/${!fq} >&2
+	    echo "Making test_data/${!fq} from:">&2
 	    (
-		echo "+ $TESTDATA/sim${unit}_$n.fq.gz" >&2
+		echo "- $TESTDATA/sim${unit}_$n.fq.gz" >&2
 		gzip -dc $TESTDATA/sim${unit}_$n.fq.gz |\
 		    sed 's/^@/@sim'${unit}'_/'
 		echo -n $virus+ | while read -d + vir; do
 		    [ -z "$vir" ] && continue
-		    echo "+ $TESTDATA/test_${vir}.R.$n.fq.gz" >&2
+		    echo "- $TESTDATA/test_${vir}.R.$n.fq.gz" >&2
 		    gzip -dc $TESTDATA/test_$vir.R$n.fq.gz |\
 			sed 's/^@/@vir_'${vir}'_/'
 		done
 	    ) | gzip -c > test_data/${!fq} 
 	done 
     done
+
+echo "Installing test_data/test.csv sample sheet" >&2
 cp $TESTDATA/test.csv test_data

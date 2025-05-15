@@ -1,0 +1,151 @@
+# Specific settings for each rule in VirProf, overriding YMP default
+# values as tested on our cluster. 
+overrides:
+  rules:
+    # RNA-Seq pipeline adjustments
+    vp_tximport_salmon:
+      resources:
+        mem: 256G  # enough for 10k samples
+      threads: 48
+    bbmap_trim:
+      resources:
+        mem: 32G
+        nfs_mbps: 20
+        walltime: 04:00:00
+      threads: 8
+    multiqc_report:
+      resources:
+        nfs_mbps: 5
+        walltime: 02:00:00
+        mem: 40g
+    salmon_quant:
+      resources:
+        mem: 64G
+        walltime: 03:00:00
+        nfs_mbps: 20
+      threads: 32
+    salmon_sa_quant:
+      resources:
+        mem: 64G
+        walltime: 12:00:00
+        nfs_mbps: 10
+      threads: 32
+    sambamba_sort:
+      resources:
+        nfs_mbps: 20
+        mem: 150G
+        walltime: 01:00:00
+      threads: 16
+    sambamba_sort_tx:
+      resources:
+        nfs_mbps: 20
+        mem: 150G
+        walltime: 01:00:00
+      threads: 16
+    star_map:
+      resources:
+        nfs_mbps: 2
+        mem: 64g
+        walltime: 16:00:00
+      threads: 32
+    qc_fastqc:
+      resources:
+        nfs_mbps: 12
+        walltime: 05:00:00
+        mem: 4g
+
+    # Pathogen pipeline cluster adjustments
+    vp_bin_fasta: # stage bin_vp
+      resources:
+        nfs_mbps: 10
+        mem: 1g
+        walltime: 00:10:00
+    vp_blastbin: # stage blastbin_vp
+      resources:
+        nfs_mbps: 3
+        mem: 64g
+        walltime: 00:30:00
+    vp_filter_blast: # stage blastfilter_vp
+      resources:
+        mem: 16g
+        nfs_mbps: 10
+        walltime: 00:40:00
+    vp_pathogen_report:
+      resources:
+        walltime: 00:10:00
+    vp_unmapped_from_salmon: # stage get_unmapped_vp
+      resources:
+        nfs_mbps: 90
+        walltime: 03:00:00
+        mem: 128g
+    vp_scaffold_fasta:
+      resources:
+        nfs_mbps: 10
+        walltime: 00:15:00
+    blastn_query: # stage annotate_blast
+      resources:
+        nfs_mbps: 20
+        mem: 150g
+        walltime: 04:00:00
+      threads: 24
+    blastn_query_SPLIT: # stage annotate_blast
+      resources:
+        nfs_mbps: 20
+        mem: 124g
+        walltime: 12:00:00
+      threads: 16
+    basecov_bedtools:
+      resources:
+        nfs_mbps: 5
+        mem: 128m
+        walltime: 00:10:00
+    samtools_coverage: # stage coverage_samtools
+      resources:
+        nfs_mbps: 20
+        mem: 150m
+        walltime: 00:10:00
+    samtools_collate: # stage collect_txbam
+      resources:
+        mem: 12g
+    bbmap_dust: # stage dust_bbmap
+      resources:
+        nfs_mbps: 30
+        mem: 16g
+        walltime: 00:30:00
+    bbmap_reformat: # format_bbmap
+      resources:
+        mem: 1g
+        nfs_mbps: 20
+        walltime: 00:10:00
+    bowtie2_index:
+      resources:
+        nfs_mbps: 5
+        walltime: 00:10:00
+        mem: 1g
+    bowtie2_map:
+      resources:
+        nfs_mpbs: 5
+        walltime: 16:00:00
+        mem: 16g
+      threads: 24
+    pilon_polish:
+      resources:
+        nfs_mbps: 15
+        walltime: 01:00:00
+        mem: 250G  # pilon sometimes needs a TON of memory
+      threads: 32
+    sambamba_markdup:
+      resources:
+        nfs_mbps: 15
+        walltime: 02:00:00
+        mem: 8g
+    samtools_fastq: # stage extract_reads
+      resources:
+        mem: 64m
+        nfs_mbps: 120
+        walltime: 00:40:00
+    spades:
+      resources:
+        walltime: 23:59:59
+        mem: 128G
+      threads: 48

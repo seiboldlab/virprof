@@ -1,0 +1,103 @@
+# Virprof example ymp configuration
+#
+# Notes:
+#  - paths are relative to the file configuring the path,
+#    i.e. a path in a CSV will be relative to the CSV,
+#    and a path in a yaml as well. Inside yamls,
+#    the !workdir prefix to a path will make it relative
+#    to the pipeline execution directory
+#  - yaml is unordered, so it does not matter where the
+#    "include:" is placed, all included configs are overwritten
+#    by the including file
+#  - lists are appended to, unless the !clear tag is added
+#  - use `ymp show` to examine active configuration
+
+include:
+  - <virprof>      # Load VirProf pipeline
+  - config.yml     # Optional: overrides VirProf configuration
+  # - projects.yml # Could contain your project list
+
+# Configure projects
+projects:
+  # Sample data sheets should be CSV or TSV with at least 4 columns:
+  #
+  # - Unit ID: The leftmost unique column is used to identify sequencing
+  #            units. The name of this column doesn't matter, but "unit"
+  #            works well. Must not contain '__'
+  # - Sample ID: The name of the sample. This can have been sequenced
+  #            multiple times, hence the unit id. Must not contain '__'
+  # - Forward Reads: The FastQ file with the forward reads. If relative,
+  #            will be interpreted as relative to the CSV location. The
+  #            name of the column does not matter, could be e.g. "fq1".
+  # - Reverse Reads: Same as forward reads, only for R2.
+  # 
+  # myproject:
+  #   data: /path/to/myproject/sample_sheet.csv
+
+  # This is a simple, tiny test data set that will complete quickly.
+  # It is composed of a few reads for a single human gene, and a
+  # few reads for two different viruses.
+  test:
+    data: !workdir test_data/test.csv
+
+# Configure custom directories
+directories:
+  # Destination for generated reports
+  reports: reports
+  # Location where conda environments are installed
+  # Uncomment to make local to work directory
+  #
+  # conda_prefix: envs
+  # conda_archive_prefix: envs/_archive
+
+# Configure resource limits
+resource_limits:
+  # - default: value for rules not defining resource. useful to create
+  #            new resources that may not always be defined yet
+  # - min/max: range to clamp jobs into. E.g. if you have no nodes with
+  #            more than 256GB RAM, set mem max to 250G
+  # - scale:   multiplier for resources, useful for wholesale adjustment
+  #          if you have e.g. larger sampler and/or no time to determine
+  #          the correct values for each job type
+  mem:
+    min: 1G
+    max: 127G
+    scale: 1
+  threads:
+    min: 2
+    max: 48
+    scale: 1
+  walltime: # uses SLURM format 1-0 is 1 day
+    default: 1-0
+    scale: 1
+  nfs_mbps: # custom resource example for bandwidth as resource
+    default: 0
+    scale: 0
+  
+# Override individual jobs
+overrides:
+  rules:
+    pilon_polish: # May need more, depending on data
+      resources:
+        mem: 32G
+    spades:
+      resources: # Spades also needs as much as you can give it
+        mem: 128G
+
+# Local cluster configuration
+cluster:
+  profile: slurm
+  profiles:
+    slurm:
+      args:
+        queue: "-p normal"
+        comment: "--comment {output[0]}"
+        # Nice all pipeline jobs, so we don't block anything ad-hoc
+        # we might want to submit
+        nice: "--nice=1000"
+        # Add a custom resource
+        # nfs: "-L nfs_mbps:{resources.nfs_mbps}"
+      local_cores: 32
+      # If using NFS, uncomment this, and perhaps increase
+      # latency_wait: 30
+      
