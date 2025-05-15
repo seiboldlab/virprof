@@ -61,9 +61,6 @@ sed -i 's%conda_prefix: .*%conda_prefix: /opt/envs%' \
 virprof init-test demo
 cd demo
 
-# DEBUG
-ymp show dir -vvv
-
 # Install environments
 ymp env install \
   bbmap \
@@ -84,9 +81,15 @@ ymp env install \
   vp_rnaseq_r \
   wget
 
+# Install current virprof into virprof_py environment
+vp_env=$(ymp env list virprof_py | tail -n 1 | awk '{print $3}')
+micromamba install -p $vp_env git
+micromamba run -p $vp_env pip install git+https://github.com/seiboldlab/virprof.git@{{version}} --no-deps
+
 # Cleanup
+cd
 mamba clean --all
-rm -rf /root/.cache
+rm -rf /root/.cache /root/demo
 
 %environment
 export LC_ALL=C

@@ -1,6 +1,7 @@
 #!/bin/bash
-VERS=$1
+VERS=${1-master}
 YMP_VERS=master
+echo "Building Virprof $VERS"
 apptainer build \
   --force \
   --build-arg version=$VERS \
