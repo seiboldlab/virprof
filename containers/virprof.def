@@ -63,6 +63,7 @@ cd demo
 
 # Install environments
 ymp env install \
+  bcftools \
   bbmap \
   bedtools \
   blast \

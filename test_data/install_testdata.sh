@@ -25,8 +25,6 @@ unpack() {
     tar xfv $src -C $dst
 }
 
-unpack Homo_sapiens_UCSC_hg38_test.tar.bz2
-unpack grch38_snp_tran_test.tar.bz2
 unpack nt_test.tar.bz2 nt
 
 mkdir -p test_data
