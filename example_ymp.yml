@@ -70,9 +70,6 @@ resource_limits:
   walltime: # uses SLURM format 1-0 is 1 day
     default: 1-0
     scale: 1
-  nfs_mbps: # custom resource example for bandwidth as resource
-    default: 0
-    scale: 0
   
 # Override individual jobs
 overrides:
