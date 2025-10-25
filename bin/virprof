@@ -1,13 +1,33 @@
 #!/usr/bin/env python
-import os.path as op
+#
+# Wrapper to run virprof CLI from inside Snakemake rules
+#
+# Tries to find the virprof package in either the git repo
+# location for dev installs or in the site-library for package
+# installs.
+
 import sys
 
-sys.path.insert(0, op.dirname(op.dirname(__file__)))
+
+# If we are in a Git repo, we are X/bin/virprof, and the module is X/virprof,
+# so we add ../.. to the search path:
+sys.path.append(op.dirname(op.dirname(op.abspath(__file__))))
 try:
    from virprof.cli import main
-except ModuleNotFoundError:
-   sys.path[0] = op.dirname(op.dirname(op.dirname(op.dirname(__file__))))
-   from virprof.cli import main
+except ModuleNotFoundError as exc:
+   if exc.name != "virprof":
+      # => It was a module other than virprof that failed
+      raise
+   # Package installs will have site-library/virprof/pipeline/bin/virprof,
+   # so we need to go up two more directories:
+   sys.path[-1] = op.dirname(op.dirname(sys.path[-1]))
+   try:
+      from virprof.cli import main
+   except ModuleNotFoundError as exc:
+      # Still nothing => note that it's us with a print, and just give up
+      if exc.name == "virprof":
+         print("Unable to find virprof python module?!")
+      raise
 
 
 if __name__ == "__main__":
