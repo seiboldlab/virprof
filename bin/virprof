@@ -7,7 +7,7 @@
 # installs.
 
 import sys
-
+from os import path as op
 
 # If we are in a Git repo, we are X/bin/virprof, and the module is X/virprof,
 # so we add ../.. to the search path:
